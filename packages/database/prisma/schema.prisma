@@ -1,0 +1,416 @@
+// ============================================================
+// STYLOGESTOR — Prisma Schema
+// PostgreSQL + Row-Level Security (Multi-tenant)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum PlanType {
+  FREE
+  STARTER
+  PRO
+  PREMIUM
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+  NO_SHOW
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum PaymentMethod {
+  CASH
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  TRANSFER
+  OTHER
+}
+
+// ============================================================
+// TENANT (Barbearia / Salão)
+// ============================================================
+
+model Tenant {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug      String   @unique
+  name      String
+  type      String   @default("barbershop")
+  phone     String?
+  email     String?
+  address   Json?
+  logo      String?
+  timezone  String   @default("America/Sao_Paulo")
+  settings  Json?
+  plan      PlanType @default(FREE)
+  trialEndsAt DateTime?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         TenantUser[]
+  professionals Professional[]
+  clients       Client[]
+  appointments  Appointment[]
+  services      Service[]
+  products      Product[]
+  transactions  Transaction[]
+  subscription  Subscription?
+  schedules     BusinessSchedule[]
+
+  @@map("tenants")
+}
+
+// ============================================================
+// USUÁRIOS
+// ============================================================
+
+model User {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clerkId   String   @unique
+  email     String   @unique
+  name      String
+  phone     String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenants TenantUser[]
+
+  @@map("users")
+}
+
+model TenantUser {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId String   @db.Uuid
+  userId   String   @db.Uuid
+  role     String   @default("owner")
+  active   Boolean  @default(true)
+  joinedAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@map("tenant_users")
+}
+
+// ============================================================
+// PROFISSIONAL
+// ============================================================
+
+model Professional {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @db.Uuid
+  name           String
+  email          String?
+  phone          String?
+  role           String   @default("barber")
+  avatar         String?
+  commission     Float    @default(0)
+  commissionType String   @default("percentage")
+  active         Boolean  @default(true)
+  bio            String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  schedules    ProfessionalSchedule[]
+  appointments Appointment[]
+  commissions  Commission[]
+
+  @@index([tenantId])
+  @@map("professionals")
+}
+
+model ProfessionalSchedule {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  professionalId String  @db.Uuid
+  dayOfWeek      Int
+  startTime      String
+  endTime        String
+  lunchStart     String?
+  lunchEnd       String?
+  active         Boolean @default(true)
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@map("professional_schedules")
+}
+
+model BusinessSchedule {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String  @db.Uuid
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  active    Boolean @default(true)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("business_schedules")
+}
+
+// ============================================================
+// CLIENTE
+// ============================================================
+
+model Client {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @db.Uuid
+  name        String
+  phone       String
+  email       String?
+  birthdate   DateTime?
+  gender      String?
+  address     Json?
+  notes       String?
+  source      String?
+  tags        String[]
+  totalVisits Int       @default(0)
+  totalSpent  Decimal   @default(0) @db.Decimal(10, 2)
+  lastVisit   DateTime?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  reviews      Review[]
+
+  @@index([tenantId])
+  @@index([tenantId, phone])
+  @@map("clients")
+}
+
+// ============================================================
+// SERVIÇO
+// ============================================================
+
+model Service {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @db.Uuid
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  duration    Int
+  category    String?
+  color       String?
+  image       String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  appointmentServices AppointmentService[]
+
+  @@index([tenantId])
+  @@map("services")
+}
+
+// ============================================================
+// PRODUTO (Estoque)
+// ============================================================
+
+model Product {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @db.Uuid
+  name        String
+  description String?
+  sku         String?
+  price       Decimal  @db.Decimal(10, 2)
+  cost        Decimal? @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  minStock    Int      @default(0)
+  category    String?
+  unit        String   @default("un")
+  image       String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stockMovements StockMovement[]
+
+  @@index([tenantId])
+  @@map("products")
+}
+
+model StockMovement {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String   @db.Uuid
+  type      String
+  quantity  Int
+  reason    String?
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("stock_movements")
+}
+
+// ============================================================
+// AGENDAMENTO
+// ============================================================
+
+model Appointment {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String            @db.Uuid
+  clientId       String            @db.Uuid
+  professionalId String            @db.Uuid
+  date           DateTime          @db.Date
+  startTime      DateTime
+  endTime        DateTime
+  status         AppointmentStatus @default(SCHEDULED)
+  totalPrice     Decimal           @db.Decimal(10, 2)
+  totalDuration  Int
+  notes          String?
+  source         String?
+  reminderSent   Boolean           @default(false)
+  confirmationSentAt DateTime?
+  cancelReason   String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client       Client               @relation(fields: [clientId], references: [id])
+  professional Professional         @relation(fields: [professionalId], references: [id])
+  services     AppointmentService[]
+  payments     Payment[]
+  commission   Commission?
+
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+  @@index([professionalId, date])
+  @@index([clientId])
+  @@map("appointments")
+}
+
+model AppointmentService {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appointmentId String  @db.Uuid
+  serviceId     String  @db.Uuid
+  price         Decimal @db.Decimal(10, 2)
+  duration      Int
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  service     Service     @relation(fields: [serviceId], references: [id])
+
+  @@map("appointment_services")
+}
+
+// ============================================================
+// FINANCEIRO
+// ============================================================
+
+model Transaction {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String          @db.Uuid
+  type          TransactionType
+  category      String
+  description   String
+  amount        Decimal         @db.Decimal(10, 2)
+  date          DateTime        @db.Date
+  paymentMethod PaymentMethod?
+  appointmentId String?         @db.Uuid
+  status        String          @default("confirmed")
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@index([tenantId, date])
+  @@index([tenantId, type])
+  @@map("transactions")
+}
+
+model Payment {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appointmentId String        @db.Uuid
+  amount        Decimal       @db.Decimal(10, 2)
+  method        PaymentMethod
+  paidAt        DateTime      @default(now())
+  notes         String?
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Commission {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appointmentId    String   @unique @db.Uuid
+  professionalId   String   @db.Uuid
+  tenantId         String   @db.Uuid
+  baseAmount       Decimal  @db.Decimal(10, 2)
+  percentage       Float
+  commissionAmount Decimal  @db.Decimal(10, 2)
+  paid             Boolean  @default(false)
+  paidAt           DateTime?
+  createdAt        DateTime @default(now())
+
+  appointment  Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id])
+
+  @@map("commissions")
+}
+
+// ============================================================
+// AVALIAÇÕES
+// ============================================================
+
+model Review {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @db.Uuid
+  clientId      String   @db.Uuid
+  appointmentId String?  @db.Uuid
+  rating        Int
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@map("reviews")
+}
+
+// ============================================================
+// ASSINATURA SAAS
+// ============================================================
+
+model Subscription {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String   @unique @db.Uuid
+  plan               PlanType
+  status             String
+  pagarmeSubId       String?
+  pagarmeCustomerId  String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  canceledAt         DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
