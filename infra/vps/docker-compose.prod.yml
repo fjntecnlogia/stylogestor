@@ -1,0 +1,138 @@
+version: '3.9'
+
+# ============================================================
+# STYLOGESTOR — Docker Compose PRODUÇÃO (VPS Hostinger)
+# ============================================================
+# Uso no servidor:
+#   docker-compose -f docker-compose.prod.yml up -d
+# ============================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: stylogestor_db
+    restart: always
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - stylo_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: stylogestor_redis
+    restart: always
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    networks:
+      - stylo_net
+
+  evolution:
+    image: atendai/evolution-api:v2.1.1
+    container_name: stylogestor_whatsapp
+    restart: always
+    expose:
+      - "8080"
+    environment:
+      SERVER_URL: https://whatsapp.${DOMAIN}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "false"
+      REDIS_ENABLED: "true"
+      REDIS_URI: redis://:${REDIS_PASSWORD}@redis:6379/1
+    depends_on:
+      - redis
+    volumes:
+      - evolution_data:/evolution/instances
+    networks:
+      - stylo_net
+
+  api:
+    image: stylogestor/api:latest
+    container_name: stylogestor_api
+    restart: always
+    expose:
+      - "3001"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PORT: 3001
+    env_file: .env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - stylo_net
+
+  web:
+    image: stylogestor/web:latest
+    container_name: stylogestor_web
+    restart: always
+    expose:
+      - "3000"
+    env_file: .env.prod
+    networks:
+      - stylo_net
+
+  site:
+    image: stylogestor/site:latest
+    container_name: stylogestor_site
+    restart: always
+    expose:
+      - "3002"
+    env_file: .env.prod
+    networks:
+      - stylo_net
+
+  booking:
+    image: stylogestor/booking:latest
+    container_name: stylogestor_booking
+    restart: always
+    expose:
+      - "3003"
+    env_file: .env.prod
+    networks:
+      - stylo_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: stylogestor_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - web
+      - site
+      - api
+    networks:
+      - stylo_net
+
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_data:
+
+networks:
+  stylo_net:
+    driver: bridge
