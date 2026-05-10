@@ -1,10 +1,9 @@
 version: '3.9'
 
 # ============================================================
-# STYLOGESTOR — Docker Compose PRODUÇÃO (VPS Hostinger)
-# ============================================================
-# Uso no servidor:
-#   docker-compose -f docker-compose.prod.yml up -d
+# STYLOGESTOR — Docker Compose PRODUÇÃO
+# VPS: 82.25.65.201 | DNS: Cloudflare
+# SSL gerenciado pelo Cloudflare (não precisa de Certbot)
 # ============================================================
 
 services:
@@ -20,7 +19,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 30s
@@ -53,6 +52,7 @@ services:
       DATABASE_ENABLED: "false"
       REDIS_ENABLED: "true"
       REDIS_URI: redis://:${REDIS_PASSWORD}@redis:6379/1
+      DEL_INSTANCE: "false"
     depends_on:
       - redis
     volumes:
@@ -61,51 +61,60 @@ services:
       - stylo_net
 
   api:
-    image: stylogestor/api:latest
+    build:
+      context: ../..
+      dockerfile: Dockerfile.api
     container_name: stylogestor_api
     restart: always
     expose:
       - "3001"
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       PORT: 3001
-    env_file: .env.prod
+    env_file:
+      - /opt/stylogestor-env/.env.prod
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_started
     networks:
       - stylo_net
 
   web:
-    image: stylogestor/web:latest
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
     container_name: stylogestor_web
     restart: always
     expose:
       - "3000"
-    env_file: .env.prod
+    env_file:
+      - /opt/stylogestor-env/.env.prod
     networks:
       - stylo_net
 
   site:
-    image: stylogestor/site:latest
+    build:
+      context: ../..
+      dockerfile: apps/site/Dockerfile
     container_name: stylogestor_site
     restart: always
     expose:
       - "3002"
-    env_file: .env.prod
+    env_file:
+      - /opt/stylogestor-env/.env.prod
     networks:
       - stylo_net
 
   booking:
-    image: stylogestor/booking:latest
+    build:
+      context: ../..
+      dockerfile: apps/booking/Dockerfile
     container_name: stylogestor_booking
     restart: always
     expose:
       - "3003"
-    env_file: .env.prod
+    env_file:
+      - /opt/stylogestor-env/.env.prod
     networks:
       - stylo_net
 
@@ -115,16 +124,15 @@ services:
     restart: always
     ports:
       - "80:80"
-      - "443:443"
+      # Porta 443 não necessária — SSL termina no Cloudflare
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-      - /var/www/certbot:/var/www/certbot:ro
     depends_on:
       - web
       - site
       - api
+      - booking
     networks:
       - stylo_net
 
