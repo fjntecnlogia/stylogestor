@@ -149,13 +149,13 @@ export function ConfiguracoesView() {
 
         {tab === 'integracao' && (
           <div className="space-y-4">
+            {/* Integrações padrão */}
             {[
               { icon: '💬', name: 'WhatsApp Business', desc: 'Envie confirmações e lembretes automáticos', status: 'Não conectado', connected: false },
-              { icon: '💳', name: 'Pagar.me', desc: 'Processe assinaturas e pagamentos online', status: 'Não configurado', connected: false },
               { icon: '📧', name: 'Resend (Email)', desc: 'Envie e-mails transacionais aos clientes', status: 'Configurado', connected: true },
               { icon: '🔗', name: 'Link de agendamento', desc: 'Compartilhe seu link de agendamento online', status: 'joao-barber.stylogestor.com.br', connected: true },
             ].map((item) => (
-              <div key={item.name} className="bg-white rounded-2xl border border-[#E8E6E2] p-5 flex items-center justify-between">
+              <div key={item.name} className="bg-white rounded-2xl border border-[#E8E6E2] p-5 flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-4">
                   <span className="text-3xl">{item.icon}</span>
                   <div>
@@ -166,15 +166,66 @@ export function ConfiguracoesView() {
                     </p>
                   </div>
                 </div>
-                <button className={`text-xs font-semibold px-3 py-1.5 rounded-xl ${
-                  item.connected
-                    ? 'border border-[#E8E6E2] text-[#4A4A5A] hover:bg-[#F8F6F2]'
-                    : 'bg-[#1A3A6B] text-white hover:bg-[#142d55]'
+                <button className={`text-xs font-semibold px-3 py-1.5 rounded-xl shrink-0 ${
+                  item.connected ? 'border border-[#E8E6E2] text-[#4A4A5A] hover:bg-[#F8F6F2]' : 'bg-[#1A3A6B] text-white hover:bg-[#142d55]'
                 }`}>
                   {item.connected ? 'Configurar' : 'Conectar'}
                 </button>
               </div>
             ))}
+
+            {/* Stripe Connect — Add-on opcional */}
+            <div className="bg-white rounded-2xl border-2 border-[#1A3A6B]/20 overflow-hidden">
+              <div className="bg-[#1A3A6B] px-5 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">💳</span>
+                  <p className="font-sora font-bold text-white text-sm">Pagamentos online dos clientes</p>
+                </div>
+                <span className="text-[10px] bg-[#F5A623] text-[#1A3A6B] font-bold px-2 py-1 rounded-full uppercase tracking-wide">Add-on · Pro/Premium</span>
+              </div>
+              <div className="p-5">
+                <p className="text-sm text-[#374151] mb-3">
+                  Permita que seus clientes <strong>paguem online</strong> na hora do agendamento. O dinheiro cai diretamente na sua conta bancária.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  {[
+                    { icon: '⚡', title: 'PIX instantâneo', desc: 'Clientes pagam via PIX na hora' },
+                    { icon: '💳', title: 'Cartão online', desc: 'Débito e crédito pelo link' },
+                    { icon: '📊', title: 'Relatório completo', desc: 'Todos os recebimentos centralizados' },
+                  ].map((f) => (
+                    <div key={f.title} className="bg-[#F9FAFB] rounded-xl p-3 text-center">
+                      <p className="text-xl mb-1">{f.icon}</p>
+                      <p className="font-semibold text-xs text-[#111827]">{f.title}</p>
+                      <p className="text-[10px] text-[#6B7280] mt-0.5">{f.desc}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-[#FEF9C3] border border-[#FCD34D] rounded-xl p-3 mb-4 text-xs text-[#92400E]">
+                  <p className="font-semibold mb-0.5">💡 Como funciona a cobrança:</p>
+                  <p>O STYLOGESTOR retém <strong>2% de taxa</strong> por transação processada. O restante vai direto para sua conta. Sem mensalidade extra.</p>
+                </div>
+
+                <button
+                  onClick={async () => {
+                    const res = await fetch('/api/stripe/connect/onboard', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ tenantName: 'Minha Barbearia', email: '' }),
+                    })
+                    const data = await res.json()
+                    if (data.url) window.location.href = data.url
+                  }}
+                  className="w-full bg-[#1A3A6B] text-white font-bold py-3 rounded-xl hover:bg-[#142d55] transition-colors text-sm"
+                >
+                  🔗 Conectar minha conta bancária via Stripe
+                </button>
+                <p className="text-xs text-[#9CA3AF] text-center mt-2">
+                  Processo seguro. Leva menos de 5 minutos. Dados protegidos pelo Stripe.
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
