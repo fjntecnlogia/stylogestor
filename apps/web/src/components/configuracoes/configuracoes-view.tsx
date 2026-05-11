@@ -79,7 +79,10 @@ export function ConfiguracoesView() {
                 <p className="text-xs text-[#4A4A5A]/60">PNG, JPG ou SVG até 2MB</p>
               </div>
             </div>
-            <button className="bg-[#1A3A6B] text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-[#142d55]">
+            <button
+              onClick={() => alert('Configurações salvas!')}
+              className="bg-[#1A3A6B] text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-[#142d55] transition-colors"
+            >
               Salvar alterações
             </button>
           </div>
@@ -113,7 +116,10 @@ export function ConfiguracoesView() {
                 )
               })}
             </div>
-            <button className="bg-[#1A3A6B] text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-[#142d55]">
+            <button
+              onClick={() => alert('Horários salvos!')}
+              className="bg-[#1A3A6B] text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-[#142d55] transition-colors"
+            >
               Salvar horários
             </button>
           </div>
@@ -137,9 +143,12 @@ export function ConfiguracoesView() {
                 <div className="text-right">
                   <p className="font-sora font-bold text-xl text-[#1A3A6B]">R$ {p.price}<span className="text-xs font-normal text-[#4A4A5A]">/mês</span></p>
                   {!p.current && (
-                    <button className="text-xs border border-[#1A3A6B] text-[#1A3A6B] px-3 py-1 rounded-lg mt-1 hover:bg-[#1A3A6B]/5">
+                    <a
+                      href="/planos"
+                      className="inline-block text-xs border border-[#1A3A6B] text-[#1A3A6B] px-3 py-1 rounded-lg mt-1 hover:bg-[#1A3A6B]/5 transition-colors"
+                    >
                       {p.price > 149 ? 'Fazer upgrade' : 'Fazer downgrade'}
-                    </button>
+                    </a>
                   )}
                 </div>
               </div>

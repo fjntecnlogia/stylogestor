@@ -1,14 +1,21 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+'use client'
 
-export const metadata = { title: 'Afiliados — STYLOGESTOR' }
+import { useUser } from '@clerk/nextjs'
+import { useState } from 'react'
 
-export default async function AfiliadosPage() {
-  const user = await currentUser()
-  const userId = user?.id || ''
+export default function AfiliadosPage() {
+  const { user } = useUser()
+  const [copied, setCopied] = useState(false)
 
-  // Código de afiliado baseado no userId (últimos 8 chars)
-  const codigoAfiliado = `STYLO-${userId.slice(-8).toUpperCase()}`
+  const userId = user?.id || 'carregando'
+  const codigoAfiliado = user ? `STYLO-${userId.slice(-8).toUpperCase()}` : '...'
   const linkAfiliado = `https://stylogestor.com.br/cadastro?ref=${codigoAfiliado}`
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(linkAfiliado)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -43,7 +50,7 @@ export default async function AfiliadosPage() {
           <label className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide block mb-1.5">Código</label>
           <div className="flex items-center gap-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl px-4 py-3">
             <span className="font-sora font-bold text-[#1A3A6B] text-lg flex-1">{codigoAfiliado}</span>
-            <span className="text-xs text-[#6B7280] bg-[#D1FAE5] text-[#065F46] px-2 py-1 rounded-full font-bold">+14 dias grátis</span>
+            <span className="text-xs bg-[#D1FAE5] text-[#065F46] px-2 py-1 rounded-full font-bold">+14 dias grátis</span>
           </div>
         </div>
 
@@ -53,57 +60,57 @@ export default async function AfiliadosPage() {
             <input
               readOnly
               value={linkAfiliado}
-              className="flex-1 bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl px-4 py-2.5 text-sm text-[#374151] font-medium"
+              className="flex-1 bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl px-4 py-2.5 text-sm text-[#374151] font-medium focus:outline-none"
             />
             <button
-              onClick={() => {}}
+              onClick={handleCopy}
               className="bg-[#1A3A6B] text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-[#142d55] transition-colors whitespace-nowrap"
-              id="copy-btn"
             >
-              📋 Copiar
+              {copied ? '✓ Copiado!' : '📋 Copiar'}
             </button>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <a
-            href={`https://wa.me/?text=Olha%20esse%20sistema%20incrível%20para%20barbearias!%20${encodeURIComponent(linkAfiliado)}`}
+            href={`https://wa.me/?text=${encodeURIComponent(`Olha esse sistema incrível para barbearias! Use meu código e ganhe 14 dias grátis extra: ${linkAfiliado}`)}`}
             target="_blank"
+            rel="noreferrer"
             className="flex items-center gap-2 bg-[#25D366] text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
           >
             💬 Compartilhar no WhatsApp
           </a>
-          <a
-            href={`https://www.instagram.com/`}
-            target="_blank"
-            className="flex items-center gap-2 bg-gradient-to-r from-[#833AB4] to-[#E1306C] text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-2 bg-[#1A3A6B] text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-[#142d55] transition-colors"
           >
-            📸 Instagram
-          </a>
+            📋 Copiar link
+          </button>
         </div>
       </div>
 
       {/* Minhas indicações */}
       <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#E5E7EB]">
+        <div className="px-5 py-4 border-b border-[#E5E7EB] flex items-center justify-between">
           <p className="font-sora font-bold text-[#111827]">Minhas indicações</p>
+          <span className="text-xs text-[#6B7280]">0 indicações · R$ 0,00 acumulado</span>
         </div>
         <div className="p-8 text-center text-[#6B7280]">
           <p className="text-4xl mb-2">🎯</p>
           <p className="font-semibold text-sm">Nenhuma indicação ainda</p>
-          <p className="text-xs mt-1">Comece compartilhando seu link!</p>
+          <p className="text-xs mt-1">Comece compartilhando seu link acima!</p>
         </div>
       </div>
 
       {/* Regras */}
       <div className="bg-[#F0F4FF] border border-[#BFDBFE] rounded-2xl p-5">
-        <h3 className="font-semibold text-[#1E40AF] mb-2">Regras do programa</h3>
-        <ul className="text-sm text-[#374151] space-y-1">
-          <li>✓ Comissão de 20% sobre a primeira mensalidade de cada indicado</li>
-          <li>✓ O indicado ganha 14 dias extras de trial (total: 28 dias grátis)</li>
+        <h3 className="font-semibold text-[#1E40AF] mb-3">Regras do programa</h3>
+        <ul className="text-sm text-[#374151] space-y-1.5">
+          <li>✓ Comissão de <strong>20%</strong> sobre a primeira mensalidade de cada indicado</li>
+          <li>✓ O indicado ganha <strong>14 dias extras</strong> de trial (total: 28 dias grátis)</li>
           <li>✓ Comissão paga via PIX em até 30 dias após a assinatura do indicado</li>
           <li>✓ Sem limite de indicações — quanto mais indicar, mais ganha</li>
-          <li>✓ O indicado precisa manter a assinatura ativa por 30 dias</li>
+          <li>✓ O indicado precisa manter a assinatura ativa por pelo menos 30 dias</li>
         </ul>
       </div>
     </div>

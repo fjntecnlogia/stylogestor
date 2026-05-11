@@ -164,7 +164,10 @@ export function ClientesView() {
               >
                 📅 Agendar
               </button>
-              <button className="flex-1 border-2 border-[#E5E7EB] text-[#374151] text-xs font-bold py-2.5 rounded-xl hover:bg-[#F9FAFB] transition-colors">
+              <button
+                onClick={() => alert('Edição de cliente em desenvolvimento')}
+                className="flex-1 border-2 border-[#E5E7EB] text-[#374151] text-xs font-bold py-2.5 rounded-xl hover:bg-[#F9FAFB] transition-colors"
+              >
                 ✏️ Editar
               </button>
             </div>

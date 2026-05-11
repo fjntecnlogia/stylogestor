@@ -52,3 +52,18 @@ label {
 html {
   color-scheme: light;
 }
+
+/* Cursor pointer em todos elementos clicáveis */
+button,
+a,
+[role="button"],
+[role="link"],
+label[for],
+select,
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
