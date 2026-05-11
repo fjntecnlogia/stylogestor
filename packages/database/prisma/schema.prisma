@@ -401,9 +401,11 @@ model Subscription {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId           String   @unique @db.Uuid
   plan               PlanType
-  status             String
-  pagarmeSubId       String?
-  pagarmeCustomerId  String?
+  status             String   // "active" | "trial" | "past_due" | "canceled"
+  // Stripe
+  stripeSubId        String?  // ID da assinatura no Stripe
+  stripeCustomerId   String?  // ID do customer no Stripe
+  // Período atual
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
   canceledAt         DateTime?
