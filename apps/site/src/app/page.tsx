@@ -37,6 +37,7 @@ export default function Home() {
             <a href="#funcionalidades" className="hover:text-white transition-colors">Funcionalidades</a>
             <a href="#precos" className="hover:text-white transition-colors">Preços</a>
             <a href="#depoimentos" className="hover:text-white transition-colors">Depoimentos</a>
+            <Link href="/ajuda" className="hover:text-white transition-colors">Ajuda</Link>
           </nav>
           <div className="flex items-center gap-2">
             <Link href={`${APP_URL}/login`} className="text-sm text-white/70 hover:text-white hidden sm:block">Entrar</Link>
@@ -238,6 +239,7 @@ export default function Home() {
           <div className="flex gap-6">
             <a href="/termos" className="hover:text-white/70 transition-colors">Termos de uso</a>
             <a href="/privacidade" className="hover:text-white/70 transition-colors">Privacidade</a>
+            <Link href="/ajuda" className="hover:text-white/70 transition-colors">Ajuda</Link>
             <a href="mailto:suporte@stylogestor.com.br" className="hover:text-white/70 transition-colors">Suporte</a>
           </div>
           <p>© 2026 STYLOGESTOR · Todos os direitos reservados</p>
