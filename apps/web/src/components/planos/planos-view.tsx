@@ -13,11 +13,12 @@ export function PlanosView() {
 
   const desconto = 17 // % de desconto anual
 
-  const handleCheckout = async (planId: string) => {
-    setLoading(planId)
+  const handleCheckout = async (planId: string, metodo: 'card' | 'pix' = 'card') => {
+    setLoading(`${planId}-${metodo}`)
     setError('')
     try {
-      const res = await fetch('/api/checkout', {
+      const endpoint = metodo === 'pix' ? '/api/checkout/pix' : '/api/checkout'
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planId, ciclo }),
@@ -125,23 +126,30 @@ export function PlanosView() {
                   ))}
                 </ul>
 
-                <button
-                  onClick={() => handleCheckout(plan.id)}
-                  disabled={loading !== null}
-                  className={`w-full font-bold py-3.5 rounded-xl transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed ${
-                    plan.highlight
-                      ? 'bg-[#1A3A6B] text-white hover:bg-[#142d55] shadow-sm'
-                      : 'border-2 border-[#1A3A6B] text-[#1A3A6B] hover:bg-[#1A3A6B] hover:text-white'
-                  }`}
-                >
-                  {loading === plan.id ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="animate-spin">⏳</span> Redirecionando...
-                    </span>
-                  ) : (
-                    `Começar grátis — ${plan.name}`
-                  )}
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => handleCheckout(plan.id, 'card')}
+                    disabled={loading !== null}
+                    className={`w-full font-bold py-3 rounded-xl transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed ${
+                      plan.highlight
+                        ? 'bg-[#1A3A6B] text-white hover:bg-[#142d55] shadow-sm'
+                        : 'border-2 border-[#1A3A6B] text-[#1A3A6B] hover:bg-[#1A3A6B] hover:text-white'
+                    }`}
+                  >
+                    {loading === `${plan.id}-card` ? (
+                      <span className="flex items-center justify-center gap-2"><span className="animate-spin">⏳</span> Aguarde...</span>
+                    ) : '💳 Cartão ou Boleto'}
+                  </button>
+                  <button
+                    onClick={() => handleCheckout(plan.id, 'pix')}
+                    disabled={loading !== null}
+                    className="w-full font-bold py-3 rounded-xl border-2 border-[#1B8A5A] text-[#1B8A5A] hover:bg-[#1B8A5A] hover:text-white transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {loading === `${plan.id}-pix` ? (
+                      <span className="flex items-center justify-center gap-2"><span className="animate-spin">⏳</span> Aguarde...</span>
+                    ) : '⚡ Pagar 1º mês via PIX'}
+                  </button>
+                </div>
               </div>
             </div>
           )

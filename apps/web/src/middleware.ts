@@ -8,12 +8,23 @@ const RESERVED_SUBDOMAINS = new Set([
   'smtp', 'ftp', 'localhost', 'staging', 'dev',
 ])
 
-// Rotas públicas — não exigem autenticação
 const isPublicRoute = createRouteMatcher([
   '/login(.*)',
   '/cadastro(.*)',
+  '/onboarding(.*)',
+  '/sucesso(.*)',
+  '/bloqueado(.*)',
   '/api/webhooks(.*)',
   '/api/v1/tenants/by-slug(.*)',
+])
+
+// Rotas permitidas mesmo sem assinatura ativa
+const isPaymentRoute = createRouteMatcher([
+  '/planos(.*)',
+  '/sucesso(.*)',
+  '/bloqueado(.*)',
+  '/ajuda(.*)',
+  '/suporte(.*)',
 ])
 
 export default clerkMiddleware(async (auth, request: NextRequest) => {
@@ -21,15 +32,13 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   const hostname = request.headers.get('host') || ''
   const subdomain = extractSubdomain(hostname, BASE_DOMAIN)
 
-  // Subdomínio de tenant (booking público) — sem auth
+  // Subdomínio de tenant (booking público)
   if (subdomain && !RESERVED_SUBDOMAINS.has(subdomain)) {
     const tenantResponse = await fetchTenantBySlug(subdomain)
-
     if (!tenantResponse) {
       url.pathname = '/not-found'
       return NextResponse.rewrite(url)
     }
-
     const response = NextResponse.next()
     response.headers.set('x-tenant-slug', subdomain)
     response.headers.set('x-tenant-id', tenantResponse.id)
@@ -38,9 +47,19 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
     return response
   }
 
-  // Rotas protegidas — exige auth
-  if (!isPublicRoute(request)) {
-    await auth.protect()
+  // Rotas públicas — sem auth
+  if (isPublicRoute(request)) return NextResponse.next()
+
+  // Exige autenticação
+  const { userId, sessionClaims } = await auth.protect()
+
+  // Verificar status da assinatura (salvo no publicMetadata do Clerk)
+  const subStatus = (sessionClaims?.metadata as Record<string, string> | undefined)?.subscriptionStatus
+  const blockedStatuses = ['past_due', 'canceled', 'unpaid']
+
+  if (subStatus && blockedStatuses.includes(subStatus) && !isPaymentRoute(request)) {
+    url.pathname = '/bloqueado'
+    return NextResponse.redirect(url)
   }
 
   return NextResponse.next()
@@ -57,9 +76,7 @@ function extractSubdomain(hostname: string, baseDomain: string): string | null {
   return null
 }
 
-async function fetchTenantBySlug(
-  slug: string
-): Promise<{ id: string; name: string; plan: string } | null> {
+async function fetchTenantBySlug(slug: string): Promise<{ id: string; name: string; plan: string } | null> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
     const res = await fetch(`${apiUrl}/api/v1/tenants/by-slug/${slug}`, {
