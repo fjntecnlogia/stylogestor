@@ -62,6 +62,7 @@ export function AdminDashboard() {
   const [ticketFiltro, setTicketFiltro] = useState<'todos' | 'aberto' | 'andamento' | 'resolvido'>('todos')
   const [selectedTicket, setSelectedTicket] = useState<typeof TICKETS[0] | null>(null)
   const [resposta, setResposta] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const active   = TENANTS.filter((t) => t.status === 'active')
   const trials   = TENANTS.filter((t) => t.status === 'trial')
@@ -82,21 +83,36 @@ export function AdminDashboard() {
 
   const maxPageView = Math.max(...ANALYTICS.pageViews)
 
+  const handleNav = (id: string) => { setPage(id); setSidebarOpen(false) }
+
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[#0F172A]">
+
+      {/* Overlay mobile */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-56 bg-[#0F172A] border-r border-white/5 flex flex-col shrink-0">
-        <div className="px-5 py-5 border-b border-white/5">
-          <div className="flex items-center gap-2 mb-0.5">
-            <div className="w-7 h-7 bg-[#F5A623] rounded-lg flex items-center justify-center font-sora font-black text-[#1A3A6B] text-sm">S</div>
-            <span className="font-sora font-extrabold text-white text-sm">STYLOGESTOR</span>
+      <aside className={`
+        w-56 bg-[#0F172A] border-r border-white/5 flex flex-col shrink-0
+        fixed lg:sticky top-0 h-screen z-40 transition-transform duration-300
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <div className="px-5 py-5 border-b border-white/5 flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <div className="w-7 h-7 bg-[#F5A623] rounded-lg flex items-center justify-center font-sora font-black text-[#1A3A6B] text-sm">S</div>
+              <span className="font-sora font-extrabold text-white text-sm">STYLOGESTOR</span>
+            </div>
+            <span className="text-[10px] font-bold text-[#F5A623] uppercase tracking-widest">Admin SaaS</span>
           </div>
-          <span className="text-[10px] font-bold text-[#F5A623] uppercase tracking-widest">Admin SaaS</span>
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-white/40 hover:text-white text-lg mt-0.5">✕</button>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5">
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {NAV.map((item) => (
-            <button key={item.id} onClick={() => setPage(item.id)}
+            <button key={item.id} onClick={() => handleNav(item.id)}
               className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
                 page === item.id ? 'bg-white/10 text-white font-semibold' : 'text-white/40 hover:text-white hover:bg-white/5'
               }`}>
@@ -119,8 +135,28 @@ export function AdminDashboard() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto bg-[#0F172A]">
-        <div className="p-6 space-y-6">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Topbar mobile */}
+        <div className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-white/5 shrink-0">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="flex flex-col gap-1 p-2 rounded-lg hover:bg-white/10 transition-colors"
+          >
+            <span className="block w-5 h-0.5 bg-white rounded" />
+            <span className="block w-5 h-0.5 bg-white rounded" />
+            <span className="block w-5 h-0.5 bg-white rounded" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-[#F5A623] rounded flex items-center justify-center font-sora font-black text-[#1A3A6B] text-xs">S</div>
+            <span className="font-sora font-extrabold text-white text-sm">STYLOGESTOR <span className="text-[#F5A623] text-[10px]">ADMIN</span></span>
+          </div>
+          {ticketsAbertos > 0 && (
+            <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{ticketsAbertos} aberto{ticketsAbertos > 1 ? 's' : ''}</span>
+          )}
+        </div>
+
+      <main className="flex-1 overflow-y-auto">
+        <div className="p-4 md:p-6 space-y-6">
 
           {/* ── DASHBOARD ── */}
           {page === 'dashboard' && (
@@ -131,7 +167,7 @@ export function AdminDashboard() {
               </div>
 
               {/* KPIs */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
                 {[
                   { label: 'MRR',              value: `R$ ${totalMRR.toLocaleString()}`, sub: '+12% vs mês ant.', icon: '💰', color: '#1B8A5A' },
                   { label: 'Tenants ativos',   value: active.length,                    sub: `${trials.length} em trial`, icon: '✂️', color: '#60A5FA' },
@@ -327,12 +363,12 @@ export function AdminDashboard() {
                   className="bg-white/5 border border-white/10 text-white placeholder-white/30 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-white/20" />
               </div>
 
-              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
+                <table className="w-full text-sm min-w-[700px]">
                   <thead>
                     <tr className="border-b border-white/10">
                       {['Barbearia','Plano','Status','MRR','Clientes','Agend.','Último login','Ações'].map((h) => (
-                        <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-white/40 uppercase tracking-wide">{h}</th>
+                        <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-white/40 uppercase tracking-wide whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -528,6 +564,7 @@ export function AdminDashboard() {
 
         </div>
       </main>
+      </div>
     </div>
   )
 }
