@@ -258,7 +258,14 @@ export function BookingFlow({ slug }: Props) {
               <p className="text-sm"><span className="text-[#4A4A5A]">Local: </span><strong>{MOCK_TENANT.address}</strong></p>
             </div>
             <p className="text-xs text-[#4A4A5A]">Precisa cancelar? Nos mande mensagem pelo WhatsApp.</p>
-            <p className="text-xs text-[#1A3A6B] font-medium">Powered by STYLOGESTOR</p>
+            <a
+              href="https://stylogestor.com.br/ajuda"
+              target="_blank"
+              className="inline-block text-xs text-[#1A3A6B] font-semibold hover:underline"
+            >
+              ❓ Dúvidas? Ver central de ajuda
+            </a>
+            <p className="text-xs text-[#1A3A6B]/50 font-medium">Powered by STYLOGESTOR</p>
           </div>
         )}
       </div>

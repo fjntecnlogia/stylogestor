@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { SiteHeader } from '@/components/site-header'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
 
@@ -26,28 +27,7 @@ const PLANS = [
 export default function Home() {
   return (
     <div className="min-h-screen">
-      {/* ── HEADER ── */}
-      <header className="bg-[#1A3A6B] text-white sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#F5A623] rounded-lg flex items-center justify-center font-sora font-extrabold text-[#1A3A6B] text-base">S</div>
-            <span className="font-sora font-extrabold text-lg">STYLO<span className="text-[#F5A623]">GESTOR</span></span>
-          </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-white/70">
-            <a href="#funcionalidades" className="hover:text-white transition-colors">Funcionalidades</a>
-            <a href="#precos" className="hover:text-white transition-colors">Preços</a>
-            <a href="#depoimentos" className="hover:text-white transition-colors">Depoimentos</a>
-            <Link href="/ajuda" className="hover:text-white transition-colors">Ajuda</Link>
-          </nav>
-          <div className="flex items-center gap-2">
-            <Link href={`${APP_URL}/login`} className="text-sm text-white/70 hover:text-white hidden sm:block">Entrar</Link>
-            <Link href={`${APP_URL}/cadastro`}
-              className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:bg-[#e09610] transition-colors">
-              Teste grátis
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* ── HERO ── */}
       <section className="bg-[#1A3A6B] text-white pt-20 pb-28 px-4 overflow-hidden relative">

@@ -25,7 +25,7 @@ export function FinanceiroView() {
   return (
     <div className="space-y-4">
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl p-5 border border-[#E8E6E2] shadow-sm">
           <p className="text-xs text-[#4A4A5A] mb-1">Entradas de hoje</p>
           <p className="font-sora font-bold text-2xl text-[#1B8A5A]">R$ {income}</p>
