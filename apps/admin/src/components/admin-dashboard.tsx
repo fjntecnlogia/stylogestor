@@ -3,12 +3,12 @@
 import { useState } from 'react'
 
 const TENANTS = [
-  { id: '1', name: 'Barbearia do João',    slug: 'joao-barber',   plan: 'PRO',     status: 'active',   mrr: 149, since: '01/03/2026', city: 'São Paulo',    clients: 148, appts: 312, lastLogin: '11/05/2026' },
-  { id: '2', name: 'Studio Beleza & Cia',  slug: 'studio-beleza', plan: 'PREMIUM', status: 'active',   mrr: 249, since: '15/02/2026', city: 'Curitiba',     clients: 234, appts: 521, lastLogin: '11/05/2026' },
-  { id: '3', name: 'Barber King',          slug: 'barber-king',   plan: 'STARTER', status: 'active',   mrr: 79,  since: '10/04/2026', city: 'BH',           clients: 67,  appts: 143, lastLogin: '10/05/2026' },
-  { id: '4', name: 'Salão da Maria',       slug: 'salao-maria',   plan: 'PRO',     status: 'trial',    mrr: 0,   since: '05/05/2026', city: 'Recife',       clients: 12,  appts: 28,  lastLogin: '11/05/2026' },
-  { id: '5', name: 'Classic Barber Shop',  slug: 'classic-bs',    plan: 'PRO',     status: 'past_due', mrr: 149, since: '20/01/2026', city: 'Porto Alegre', clients: 89,  appts: 201, lastLogin: '08/05/2026' },
-  { id: '6', name: 'Espaço Capilar',       slug: 'espaco-cap',    plan: 'STARTER', status: 'canceled', mrr: 0,   since: '01/01/2026', city: 'Fortaleza',    clients: 45,  appts: 98,  lastLogin: '01/04/2026' },
+  { id: '1', name: 'Barbearia do João',    slug: 'joao-barber',   plan: 'PRO',     status: 'active',   mrr: 149, since: '01/03/2026', city: 'São Paulo',    clients: 148, appts: 312, lastLogin: '11/05/2026', email: 'joao@barbearia.com',    phone: '5511999990001' },
+  { id: '2', name: 'Studio Beleza & Cia',  slug: 'studio-beleza', plan: 'PREMIUM', status: 'active',   mrr: 249, since: '15/02/2026', city: 'Curitiba',     clients: 234, appts: 521, lastLogin: '11/05/2026', email: 'contato@studiobeleza.com', phone: '5541999990002' },
+  { id: '3', name: 'Barber King',          slug: 'barber-king',   plan: 'STARTER', status: 'active',   mrr: 79,  since: '10/04/2026', city: 'BH',           clients: 67,  appts: 143, lastLogin: '10/05/2026', email: 'rei@barberking.com',    phone: '5531999990003' },
+  { id: '4', name: 'Salão da Maria',       slug: 'salao-maria',   plan: 'PRO',     status: 'trial',    mrr: 0,   since: '05/05/2026', city: 'Recife',       clients: 12,  appts: 28,  lastLogin: '11/05/2026', email: 'maria@salao.com',       phone: '5581999990004' },
+  { id: '5', name: 'Classic Barber Shop',  slug: 'classic-bs',    plan: 'PRO',     status: 'past_due', mrr: 149, since: '20/01/2026', city: 'Porto Alegre', clients: 89,  appts: 201, lastLogin: '08/05/2026', email: 'classic@barber.com',    phone: '5551999990005' },
+  { id: '6', name: 'Espaço Capilar',       slug: 'espaco-cap',    plan: 'STARTER', status: 'canceled', mrr: 0,   since: '01/01/2026', city: 'Fortaleza',    clients: 45,  appts: 98,  lastLogin: '01/04/2026', email: 'espaco@capilar.com',    phone: '5585999990006' },
 ]
 
 const TICKETS = [
@@ -65,6 +65,8 @@ export function AdminDashboard() {
   const [resposta, setResposta] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [cobrancaEnviada, setCobrancaEnviada] = useState<string | null>(null)
+  const [suspenderConfirm, setSuspenderConfirm] = useState(false)
+  const [tenantsSuspended, setTenantsSuspended] = useState<string[]>([])
 
   const active   = TENANTS.filter((t) => t.status === 'active')
   const trials   = TENANTS.filter((t) => t.status === 'trial')
@@ -524,10 +526,64 @@ export function AdminDashboard() {
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
                   <p className="font-sora font-bold text-white mb-3">Ações administrativas</p>
                   <div className="flex flex-wrap gap-2">
-                    <button className="text-xs bg-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-colors">📧 Enviar e-mail</button>
-                    <button className="text-xs bg-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-colors">💬 Abrir WhatsApp</button>
-                    <button className="text-xs bg-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-colors">🔑 Acessar painel</button>
-                    <button className="text-xs bg-[#FEE2E2] text-[#991B1B] px-4 py-2 rounded-xl hover:bg-[#FECACA] font-bold transition-colors">⛔ Suspender conta</button>
+                    <a
+                      href={`mailto:${t.email}?subject=STYLOGESTOR - Contato sobre sua conta&body=Olá ${t.name.split(' ')[0]},`}
+                      className="text-xs bg-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-colors"
+                    >
+                      📧 Enviar e-mail
+                    </a>
+                    <a
+                      href={`https://wa.me/${t.phone}?text=${encodeURIComponent(`Olá! Sou da equipe STYLOGESTOR. Podemos conversar sobre sua conta?`)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs bg-[#25D366] text-white px-4 py-2 rounded-xl hover:opacity-90 transition-opacity"
+                    >
+                      💬 Abrir WhatsApp
+                    </a>
+                    <a
+                      href={`https://app.stylogestor.com.br/dashboard`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs bg-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-colors"
+                    >
+                      🔑 Acessar painel
+                    </a>
+                    {!suspenderConfirm && !tenantsSuspended.includes(t.id) && (
+                      <button
+                        onClick={() => setSuspenderConfirm(true)}
+                        className="text-xs bg-[#FEE2E2] text-[#991B1B] px-4 py-2 rounded-xl hover:bg-[#FECACA] font-bold transition-colors"
+                      >
+                        ⛔ Suspender conta
+                      </button>
+                    )}
+                    {suspenderConfirm && (
+                      <div className="flex items-center gap-2 bg-[#FEE2E2] border border-[#FCA5A5] px-4 py-2 rounded-xl w-full">
+                        <p className="text-xs text-[#991B1B] font-semibold flex-1">Confirmar suspensão de {t.name}?</p>
+                        <button
+                          onClick={() => { setTenantsSuspended((p) => [...p, t.id]); setSuspenderConfirm(false) }}
+                          className="text-xs bg-[#991B1B] text-white px-3 py-1 rounded-lg font-bold hover:bg-[#7f1d1d]"
+                        >
+                          Confirmar
+                        </button>
+                        <button
+                          onClick={() => setSuspenderConfirm(false)}
+                          className="text-xs bg-white/50 text-[#991B1B] px-3 py-1 rounded-lg"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+                    {tenantsSuspended.includes(t.id) && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-[#F87171] font-bold">⛔ Conta suspensa</span>
+                        <button
+                          onClick={() => setTenantsSuspended((p) => p.filter((i) => i !== t.id))}
+                          className="text-xs bg-[#1B8A5A] text-white px-3 py-1 rounded-lg hover:bg-[#156b47] transition-colors"
+                        >
+                          🔄 Reativar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
