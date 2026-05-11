@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { PLANS } from '@/lib/plans'
+import { PortalButton } from '@/components/ui/portal-button'
 
 export function PlanosView() {
   const searchParams = useSearchParams()
@@ -194,13 +195,9 @@ export function PlanosView() {
           <p className="font-sora font-bold text-white">Já tem uma assinatura?</p>
           <p className="text-white/60 text-sm mt-0.5">Gerencie seu plano, altere o cartão ou baixe faturas.</p>
         </div>
-        <a
-          href="https://billing.stripe.com/p/login/live_eVaaEO0dL3x6grS288"
-          target="_blank"
-          className="bg-[#F5A623] text-[#1A3A6B] text-sm font-bold px-6 py-3 rounded-xl hover:bg-[#e09610] transition-colors whitespace-nowrap shrink-0"
-        >
+        <PortalButton className="bg-[#F5A623] text-[#1A3A6B] text-sm font-bold px-6 py-3 rounded-xl hover:bg-[#e09610] transition-colors whitespace-nowrap shrink-0 disabled:opacity-60">
           Portal do cliente →
-        </a>
+        </PortalButton>
       </div>
 
     </div>
