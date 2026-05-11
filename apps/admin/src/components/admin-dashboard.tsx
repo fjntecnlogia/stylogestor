@@ -61,8 +61,10 @@ export function AdminDashboard() {
   const [search, setSearch] = useState('')
   const [ticketFiltro, setTicketFiltro] = useState<'todos' | 'aberto' | 'andamento' | 'resolvido'>('todos')
   const [selectedTicket, setSelectedTicket] = useState<typeof TICKETS[0] | null>(null)
+  const [selectedTenant, setSelectedTenant] = useState<typeof TENANTS[0] | null>(null)
   const [resposta, setResposta] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [cobrancaEnviada, setCobrancaEnviada] = useState<string | null>(null)
 
   const active   = TENANTS.filter((t) => t.status === 'active')
   const trials   = TENANTS.filter((t) => t.status === 'trial')
@@ -391,8 +393,21 @@ export function AdminDashboard() {
                           <td className="px-4 py-3.5 text-white/40 text-xs">{t.lastLogin}</td>
                           <td className="px-4 py-3.5">
                             <div className="flex gap-1">
-                              <button className="text-[10px] bg-white/10 text-white px-2 py-1 rounded-lg hover:bg-white/20">Ver</button>
-                              {t.status === 'past_due' && <button className="text-[10px] bg-[#FEE2E2] text-[#991B1B] px-2 py-1 rounded-lg font-bold">Cobrar</button>}
+                              <button
+                                onClick={() => { setSelectedTenant(t); setPage('tenant-detail') }}
+                                className="text-[10px] bg-white/10 text-white px-2 py-1 rounded-lg hover:bg-white/20 transition-colors"
+                              >Ver</button>
+                              {t.status === 'past_due' && (
+                                <button
+                                  onClick={() => {
+                                    setCobrancaEnviada(t.id)
+                                    setTimeout(() => setCobrancaEnviada(null), 3000)
+                                  }}
+                                  className="text-[10px] bg-[#FEE2E2] text-[#991B1B] px-2 py-1 rounded-lg font-bold hover:bg-[#FECACA] transition-colors"
+                                >
+                                  {cobrancaEnviada === t.id ? '✓ Enviado' : 'Cobrar'}
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -403,6 +418,121 @@ export function AdminDashboard() {
               </div>
             </>
           )}
+
+          {/* ── DETALHE DO TENANT ── */}
+          {page === 'tenant-detail' && selectedTenant && (() => {
+            const t = selectedTenant
+            const st = STATUS_TENANT[t.status as keyof typeof STATUS_TENANT]
+            const tenantTickets = TICKETS.filter((tk) => tk.tenant === t.name)
+            return (
+              <>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => { setPage('tenants'); setSelectedTenant(null) }}
+                    className="text-white/50 hover:text-white text-sm transition-colors"
+                  >← Voltar</button>
+                  <h1 className="font-sora font-bold text-2xl text-white">{t.name}</h1>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${st.cls}`}>{st.label}</span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Plano', value: t.plan, color: PLAN_COLORS[t.plan] },
+                    { label: 'MRR', value: t.mrr > 0 ? `R$ ${t.mrr}` : '—', color: '#1B8A5A' },
+                    { label: 'Clientes', value: t.clients, color: '#60A5FA' },
+                    { label: 'Agendamentos', value: t.appts, color: '#F5A623' },
+                  ].map((k) => (
+                    <div key={k.label} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                      <p className="text-[10px] text-white/40 font-bold uppercase tracking-wide">{k.label}</p>
+                      <p className="font-sora font-extrabold text-2xl mt-1" style={{ color: k.color }}>{k.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Informações */}
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
+                    <p className="font-sora font-bold text-white">Informações</p>
+                    {[
+                      { label: 'Slug / Link', value: `${t.slug}.stylogestor.com.br` },
+                      { label: 'Cidade', value: t.city },
+                      { label: 'Cliente desde', value: t.since },
+                      { label: 'Último login', value: t.lastLogin },
+                    ].map((r) => (
+                      <div key={r.label} className="flex justify-between text-sm border-b border-white/5 pb-2">
+                        <span className="text-white/40">{r.label}</span>
+                        <span className="text-white font-medium">{r.value}</span>
+                      </div>
+                    ))}
+                    <div className="flex gap-2 pt-2">
+                      <a
+                        href={`https://${t.slug}.stylogestor.com.br`}
+                        target="_blank"
+                        className="flex-1 text-center text-xs bg-white/10 text-white py-2 rounded-xl hover:bg-white/20 transition-colors"
+                      >
+                        🔗 Ver agendamento
+                      </a>
+                      {t.status === 'past_due' && (
+                        <button
+                          onClick={() => setCobrancaEnviada(t.id)}
+                          className="flex-1 text-xs bg-[#FEE2E2] text-[#991B1B] font-bold py-2 rounded-xl hover:bg-[#FECACA] transition-colors"
+                        >
+                          💳 Enviar cobrança
+                        </button>
+                      )}
+                      {t.status === 'canceled' && (
+                        <button className="flex-1 text-xs bg-[#1B8A5A] text-white font-bold py-2 rounded-xl hover:bg-[#156b47] transition-colors">
+                          🔄 Reativar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tickets deste tenant */}
+                  <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-white/10">
+                      <p className="font-sora font-bold text-white">Chamados de suporte</p>
+                    </div>
+                    {tenantTickets.length === 0 ? (
+                      <div className="p-6 text-center text-white/30 text-sm">Nenhum chamado aberto</div>
+                    ) : (
+                      <div className="divide-y divide-white/5">
+                        {tenantTickets.map((tk) => {
+                          const stk = STATUS_TICKET[tk.status as keyof typeof STATUS_TICKET]
+                          const tipo = TIPO_TICKET[tk.tipo as keyof typeof TIPO_TICKET]
+                          return (
+                            <div key={tk.id} className="px-5 py-3 flex items-center gap-3">
+                              <span>{tipo.icon}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-white font-medium truncate">{tk.titulo}</p>
+                                <p className="text-xs text-white/30">{tk.data} · {tk.prioridade}</p>
+                              </div>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${stk.cls}`}>{stk.label}</span>
+                              <button
+                                onClick={() => { setSelectedTicket(tk); setPage('tickets') }}
+                                className="text-[10px] bg-white/10 text-white px-2 py-1 rounded-lg hover:bg-white/20"
+                              >Ver</button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ações administrativas */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                  <p className="font-sora font-bold text-white mb-3">Ações administrativas</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button className="text-xs bg-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-colors">📧 Enviar e-mail</button>
+                    <button className="text-xs bg-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-colors">💬 Abrir WhatsApp</button>
+                    <button className="text-xs bg-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-colors">🔑 Acessar painel</button>
+                    <button className="text-xs bg-[#FEE2E2] text-[#991B1B] px-4 py-2 rounded-xl hover:bg-[#FECACA] font-bold transition-colors">⛔ Suspender conta</button>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
 
           {/* ── TICKETS / SUPORTE ── */}
           {page === 'tickets' && (
