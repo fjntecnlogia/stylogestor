@@ -1,6 +1,6 @@
 'use client'
 
-import { UserButton } from '@clerk/nextjs'
+import { UserButton, Show } from '@clerk/nextjs'
 
 export function Topbar() {
   const now = new Date()
@@ -13,7 +13,16 @@ export function Topbar() {
         <button className="bg-[#1A3A6B] text-white text-sm font-semibold px-4 py-1.5 rounded-lg hover:bg-[#142d55] transition-colors">
           + Novo agendamento
         </button>
-        <UserButton afterSignOutUrl="/login" />
+        <Show when="signed-in">
+          <UserButton
+            afterSignOutUrl="/login"
+            appearance={{
+              elements: {
+                avatarBox: 'w-8 h-8',
+              },
+            }}
+          />
+        </Show>
       </div>
     </header>
   )

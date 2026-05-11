@@ -15,17 +15,13 @@ export default function LoginPage() {
           </div>
           <p className="text-white/60 text-sm">Acesse sua conta para gerenciar seu negócio</p>
         </div>
+
         <SignIn
-          appearance={{
-            elements: {
-              rootBox: 'w-full',
-              card: 'rounded-2xl shadow-2xl border-0',
-              headerTitle: 'font-sora',
-              formButtonPrimary: 'bg-[#1A3A6B] hover:bg-[#142d55] rounded-xl',
-              footerActionLink: 'text-[#1A3A6B]',
-            },
-          }}
+          routing="hash"
+          signUpUrl="/cadastro"
+          fallbackRedirectUrl="/dashboard"
         />
+
         <p className="text-center text-white/40 text-xs">
           Não tem conta?{' '}
           <a href="/cadastro" className="text-[#F5A623] hover:underline font-medium">
