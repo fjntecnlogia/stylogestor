@@ -40,7 +40,6 @@ export function Topbar({ onMenuToggle }: Props) {
           </button>
           <Show when="signed-in">
             <UserButton
-              afterSignOutUrl="/login"
               appearance={{ elements: { avatarBox: 'w-8 h-8' } }}
             />
           </Show>
