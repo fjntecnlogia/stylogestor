@@ -1,0 +1,83 @@
+// ============================================================
+// STYLOGESTOR — Adições ao Schema: Fidelidade + Assinatura
+// Adicionar ao schema.prisma principal
+// ============================================================
+
+// ── PROGRAMA DE FIDELIDADE ────────────────────────────────────
+
+model LoyaltyProgram {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String  @unique @db.Uuid
+  type          String  @default("stamps") // "stamps" | "points"
+  stampsToReward Int    @default(10)        // a cada X visitas = 1 prêmio
+  pointsPerReal  Float  @default(1)         // pontos por R$ gasto
+  rewardDesc    String  @default("1 serviço grátis")
+  active        Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  rewards LoyaltyReward[]
+
+  @@map("loyalty_programs")
+}
+
+model ClientLoyalty {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @db.Uuid
+  clientId    String   @unique @db.Uuid
+  stamps      Int      @default(0)   // carimbos acumulados
+  points      Int      @default(0)   // pontos acumulados
+  totalVisits Int      @default(0)
+  totalSpent  Decimal  @default(0) @db.Decimal(10,2)
+  tier        String   @default("bronze") // "bronze" | "prata" | "ouro" | "vip"
+  lastVisit   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client  Client          @relation(fields: [clientId], references: [id])
+  rewards LoyaltyReward[]
+
+  @@map("client_loyalties")
+}
+
+model LoyaltyReward {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @db.Uuid
+  clientLoyaltyId String   @db.Uuid
+  type            String   // "stamp_reward" | "points_reward" | "birthday"
+  description     String
+  usedAt          DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  clientLoyalty ClientLoyalty  @relation(fields: [clientLoyaltyId], references: [id])
+  program       LoyaltyProgram @relation(fields: [tenantId], references: [tenantId])
+
+  @@map("loyalty_rewards")
+}
+
+// ── PAGAMENTOS / ASSINATURA SAAS ─────────────────────────────
+
+// Atualizar o model Subscription existente com campos extras:
+// pagarmeCheckoutUrl  String?   // URL do checkout gerado
+// pagarmeOrderId      String?   // ID do pedido no Pagar.me
+// lastPaymentAt       DateTime?
+// nextPaymentAt       DateTime?
+// invoices            Invoice[]
+
+model Invoice {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @db.Uuid
+  amount       Decimal  @db.Decimal(10, 2)
+  status       String   // "pending" | "paid" | "failed" | "refunded"
+  pagarmeOrderId String?
+  paidAt       DateTime?
+  dueDate      DateTime
+  description  String   @default("Mensalidade STYLOGESTOR")
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("invoices")
+}
