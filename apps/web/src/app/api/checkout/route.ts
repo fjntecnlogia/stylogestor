@@ -1,43 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
+import { stripe, PLANS } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth()
     if (!userId) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
-    const body = await req.json()
-    const { plan, ciclo, email } = body
-
-    if (!plan || !ciclo || !email) {
-      return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 })
+    const { planId } = await req.json()
+    const plan = PLANS.find((p) => p.id === planId)
+    if (!plan) {
+      return NextResponse.json({ error: 'Plano não encontrado' }, { status: 404 })
     }
 
-    // Chama o backend NestJS para criar a sessão Stripe
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-    const tenantSlug = req.headers.get('x-tenant-slug') || ''
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
 
-    const res = await fetch(`${apiUrl}/api/v1/subscriptions/checkout`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-tenant-slug': tenantSlug,
-        'x-stylo-tenant': tenantSlug,
-      },
-      body: JSON.stringify({ plan, ciclo, email }),
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      line_items: [
+        {
+          price_data: {
+            currency: plan.currency,
+            product_data: {
+              name: `STYLOGESTOR ${plan.name}`,
+              description: plan.description,
+            },
+            unit_amount: plan.price,
+            recurring: { interval: plan.interval },
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: { userId, planId: plan.id },
+      success_url: `${appUrl}/sucesso?session_id={CHECKOUT_SESSION_ID}&plan=${plan.id}`,
+      cancel_url: `${appUrl}/planos?canceled=1`,
+      locale: 'pt-BR',
+      allow_promotion_codes: true,
     })
 
-    if (!res.ok) {
-      const err = await res.json()
-      return NextResponse.json({ error: err.message || 'Erro ao criar checkout' }, { status: 500 })
-    }
-
-    const data = await res.json()
-    return NextResponse.json(data)
-  } catch (err) {
-    console.error('Checkout error:', err)
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+    return NextResponse.json({ url: session.url })
+  } catch (error) {
+    console.error('[CHECKOUT_ERROR]', error)
+    return NextResponse.json({ error: 'Erro ao criar sessão de pagamento' }, { status: 500 })
   }
 }
