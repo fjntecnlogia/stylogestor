@@ -9,41 +9,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
-    const { planId } = await req.json()
+    const { planId, ciclo = 'mensal' } = await req.json()
+
     const plan = PLANS.find((p) => p.id === planId)
     if (!plan) {
       return NextResponse.json({ error: 'Plano não encontrado' }, { status: 404 })
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
+    const isAnual = ciclo === 'anual'
+    const unitAmount = isAnual ? plan.priceAnnual : plan.priceMonthly
+    const interval = isAnual ? 'year' : 'month'
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'boleto'],
       mode: 'subscription',
       line_items: [
         {
           price_data: {
             currency: plan.currency,
             product_data: {
-              name: `STYLOGESTOR ${plan.name}`,
+              name: `STYLOGESTOR ${plan.name}${isAnual ? ' (Anual)' : ''}`,
               description: plan.description,
             },
-            unit_amount: plan.price,
-            recurring: { interval: plan.interval },
+            unit_amount: unitAmount,
+            recurring: { interval },
           },
           quantity: 1,
         },
       ],
-      metadata: { userId, planId: plan.id },
-      success_url: `${appUrl}/sucesso?session_id={CHECKOUT_SESSION_ID}&plan=${plan.id}`,
+      metadata: { userId, planId: plan.id, ciclo },
+      subscription_data: {
+        trial_period_days: 14,
+        metadata: { userId, planId: plan.id },
+      },
+      success_url: `${appUrl}/sucesso?session_id={CHECKOUT_SESSION_ID}&plan=${plan.id}&ciclo=${ciclo}`,
       cancel_url: `${appUrl}/planos?canceled=1`,
       locale: 'pt-BR',
       allow_promotion_codes: true,
+      billing_address_collection: 'auto',
     })
 
     return NextResponse.json({ url: session.url })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[CHECKOUT_ERROR]', error)
-    return NextResponse.json({ error: 'Erro ao criar sessão de pagamento' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Erro ao criar sessão'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

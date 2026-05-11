@@ -511,23 +511,114 @@ export function AdminDashboard() {
             </>
           )}
 
-          {/* ── RECEITA ── */}
+          {/* ── RECEITA / FINANCEIRO STRIPE ── */}
           {page === 'revenue' && (
             <>
-              <h1 className="font-sora font-bold text-2xl text-white">Receita do SaaS</h1>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h1 className="font-sora font-bold text-2xl text-white">Financeiro · Stripe</h1>
+                  <p className="text-white/40 text-sm mt-0.5">Receita, assinaturas e pagamentos em tempo real</p>
+                </div>
+                <a
+                  href="https://dashboard.stripe.com"
+                  target="_blank"
+                  className="text-xs bg-[#F5A623] text-[#1A3A6B] font-bold px-4 py-2 rounded-xl hover:bg-[#e09610] transition-colors self-start sm:self-auto"
+                >
+                  Abrir Stripe Dashboard →
+                </a>
+              </div>
+
+              {/* KPIs financeiros */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {[
-                  { label: 'MRR atual',    value: `R$ ${totalMRR}`,        sub: 'receita recorrente mensal' },
-                  { label: 'ARR',          value: `R$ ${totalMRR * 12}`,   sub: 'receita anual recorrente' },
-                  { label: 'Churn rate',   value: '4,8%',                  sub: '1 cancelamento este mês' },
-                  { label: 'LTV médio',    value: 'R$ 2.682',              sub: 'por tenant (18 meses)' },
-                  { label: 'CAC estimado', value: 'R$ 45',                 sub: 'custo de aquisição' },
-                  { label: 'Payback',      value: '0,3 meses',             sub: 'recuperação do CAC' },
+                  { label: 'MRR atual',     value: `R$ ${totalMRR.toLocaleString('pt-BR')}`, sub: 'receita recorrente mensal', color: '#1B8A5A' },
+                  { label: 'ARR',           value: `R$ ${(totalMRR * 12).toLocaleString('pt-BR')}`, sub: 'receita anual projetada', color: '#60A5FA' },
+                  { label: 'Churn rate',    value: '4,8%', sub: '1 cancelamento este mês', color: '#EF4444' },
+                  { label: 'LTV médio',     value: 'R$ 2.682', sub: 'por tenant (18 meses)', color: '#F5A623' },
+                  { label: 'CAC estimado',  value: 'R$ 45',    sub: 'custo de aquisição', color: '#A78BFA' },
+                  { label: 'Payback',       value: '0,3 meses', sub: 'recuperação do CAC', color: '#34D399' },
                 ].map((k) => (
-                  <div key={k.label} className="bg-white/5 border border-white/10 rounded-2xl p-5">
-                    <p className="text-xs text-white/40 font-semibold uppercase tracking-wide">{k.label}</p>
-                    <p className="font-sora font-extrabold text-3xl text-white mt-2">{k.value}</p>
-                    <p className="text-xs text-white/30 mt-1">{k.sub}</p>
+                  <div key={k.label} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-wide">{k.label}</p>
+                    <p className="font-sora font-extrabold text-2xl mt-1" style={{ color: k.color }}>{k.value}</p>
+                    <p className="text-[10px] text-white/30 mt-0.5">{k.sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Receita por plano */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-white/10">
+                  <p className="font-sora font-bold text-white">Receita por plano</p>
+                </div>
+                <div className="p-5 space-y-3">
+                  {[
+                    { plan: 'Premium', tenants: 1, mrr: 249,  color: '#7C3AED' },
+                    { plan: 'Pro',     tenants: 2, mrr: 298,  color: '#1A3A6B' },
+                    { plan: 'Starter', tenants: 2, mrr: 79,   color: '#6B7280' },
+                  ].map((p) => {
+                    const pct = Math.round((p.mrr / totalMRR) * 100)
+                    return (
+                      <div key={p.plan}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-white font-semibold">{p.plan} <span className="text-white/40 font-normal text-xs">({p.tenants} tenants)</span></span>
+                          <span className="font-bold" style={{ color: p.color }}>R$ {p.mrr}/mês · {pct}%</span>
+                        </div>
+                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: p.color }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Pagamentos recentes */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+                  <p className="font-sora font-bold text-white">Pagamentos recentes</p>
+                  <span className="text-xs text-white/40">Via Stripe</span>
+                </div>
+                <div className="divide-y divide-white/5">
+                  {[
+                    { tenant: 'Studio Beleza & Cia', plan: 'Premium', valor: 249, status: 'pago',     data: '10/05/2026', metodo: 'Cartão •••• 4242' },
+                    { tenant: 'Barbearia do João',   plan: 'Pro',     valor: 149, status: 'pago',     data: '08/05/2026', metodo: 'Cartão •••• 1234' },
+                    { tenant: 'Barber King',          plan: 'Starter', valor: 79,  status: 'pago',     data: '07/05/2026', metodo: 'Boleto' },
+                    { tenant: 'Classic Barber Shop',  plan: 'Pro',     valor: 149, status: 'falhou',   data: '05/05/2026', metodo: 'Cartão •••• 0000' },
+                    { tenant: 'Espaço Capilar',       plan: 'Starter', valor: 79,  status: 'cancelado',data: '01/04/2026', metodo: 'Cartão •••• 5678' },
+                  ].map((p, i) => (
+                    <div key={i} className="px-5 py-3.5 flex items-center gap-3 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-white text-sm truncate">{p.tenant}</p>
+                        <p className="text-xs text-white/40">{p.metodo} · {p.data}</p>
+                      </div>
+                      <span className="text-xs text-white/40 hidden sm:block">{p.plan}</span>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                        p.status === 'pago' ? 'bg-[#D1FAE5] text-[#065F46]' :
+                        p.status === 'falhou' ? 'bg-[#FEE2E2] text-[#991B1B]' :
+                        'bg-[#F3F4F6] text-[#6B7280]'
+                      }`}>
+                        {p.status === 'pago' ? '✓ Pago' : p.status === 'falhou' ? '✗ Falhou' : 'Cancelado'}
+                      </span>
+                      <span className={`font-bold text-sm w-16 text-right ${p.status === 'pago' ? 'text-[#1B8A5A]' : 'text-white/30 line-through'}`}>
+                        R$ {p.valor}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Assinaturas por status */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { label: 'Ativas',       count: 3, valor: 477,  color: '#1B8A5A', bg: 'bg-[#D1FAE5]/10 border-[#1B8A5A]/20' },
+                  { label: 'Em trial',     count: 1, valor: 0,    color: '#60A5FA', bg: 'bg-[#DBEAFE]/10 border-[#60A5FA]/20' },
+                  { label: 'Inadimplente', count: 1, valor: 149,  color: '#EF4444', bg: 'bg-[#FEE2E2]/10 border-[#EF4444]/20' },
+                ].map((s) => (
+                  <div key={s.label} className={`border rounded-2xl p-5 ${s.bg}`}>
+                    <p className="text-xs text-white/40 font-bold uppercase tracking-wide">{s.label}</p>
+                    <p className="font-sora font-extrabold text-3xl mt-1" style={{ color: s.color }}>{s.count}</p>
+                    {s.valor > 0 && <p className="text-xs text-white/30 mt-0.5">R$ {s.valor}/mês em risco</p>}
                   </div>
                 ))}
               </div>
