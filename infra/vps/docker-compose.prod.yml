@@ -118,6 +118,19 @@ services:
     networks:
       - stylo_net
 
+  admin:
+    build:
+      context: ../..
+      dockerfile: apps/admin/Dockerfile
+    container_name: stylogestor_admin
+    restart: always
+    expose:
+      - "3004"
+    env_file:
+      - /opt/stylogestor-env/.env.prod
+    networks:
+      - stylo_net
+
   nginx:
     image: nginx:alpine
     container_name: stylogestor_nginx
@@ -133,6 +146,7 @@ services:
       - site
       - api
       - booking
+      - admin
     networks:
       - stylo_net
 
