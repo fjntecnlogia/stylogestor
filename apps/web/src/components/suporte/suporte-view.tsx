@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useToast } from '@/components/ui/toast'
 
 const TIPOS = [
   { id: 'suporte',    label: 'Suporte técnico', icon: '🎧', desc: 'Algo não está funcionando como esperado', color: '#3B82F6' },
@@ -30,6 +31,7 @@ export function SuporteView() {
   const [enviado, setEnviado] = useState(false)
   const [loading, setLoading] = useState(false)
   const [tickets, setTickets] = useState(MOCK_TICKETS)
+  const { success } = useToast()
 
   const handleEnviar = async () => {
     if (!tipo || !titulo || !descricao) return
@@ -47,6 +49,7 @@ export function SuporteView() {
     setTickets((prev) => [novoTicket, ...prev])
     setEnviado(true)
     setLoading(false)
+    success('Chamado enviado! Nossa equipe responderá em breve.')
     setTimeout(() => {
       setEnviado(false)
       setTab('historico')

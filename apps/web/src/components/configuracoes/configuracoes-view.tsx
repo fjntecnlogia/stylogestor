@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useToast } from '@/components/ui/toast'
 
 const PLANOS = [
   { id: 'STARTER', name: 'Starter', price: 79,  desc: '1 profissional · Agenda + Clientes' },
@@ -26,6 +27,7 @@ const DEFAULT_HOURS = [
 export function ConfiguracoesView() {
   const [tab, setTab] = useState<'negocio' | 'horarios' | 'plano' | 'integracao'>('negocio')
   const [hours, setHours] = useState(DEFAULT_HOURS)
+  const { success, error } = useToast()
 
   const toggleDay = (day: number) =>
     setHours((h) => h.map((d) => d.day === day ? { ...d, active: !d.active } : d))
@@ -80,7 +82,7 @@ export function ConfiguracoesView() {
               </div>
             </div>
             <button
-              onClick={() => alert('Configurações salvas!')}
+              onClick={() => success('Configurações salvas com sucesso!')}
               className="bg-[#1A3A6B] text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-[#142d55] transition-colors"
             >
               Salvar alterações
@@ -117,7 +119,7 @@ export function ConfiguracoesView() {
               })}
             </div>
             <button
-              onClick={() => alert('Horários salvos!')}
+              onClick={() => success('Horários de funcionamento salvos!')}
               className="bg-[#1A3A6B] text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-[#142d55] transition-colors"
             >
               Salvar horários

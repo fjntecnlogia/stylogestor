@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { NovoClienteModal } from './novo-cliente-modal'
 import { AppointmentModal } from '../agenda/appointment-modal'
+import { useToast } from '@/components/ui/toast'
 
 const MOCK_CLIENTS = [
   { id: '1', name: 'Carlos Oliveira', phone: '(11) 99999-0001', email: 'carlos@email.com', visits: 12, spent: 720, lastVisit: '08/05/2026', tags: ['vip'] },
@@ -16,6 +17,7 @@ const MOCK_CLIENTS = [
 export function ClientesView() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<typeof MOCK_CLIENTS[0] | null>(null)
+  const { info } = useToast()
   const [novoClienteOpen, setNovoClienteOpen] = useState(false)
   const [agendamentoOpen, setAgendamentoOpen] = useState(false)
   const [clients, setClients] = useState(MOCK_CLIENTS)
@@ -165,7 +167,7 @@ export function ClientesView() {
                 📅 Agendar
               </button>
               <button
-                onClick={() => alert('Edição de cliente em desenvolvimento')}
+                onClick={() => info('Edição de cliente em breve!')}
                 className="flex-1 border-2 border-[#E5E7EB] text-[#374151] text-xs font-bold py-2.5 rounded-xl hover:bg-[#F9FAFB] transition-colors"
               >
                 ✏️ Editar
