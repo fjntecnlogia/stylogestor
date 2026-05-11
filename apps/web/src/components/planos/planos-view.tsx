@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { PLANS } from '@/lib/stripe'
+import { PLANS } from '@/lib/plans'
 
 export function PlanosView() {
   const searchParams = useSearchParams()

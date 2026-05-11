@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { stripe, PLANS } from '@/lib/stripe'
+import { getStripe, PLANS } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     const unitAmount = isAnual ? plan.priceAnnual : plan.priceMonthly
     const interval = isAnual ? 'year' : 'month'
 
+    const stripe = getStripe()
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'boleto'],
       mode: 'subscription',
