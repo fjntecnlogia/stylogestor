@@ -1,0 +1,39 @@
+{
+  "name": "@stylogestor/mobile-gestor",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "build:android": "eas build --platform android --profile preview",
+    "build:ios": "eas build --platform ios --profile preview"
+  },
+  "dependencies": {
+    "expo": "~54.0.33",
+    "expo-router": "~5.0.0",
+    "expo-status-bar": "~3.0.9",
+    "expo-font": "~13.3.1",
+    "expo-splash-screen": "~0.30.0",
+    "expo-notifications": "~0.30.0",
+    "expo-secure-store": "~14.2.0",
+    "expo-linear-gradient": "~14.1.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.10.0",
+    "react-native-svg": "15.12.0",
+    "@react-navigation/native": "^7.0.0",
+    "@react-navigation/bottom-tabs": "^7.0.0",
+    "@clerk/clerk-expo": "^2.5.0",
+    "axios": "^1.7.9",
+    "date-fns": "^4.1.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@types/react": "~19.1.0",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
