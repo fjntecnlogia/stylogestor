@@ -49,11 +49,68 @@ const PLAN_COLORS: Record<string, string> = { STARTER: '#6B7280', PRO: '#1A3A6B'
 
 const NAV = [
   { id: 'dashboard',  label: 'Dashboard',    icon: '📊' },
+  { id: 'funil',      label: 'Funil & Lançamento', icon: '🚀' },
   { id: 'analytics',  label: 'Analytics',    icon: '📈' },
   { id: 'tenants',    label: 'Barbearias',   icon: '✂️' },
   { id: 'tickets',    label: 'Suporte',      icon: '🎧' },
   { id: 'revenue',    label: 'Receita',      icon: '💰' },
   { id: 'settings',   label: 'Configurações',icon: '⚙️' },
+]
+
+// ── DADOS DO FUNIL ──────────────────────────────────────────────
+const FUNIL_STAGES = [
+  { id: 'visitantes', label: 'Visitantes',  count: 12840, pct: 100, color: '#6B7280', icon: '👁️' },
+  { id: 'leads',      label: 'Leads',       count: 1923,  pct: 15,  color: '#3B82F6', icon: '📧' },
+  { id: 'trial',      label: 'Trial Ativo', count: 312,   pct: 16,  color: '#F5A623', icon: '⚡' },
+  { id: 'assinante',  label: 'Assinante',   count: 87,    pct: 28,  color: '#10B981', icon: '✅' },
+  { id: 'premium',    label: 'Upgrade',     count: 34,    pct: 39,  color: '#7C3AED', icon: '💎' },
+]
+
+const LEADS = [
+  { id: 'L001', nome: 'Carlos Mendes',    email: 'carlos@barbearia.com', cidade: 'São Paulo, SP',     plano: 'PRO',     status: 'trial',    origem: 'Google Ads', data: '11/05/2026', score: 92 },
+  { id: 'L002', nome: 'Fernanda Lima',    email: 'fe@studiocabelo.com',  cidade: 'Rio de Janeiro, RJ', plano: 'PREMIUM', status: 'quente',   origem: 'Instagram',  data: '11/05/2026', score: 87 },
+  { id: 'L003', nome: 'Rafael Costa',     email: 'rc@barberking.com',    cidade: 'Belo Horizonte, MG', plano: 'PRO',     status: 'quente',   origem: 'Afiliado',   data: '10/05/2026', score: 81 },
+  { id: 'L004', nome: 'Juliana Rocha',    email: 'ju@salaorocha.com',    cidade: 'Curitiba, PR',       plano: 'STARTER', status: 'morno',    origem: 'Orgânico',   data: '10/05/2026', score: 65 },
+  { id: 'L005', nome: 'Diego Ferreira',   email: 'd@classicbs.com',      cidade: 'Porto Alegre, RS',   plano: 'PRO',     status: 'morno',    origem: 'WhatsApp',   data: '09/05/2026', score: 58 },
+  { id: 'L006', nome: 'Mariana Souza',    email: 'ms@estilopm.com',      cidade: 'Fortaleza, CE',      plano: 'STARTER', status: 'frio',     origem: 'Facebook',   data: '08/05/2026', score: 34 },
+  { id: 'L007', nome: 'André Oliveira',   email: 'ao@barberapm.com',     cidade: 'Recife, PE',         plano: 'PRO',     status: 'perdido',  origem: 'Google Ads', data: '07/05/2026', score: 12 },
+]
+
+const AUTOMACOES = [
+  { id: 'A1', nome: 'Boas-vindas Trial',     tipo: 'email',    status: 'ativo',    enviados: 312, abertos: 218, cliques: 89,  conversoes: 34, descricao: 'Email D+0 após cadastro no trial' },
+  { id: 'A2', nome: 'Sequência Nurturing',   tipo: 'email',    status: 'ativo',    enviados: 289, abertos: 156, cliques: 67,  conversoes: 28, descricao: 'D+3, D+7, D+10 com dicas de uso' },
+  { id: 'A3', nome: 'Urgência Trial D+12',   tipo: 'email',    status: 'ativo',    enviados: 201, abertos: 134, cliques: 78,  conversoes: 41, descricao: 'Email de urgência antes do trial expirar' },
+  { id: 'A4', nome: 'WhatsApp Boas-vindas',  tipo: 'whatsapp', status: 'ativo',    enviados: 312, abertos: 298, cliques: 201, conversoes: 67, descricao: 'Mensagem WA logo após cadastro' },
+  { id: 'A5', nome: 'WA Follow-up D+5',      tipo: 'whatsapp', status: 'ativo',    enviados: 178, abertos: 165, cliques: 112, conversoes: 38, descricao: 'Pergunta se precisa de ajuda' },
+  { id: 'A6', nome: 'Recuperação Churn',     tipo: 'email',    status: 'pausado',  enviados: 45,  abertos: 23,  cliques: 8,   conversoes: 3,  descricao: 'Email para cancelamentos recentes' },
+  { id: 'A7', nome: 'Upsell PRO→PREMIUM',    tipo: 'email',    status: 'rascunho', enviados: 0,   abertos: 0,   cliques: 0,   conversoes: 0,  descricao: 'Oferta de upgrade para clientes PRO' },
+]
+
+const AFILIADOS = [
+  { id: 'AF1', nome: 'João Barber SP',    codigo: 'JOAO10',  comissao: 20, cliques: 342, cadastros: 28, ativos: 18, mrr: 2682, pago: 536.40, pendente: 268.20 },
+  { id: 'AF2', nome: 'BarbeirosBR',       codigo: 'BRB15',   comissao: 15, cliques: 891, cadastros: 67, ativos: 41, mrr: 5159, pago: 773.85, pendente: 386.93 },
+  { id: 'AF3', nome: 'Estilo Digital',    codigo: 'ESTILO20',comissao: 20, cliques: 234, cadastros: 19, ativos: 12, mrr: 1788, pago: 357.60, pendente: 178.80 },
+  { id: 'AF4', nome: 'Rafael Mentor',     codigo: 'RAF10',   comissao: 10, cliques: 156, cadastros: 11, ativos: 7,  mrr: 1043, pago: 104.30, pendente: 52.15 },
+]
+
+const ESTADOS_BR = [
+  { uf: 'SP', nome: 'São Paulo',          clientes: 23, mrr: 3427, cor: '#1A3A6B' },
+  { uf: 'RJ', nome: 'Rio de Janeiro',     clientes: 14, mrr: 2086, cor: '#1A3A6B' },
+  { uf: 'MG', nome: 'Minas Gerais',       clientes: 12, mrr: 1788, cor: '#1A3A6B' },
+  { uf: 'RS', nome: 'Rio Grande do Sul',  clientes: 9,  mrr: 1341, cor: '#3B82F6' },
+  { uf: 'PR', nome: 'Paraná',             clientes: 8,  mrr: 1192, cor: '#3B82F6' },
+  { uf: 'BA', nome: 'Bahia',              clientes: 6,  mrr: 894,  cor: '#6B7280' },
+  { uf: 'CE', nome: 'Ceará',              clientes: 5,  mrr: 745,  cor: '#6B7280' },
+  { uf: 'PE', nome: 'Pernambuco',         clientes: 4,  mrr: 596,  cor: '#6B7280' },
+  { uf: 'GO', nome: 'Goiás',              clientes: 3,  mrr: 447,  cor: '#9CA3AF' },
+  { uf: 'SC', nome: 'Santa Catarina',     clientes: 3,  mrr: 447,  cor: '#9CA3AF' },
+]
+
+const CAMPANHAS = [
+  { id: 'C1', nome: 'Google Ads — Barbearia Sistema', canal: 'google', gasto: 1240, cliques: 3420, leads: 312, custo_lead: 3.97, conversoes: 28, cac: 44.28, status: 'ativo' },
+  { id: 'C2', nome: 'Meta Ads — Donos de Salão',      canal: 'meta',   gasto: 890,  cliques: 2180, leads: 198, custo_lead: 4.49, conversoes: 19, cac: 46.84, status: 'ativo' },
+  { id: 'C3', nome: 'Instagram — Vídeo Depoimento',   canal: 'insta',  gasto: 340,  cliques: 1890, leads: 87,  custo_lead: 3.91, conversoes: 11, cac: 30.91, status: 'ativo' },
+  { id: 'C4', nome: 'YouTube — Tutorial Gestão',      canal: 'yt',     gasto: 180,  cliques: 890,  leads: 43,  custo_lead: 4.19, conversoes: 6,  cac: 30.00, status: 'pausado' },
 ]
 
 export function AdminDashboard() {
@@ -161,6 +218,257 @@ export function AdminDashboard() {
 
       <main className="flex-1 overflow-y-auto">
         <div className="p-4 md:p-6 space-y-6">
+
+          {/* ── FUNIL & LANÇAMENTO ── */}
+          {page === 'funil' && (
+            <>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <h1 className="font-sora font-bold text-2xl text-white">🚀 Funil & Lançamento Brasil</h1>
+                  <p className="text-white/40 text-sm mt-0.5">Visão completa da máquina de vendas automática</p>
+                </div>
+                <div className="flex gap-2">
+                  <button className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">+ Nova Campanha</button>
+                  <button className="bg-white/10 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-white/15 transition-colors">📤 Exportar</button>
+                </div>
+              </div>
+
+              {/* KPIs do Funil */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  { label: 'Visitantes/mês',   value: '12.840', sub: '▲ 34%', color: '#6B7280', icon: '👁️' },
+                  { label: 'Leads capturados', value: '1.923',  sub: '▲ 28%', color: '#3B82F6', icon: '📧' },
+                  { label: 'Trials ativos',    value: '312',    sub: '▲ 21%', color: '#F5A623', icon: '⚡' },
+                  { label: 'Assinantes',       value: '87',     sub: '▲ 15%', color: '#10B981', icon: '✅' },
+                  { label: 'CAC médio',        value: 'R$41',   sub: 'meta R$50', color: '#A78BFA', icon: '🎯' },
+                  { label: 'LTV estimado',     value: 'R$2.1k', sub: '14 meses', color: '#F59E0B', icon: '💎' },
+                ].map((k) => (
+                  <div key={k.label} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                    <div className="text-xl mb-2">{k.icon}</div>
+                    <p className="font-sora font-extrabold text-xl" style={{ color: k.color }}>{k.value}</p>
+                    <p className="text-[10px] text-white/40 font-medium mt-0.5">{k.label}</p>
+                    <p className="text-[10px] font-bold mt-1" style={{ color: k.color }}>{k.sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Funil Visual */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                <h3 className="font-sora font-bold text-white mb-6">📊 Funil de Conversão</h3>
+                <div className="space-y-3">
+                  {FUNIL_STAGES.map((stage, i) => {
+                    const prev = i > 0 ? FUNIL_STAGES[i-1] : null
+                    const dropPct = prev ? Math.round((1 - stage.count / prev.count) * 100) : null
+                    return (
+                      <div key={stage.id} className="relative">
+                        {dropPct !== null && (
+                          <div className="flex items-center gap-2 mb-1 ml-4">
+                            <span className="text-[10px] text-white/30">↓ abandono</span>
+                            <span className="text-[10px] font-bold text-red-400">{dropPct}%</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 text-center text-lg">{stage.icon}</div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-sm font-semibold text-white">{stage.label}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm font-bold text-white/60">{stage.count.toLocaleString()}</span>
+                                {i > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: stage.color + '20', color: stage.color }}>{stage.pct}% conv.</span>}
+                              </div>
+                            </div>
+                            <div className="h-3 bg-white/5 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all" style={{ width: `${stage.count / 12840 * 100}%`, background: stage.color }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-3 gap-4 text-center">
+                  <div><p className="text-xs text-white/40">Conversão Total</p><p className="font-sora font-bold text-white text-lg">0,68%</p></div>
+                  <div><p className="text-xs text-white/40">Taxa Trial→Pago</p><p className="font-sora font-bold text-[#10B981] text-lg">27,9%</p></div>
+                  <div><p className="text-xs text-white/40">Tempo médio trial</p><p className="font-sora font-bold text-[#F5A623] text-lg">9,3 dias</p></div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Leads recentes com score */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-sora font-bold text-white">🔥 Leads Recentes</h3>
+                    <span className="text-xs text-white/40">{LEADS.length} leads ativos</span>
+                  </div>
+                  <div className="space-y-2">
+                    {LEADS.map((l) => {
+                      const statusCor: Record<string, string> = { quente: '#EF4444', morno: '#F59E0B', frio: '#6B7280', trial: '#3B82F6', perdido: '#374151' }
+                      const statusLabel: Record<string, string> = { quente: '🔴 Quente', morno: '🟡 Morno', frio: '🔵 Frio', trial: '⚡ Trial', perdido: '❌ Perdido' }
+                      return (
+                        <div key={l.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center font-bold text-white text-sm shrink-0">{l.nome.charAt(0)}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-white truncate">{l.nome}</p>
+                              <span className="text-[10px] font-bold shrink-0" style={{ color: statusCor[l.status] }}>{statusLabel[l.status]}</span>
+                            </div>
+                            <p className="text-xs text-white/40 truncate">{l.cidade} · {l.origem}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="w-10 h-10 rounded-full border-2 flex items-center justify-center text-xs font-bold" style={{ borderColor: l.score > 70 ? '#10B981' : l.score > 40 ? '#F59E0B' : '#6B7280', color: l.score > 70 ? '#10B981' : l.score > 40 ? '#F59E0B' : '#6B7280' }}>{l.score}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Performance por estado */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-sora font-bold text-white">🗺️ Brasil — Por Estado</h3>
+                    <span className="text-xs text-white/40">Top 10 estados</span>
+                  </div>
+                  <div className="space-y-2">
+                    {ESTADOS_BR.map((e, i) => (
+                      <div key={e.uf} className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-white/30 w-4 text-right">{i+1}</span>
+                        <span className="font-bold text-white text-sm w-8">{e.uf}</span>
+                        <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${e.clientes / 23 * 100}%`, background: '#1A3A6B' }} />
+                        </div>
+                        <span className="text-xs text-white/60 w-6 text-right font-semibold">{e.clientes}</span>
+                        <span className="text-xs font-bold text-[#10B981] w-20 text-right">R${e.mrr.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-white/5 flex justify-between text-xs text-white/40">
+                    <span>87 clientes em 10 estados</span>
+                    <span className="font-bold text-[#10B981]">MRR Total: R$12.957</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Automações */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-sora font-bold text-white">⚙️ Automações Ativas</h3>
+                  <button className="text-xs bg-[#F5A623] text-[#1A3A6B] font-bold px-3 py-1.5 rounded-lg hover:opacity-90">+ Nova automação</button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-white/30 text-xs font-medium border-b border-white/5">
+                        <th className="text-left pb-3 font-medium">Automação</th>
+                        <th className="text-center pb-3 font-medium">Tipo</th>
+                        <th className="text-center pb-3 font-medium">Status</th>
+                        <th className="text-right pb-3 font-medium">Enviados</th>
+                        <th className="text-right pb-3 font-medium">Abertos</th>
+                        <th className="text-right pb-3 font-medium">Conversões</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {AUTOMACOES.map((a) => (
+                        <tr key={a.id} className="hover:bg-white/5 transition-colors">
+                          <td className="py-3 pr-4">
+                            <p className="font-semibold text-white">{a.nome}</p>
+                            <p className="text-xs text-white/30 mt-0.5">{a.descricao}</p>
+                          </td>
+                          <td className="py-3 text-center">
+                            <span className="text-lg">{a.tipo === 'email' ? '📧' : '💬'}</span>
+                          </td>
+                          <td className="py-3 text-center">
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                              a.status === 'ativo' ? 'bg-[#D1FAE5] text-[#065F46]' :
+                              a.status === 'pausado' ? 'bg-[#FEF3C7] text-[#92400E]' :
+                              'bg-white/10 text-white/40'
+                            }`}>{a.status.toUpperCase()}</span>
+                          </td>
+                          <td className="py-3 text-right font-semibold text-white/60">{a.enviados.toLocaleString()}</td>
+                          <td className="py-3 text-right">
+                            <span className="font-semibold text-[#3B82F6]">{a.enviados > 0 ? Math.round(a.abertos/a.enviados*100) : 0}%</span>
+                          </td>
+                          <td className="py-3 text-right">
+                            <span className="font-bold text-[#10B981]">{a.conversoes}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Campanhas + Afiliados */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Campanhas */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-sora font-bold text-white">📣 Campanhas Pagas</h3>
+                    <span className="text-xs text-white/40">Gasto total: R${CAMPANHAS.reduce((s,c)=>s+c.gasto,0).toLocaleString()}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {CAMPANHAS.map((c) => {
+                      const canais: Record<string, string> = { google: '🔵', meta: '🟦', insta: '🩷', yt: '🔴' }
+                      return (
+                        <div key={c.id} className="bg-white/5 rounded-xl p-3">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span>{canais[c.canal]}</span>
+                                <p className="text-sm font-semibold text-white">{c.nome}</p>
+                              </div>
+                              <p className="text-xs text-white/30 mt-0.5">CAC: R${c.cac.toFixed(0)} · {c.conversoes} conversões</p>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.status === 'ativo' ? 'bg-[#D1FAE5] text-[#065F46]' : 'bg-white/10 text-white/40'}`}>{c.status.toUpperCase()}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                            <div><p className="text-white/30">Gasto</p><p className="font-bold text-white">R${c.gasto}</p></div>
+                            <div><p className="text-white/30">Leads</p><p className="font-bold text-[#3B82F6]">{c.leads}</p></div>
+                            <div><p className="text-white/30">CPL</p><p className="font-bold text-[#F5A623]">R${c.custo_lead}</p></div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Afiliados */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-sora font-bold text-white">🤝 Programa de Afiliados</h3>
+                    <button className="text-xs text-[#F5A623] hover:underline">+ Novo afiliado</button>
+                  </div>
+                  <div className="space-y-3">
+                    {AFILIADOS.map((a) => (
+                      <div key={a.id} className="bg-white/5 rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-sm font-semibold text-white">{a.nome}</p>
+                            <p className="text-xs text-white/30 font-mono">{a.codigo} · {a.comissao}% comissão</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-[#10B981]">R${a.pago.toFixed(0)} pago</p>
+                            <p className="text-xs text-[#F5A623]">R${a.pendente.toFixed(0)} pendente</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                          <div><p className="text-white/30">Cliques</p><p className="font-bold text-white">{a.cliques}</p></div>
+                          <div><p className="text-white/30">Cadastros</p><p className="font-bold text-[#3B82F6]">{a.cadastros}</p></div>
+                          <div><p className="text-white/30">Ativos</p><p className="font-bold text-[#10B981]">{a.ativos}</p></div>
+                          <div><p className="text-white/30">MRR gerado</p><p className="font-bold text-[#F5A623]">R${a.mrr}</p></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-white/5 grid grid-cols-2 gap-4 text-center text-xs">
+                    <div><p className="text-white/30">Total pago afiliados</p><p className="font-bold text-[#10B981] text-base">R${AFILIADOS.reduce((s,a)=>s+a.pago,0).toFixed(0)}</p></div>
+                    <div><p className="text-white/30">MRR gerado afiliados</p><p className="font-bold text-[#F5A623] text-base">R${AFILIADOS.reduce((s,a)=>s+a.mrr,0).toLocaleString()}</p></div>
+                  </div>
+                </div>
+              </div>
+
+            </>
+          )}
 
           {/* ── DASHBOARD ── */}
           {page === 'dashboard' && (

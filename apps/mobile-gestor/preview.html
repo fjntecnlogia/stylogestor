@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STYLOGESTOR — Preview dos Apps Mobile</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111827; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; padding: 40px 20px; }
+  h1 { color: #fff; text-align: center; font-size: 28px; font-weight: 900; margin-bottom: 8px; }
+  h1 span { color: #F5A623; }
+  .subtitle { color: rgba(255,255,255,0.5); text-align: center; margin-bottom: 48px; font-size: 14px; }
+  .apps-row { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; }
+  .app-section { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .app-title { color: #F5A623; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
+  .screens-row { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+  .phone { width: 320px; background: #1C1C1E; border-radius: 44px; padding: 12px; box-shadow: 0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.1); }
+  .phone-inner { border-radius: 36px; overflow: hidden; background: #F8F6F2; height: 640px; position: relative; display: flex; flex-direction: column; }
+  .screen-label { background: rgba(0,0,0,0.7); color: #F5A623; text-align: center; padding: 6px; font-size: 11px; font-weight: 700; letter-spacing: 1px; position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; }
+
+  /* ─── CORES ─── */
+  .navy { background: #1A3A6B; }
+  .gold { color: #F5A623; }
+  .green { color: #1B8A5A; }
+  .white { color: #fff; }
+  .gray { color: #6B7280; }
+
+  /* ─── GESTOR: LOGIN ─── */
+  .login-screen { background: #1A3A6B; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; flex: 1; }
+  .logo-box { width: 72px; height: 72px; background: #F5A623; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 36px; font-weight: 900; color: #1A3A6B; }
+  .logo-name { font-size: 28px; font-weight: 900; color: #fff; letter-spacing: 1px; }
+  .logo-name span { color: #F5A623; }
+  .logo-sub { color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 32px; }
+  .form-card { background: #fff; border-radius: 24px; padding: 24px; width: 100%; }
+  .form-label { font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 6px; margin-top: 12px; display: block; }
+  .form-input { background: #F9FAFB; border: 1.5px solid #E5E7EB; border-radius: 12px; padding: 11px 14px; width: 100%; font-size: 14px; color: #111827; display: block; }
+  .form-btn { background: #1A3A6B; color: #fff; border-radius: 12px; padding: 13px; width: 100%; font-weight: 700; font-size: 15px; margin-top: 18px; text-align: center; cursor: pointer; }
+  .form-link { color: #1A3A6B; text-align: center; font-size: 13px; font-weight: 600; margin-top: 12px; }
+
+  /* ─── GESTOR: DASHBOARD ─── */
+  .header { background: #1A3A6B; padding: 16px 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .header h2 { color: #fff; font-size: 17px; font-weight: 800; }
+  .header small { color: rgba(255,255,255,0.5); font-size: 11px; display: block; margin-top: 2px; }
+  .avatar { width: 40px; height: 40px; background: #F5A623; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; color: #1A3A6B; }
+  .scroll-area { flex: 1; overflow: hidden; padding: 12px; background: #F8F6F2; }
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .kpi { border-radius: 14px; padding: 12px; }
+  .kpi .k-label { font-size: 10px; color: #6B7280; font-weight: 500; }
+  .kpi .k-value { font-size: 20px; font-weight: 900; margin: 3px 0; }
+  .kpi .k-sub { font-size: 10px; font-weight: 600; }
+  .cta { background: #1A3A6B; border-radius: 12px; padding: 12px; text-align: center; color: #fff; font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+  .section-title { font-size: 14px; font-weight: 800; color: #111827; margin-bottom: 8px; }
+  .apt-card { background: #fff; border-radius: 12px; padding: 10px; display: flex; align-items: center; gap: 10px; margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .apt-time { width: 48px; height: 48px; border-radius: 10px; background: #F3F4F6; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #374151; text-align: center; }
+  .apt-time.next { background: #1A3A6B; color: #fff; }
+  .apt-info { flex: 1; }
+  .apt-info .c-name { font-size: 13px; font-weight: 700; color: #111827; }
+  .apt-info .c-svc { font-size: 11px; color: #6B7280; margin-top: 2px; }
+  .badge { padding: 3px 7px; border-radius: 7px; font-size: 10px; font-weight: 700; }
+
+  /* ─── GESTOR: AGENDA ─── */
+  .days-bar { background: #1A3A6B; padding: 0 12px 14px; display: flex; gap: 6px; overflow: hidden; }
+  .day-btn { width: 44px; padding: 8px 0; border-radius: 10px; text-align: center; background: rgba(255,255,255,0.1); }
+  .day-btn.active { background: #F5A623; }
+  .day-btn .d-name { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.7); }
+  .day-btn.active .d-name { color: #1A3A6B; }
+  .day-btn .d-num { font-size: 17px; font-weight: 900; color: #fff; }
+  .day-btn.active .d-num { color: #1A3A6B; }
+
+  /* ─── CLIENTE: HOME ─── */
+  .client-header { background: #1A3A6B; padding: 16px; }
+  .demo-btn { background: #F5A623; margin: 10px 12px; border-radius: 12px; padding: 13px; text-align: center; font-weight: 800; color: #1A3A6B; font-size: 14px; }
+  .barb-list { padding: 0 12px; }
+  .barb-card { background: #fff; border-radius: 14px; padding: 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .barb-avatar { width: 50px; height: 50px; border-radius: 25px; background: #1A3A6B; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; color: #fff; }
+  .barb-info { flex: 1; }
+  .barb-name { font-size: 14px; font-weight: 700; color: #111827; }
+  .barb-city { font-size: 11px; color: #6B7280; margin-top: 2px; }
+  .barb-meta { display: flex; gap: 8px; margin-top: 4px; }
+  .barb-meta span { font-size: 10px; color: #374151; font-weight: 600; }
+  .barb-slot { font-size: 10px; font-weight: 700; color: #1B8A5A; background: #D1FAE5; padding: 3px 8px; border-radius: 7px; }
+
+  /* ─── CLIENTE: AGENDAR ─── */
+  .step-header { background: #1A3A6B; padding: 14px 16px; }
+  .back-btn { color: #F5A623; font-size: 14px; font-weight: 700; }
+  .progress-bar { display: flex; gap: 4px; justify-content: center; padding: 10px 0; background: #1A3A6B; }
+  .prog-dot { width: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.3); }
+  .prog-dot.active { background: #F5A623; width: 20px; }
+  .step-title { font-size: 18px; font-weight: 800; color: #111827; margin: 14px 14px 12px; }
+  .svc-card { background: #fff; border-radius: 12px; margin: 0 12px 7px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; border: 2px solid transparent; }
+  .svc-card.selected { border-color: #1A3A6B; background: #EFF6FF; }
+  .svc-name { font-size: 13px; font-weight: 600; color: #111827; }
+  .svc-dur { font-size: 11px; color: #6B7280; margin-top: 2px; }
+  .svc-price { font-size: 15px; font-weight: 800; color: #374151; }
+  .svc-price.sel { color: #1A3A6B; }
+  .bottom-bar { background: #1A3A6B; margin: 8px 12px; border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .next-btn { background: #F5A623; padding: 9px 18px; border-radius: 10px; color: #1A3A6B; font-weight: 700; font-size: 13px; }
+
+  /* ─── TAB BAR ─── */
+  .tab-bar { background: #1A3A6B; padding: 8px 0 10px; display: flex; }
+  .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; opacity: 0.4; }
+  .tab-item.active { opacity: 1; }
+  .tab-emoji { font-size: 20px; }
+  .tab-label { font-size: 10px; color: #fff; font-weight: 600; }
+  .tab-item.active .tab-label { color: #F5A623; }
+
+  /* ─── FINANCEIRO ─── */
+  .fin-kpis { display: flex; gap: 6px; padding: 10px 12px; }
+  .fin-kpi { flex: 1; border-radius: 12px; padding: 10px; text-align: center; }
+  .fin-kpi .fk-label { font-size: 10px; color: #6B7280; }
+  .fin-kpi .fk-value { font-size: 16px; font-weight: 900; margin-top: 3px; }
+  .tx-list { padding: 0 12px; }
+  .tx-item { background: #fff; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .tx-dot { width: 8px; height: 8px; border-radius: 4px; flex-shrink: 0; }
+  .tx-desc { font-size: 12px; font-weight: 600; color: #111827; flex: 1; }
+  .tx-amount { font-size: 13px; font-weight: 800; }
+</style>
+</head>
+<body>
+
+<h1>STYLO<span>GESTOR</span> — Mobile Apps</h1>
+<p class="subtitle">Preview das telas dos dois aplicativos React Native</p>
+
+<div class="apps-row">
+
+  <!-- ═══════════════════════════════ APP DO GESTOR ═══════════════════════════════ -->
+  <div class="app-section">
+    <div class="app-title">📊 App do Gestor</div>
+    <div class="screens-row">
+
+      <!-- LOGIN -->
+      <div>
+        <div class="phone">
+          <div class="phone-inner">
+            <div class="login-screen">
+              <div class="logo-box">S</div>
+              <div class="logo-name">STYLO<span>GESTOR</span></div>
+              <div class="logo-sub">Gestão para barbearias</div>
+              <div class="form-card">
+                <label class="form-label">E-mail</label>
+                <div class="form-input" style="color:#9CA3AF">joao@barbearia.com</div>
+                <label class="form-label">Senha</label>
+                <div class="form-input" style="color:#9CA3AF">••••••••</div>
+                <div class="form-btn">Entrar</div>
+                <div class="form-link">Esqueci minha senha</div>
+              </div>
+            </div>
+            <div class="screen-label">🔐 LOGIN</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div>
+        <div class="phone">
+          <div class="phone-inner" style="display:flex;flex-direction:column;">
+            <div class="header">
+              <div>
+                <div class="white" style="font-size:17px;font-weight:800;">Bom dia, João! 👋</div>
+                <div style="color:rgba(255,255,255,0.5);font-size:11px;">segunda-feira, 11 de maio</div>
+              </div>
+              <div class="avatar">J</div>
+            </div>
+            <div class="scroll-area" style="flex:1;overflow:hidden;">
+              <div class="kpi-grid">
+                <div class="kpi" style="background:#F0FDF4;">
+                  <div class="k-label">Caixa hoje</div>
+                  <div class="k-value" style="color:#1B8A5A;">R$ 1.240</div>
+                  <div class="k-sub" style="color:#1B8A5A;">▲ 18% vs ontem</div>
+                </div>
+                <div class="kpi" style="background:#EFF6FF;">
+                  <div class="k-label">Agendamentos</div>
+                  <div class="k-value" style="color:#1A3A6B;">12</div>
+                  <div class="k-sub" style="color:#1A3A6B;">3 pendentes</div>
+                </div>
+                <div class="kpi" style="background:#FFFBEB;">
+                  <div class="k-label">Ticket médio</div>
+                  <div class="k-value" style="color:#F5A623;">R$ 85</div>
+                  <div class="k-sub" style="color:#F5A623;">▲ 5% este mês</div>
+                </div>
+                <div class="kpi" style="background:#F5F3FF;">
+                  <div class="k-label">Clientes hoje</div>
+                  <div class="k-value" style="color:#7C3AED;">9</div>
+                  <div class="k-sub" style="color:#7C3AED;">2 novos clientes</div>
+                </div>
+              </div>
+              <div class="cta">+ Novo agendamento</div>
+              <div class="section-title">Agendamentos de hoje</div>
+              <div class="apt-card">
+                <div class="apt-time">09:00</div>
+                <div class="apt-info">
+                  <div class="c-name">Carlos Oliveira</div>
+                  <div class="c-svc">Corte + Barba • João</div>
+                </div>
+                <div class="badge" style="background:#D1FAE5;color:#065F46;">Concluído</div>
+              </div>
+              <div class="apt-card">
+                <div class="apt-time next">14:00</div>
+                <div class="apt-info">
+                  <div class="c-name">Pedro Alves</div>
+                  <div class="c-svc">Barba • Pedro</div>
+                </div>
+                <div class="badge" style="background:#DBEAFE;color:#1E40AF;">Próximo</div>
+              </div>
+              <div class="apt-card">
+                <div class="apt-time">15:00</div>
+                <div class="apt-info">
+                  <div class="c-name">Lucas Ferreira</div>
+                  <div class="c-svc">Corte • João</div>
+                </div>
+                <div class="badge" style="background:#FEF9C3;color:#92400E;">Agendado</div>
+              </div>
+            </div>
+            <div class="tab-bar">
+              <div class="tab-item active"><div class="tab-emoji">📊</div><div class="tab-label">Dashboard</div></div>
+              <div class="tab-item"><div class="tab-emoji">📅</div><div class="tab-label">Agenda</div></div>
+              <div class="tab-item"><div class="tab-emoji">👥</div><div class="tab-label">Clientes</div></div>
+              <div class="tab-item"><div class="tab-emoji">💰</div><div class="tab-label">Financeiro</div></div>
+              <div class="tab-item"><div class="tab-emoji">⚙️</div><div class="tab-label">Mais</div></div>
+            </div>
+            <div class="screen-label">📊 DASHBOARD</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENDA -->
+      <div>
+        <div class="phone">
+          <div class="phone-inner" style="display:flex;flex-direction:column;">
+            <div class="header">
+              <div class="white" style="font-size:18px;font-weight:800;">Agenda</div>
+              <div style="background:#F5A623;padding:7px 14px;border-radius:10px;color:#1A3A6B;font-weight:700;font-size:13px;">+ Agendar</div>
+            </div>
+            <div class="days-bar">
+              <div class="day-btn"><div class="d-name">seg</div><div class="d-num">11</div></div>
+              <div class="day-btn active"><div class="d-name">ter</div><div class="d-num">12</div></div>
+              <div class="day-btn"><div class="d-name">qua</div><div class="d-num">13</div></div>
+              <div class="day-btn"><div class="d-name">qui</div><div class="d-num">14</div></div>
+              <div class="day-btn"><div class="d-name">sex</div><div class="d-num">15</div></div>
+            </div>
+            <div style="padding:8px 12px;background:#fff;border-bottom:1px solid #E5E7EB;font-size:11px;color:#6B7280;">2 concluídos • 3 agendados • R$ 70</div>
+            <div class="scroll-area" style="flex:1;overflow:hidden;padding:10px;">
+              <div class="apt-card">
+                <div class="apt-time">09:00</div>
+                <div class="apt-info"><div class="c-name">Carlos Oliveira</div><div class="c-svc">Corte + Barba • João</div></div>
+                <div class="badge" style="background:#D1FAE5;color:#065F46;">Concluído</div>
+              </div>
+              <div class="apt-card" style="border:1.5px solid #1A3A6B;">
+                <div class="apt-time next">11:00</div>
+                <div class="apt-info"><div class="c-name">Pedro Alves</div><div class="c-svc">Barba • Pedro</div></div>
+                <div class="badge" style="background:#FEE2E2;color:#991B1B;">Em atend.</div>
+              </div>
+              <div class="apt-card">
+                <div class="apt-time">14:00</div>
+                <div class="apt-info"><div class="c-name">Lucas Ferreira</div><div class="c-svc">Corte • João</div></div>
+                <div class="badge" style="background:#FEF9C3;color:#92400E;">Agendado</div>
+              </div>
+              <div style="background:#EFF6FF;border-radius:10px;padding:8px 10px;margin-top:6px;">
+                <div style="font-size:11px;font-weight:700;color:#1A3A6B;">Ações rápidas (Pedro Alves)</div>
+                <div style="display:flex;gap:6px;margin-top:6px;">
+                  <div style="background:#1B8A5A;color:#fff;padding:5px 10px;border-radius:7px;font-size:10px;font-weight:700;">✓ Concluir</div>
+                  <div style="background:#F3F4F6;color:#374151;padding:5px 10px;border-radius:7px;font-size:10px;font-weight:700;">✏️ Editar</div>
+                  <div style="background:#FEE2E2;color:#991B1B;padding:5px 10px;border-radius:7px;font-size:10px;font-weight:700;">✕ Cancelar</div>
+                </div>
+              </div>
+            </div>
+            <div class="tab-bar">
+              <div class="tab-item"><div class="tab-emoji">📊</div><div class="tab-label">Dashboard</div></div>
+              <div class="tab-item active"><div class="tab-emoji">📅</div><div class="tab-label">Agenda</div></div>
+              <div class="tab-item"><div class="tab-emoji">👥</div><div class="tab-label">Clientes</div></div>
+              <div class="tab-item"><div class="tab-emoji">💰</div><div class="tab-label">Financeiro</div></div>
+              <div class="tab-item"><div class="tab-emoji">⚙️</div><div class="tab-label">Mais</div></div>
+            </div>
+            <div class="screen-label">📅 AGENDA</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FINANCEIRO -->
+      <div>
+        <div class="phone">
+          <div class="phone-inner" style="display:flex;flex-direction:column;">
+            <div class="header">
+              <div class="white" style="font-size:18px;font-weight:800;">Financeiro</div>
+              <div style="background:#F5A623;padding:7px 14px;border-radius:10px;color:#1A3A6B;font-weight:700;font-size:13px;">+ Lançamento</div>
+            </div>
+            <div class="fin-kpis">
+              <div class="fin-kpi" style="background:#F0FDF4;"><div class="fk-label">Entradas</div><div class="fk-value" style="color:#1B8A5A;">R$ 205</div></div>
+              <div class="fin-kpi" style="background:#FEF2F2;"><div class="fk-label">Saídas</div><div class="fk-value" style="color:#EF4444;">R$ 85</div></div>
+              <div class="fin-kpi" style="background:#EFF6FF;"><div class="fk-label">Saldo</div><div class="fk-value" style="color:#1A3A6B;">R$ 120</div></div>
+            </div>
+            <div style="padding:0 12px;margin-bottom:8px;">
+              <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:8px;">Formas de pagamento</div>
+              <div style="display:flex;gap:6px;">
+                <div style="flex:1;background:#D1FAE5;border-radius:10px;padding:8px;text-align:center;"><div style="font-size:10px;font-weight:600;color:#065F46;">PIX</div><div style="font-size:15px;font-weight:900;color:#065F46;">R$ 80</div></div>
+                <div style="flex:1;background:#FEF9C3;border-radius:10px;padding:8px;text-align:center;"><div style="font-size:10px;font-weight:600;color:#92400E;">Dinheiro</div><div style="font-size:15px;font-weight:900;color:#92400E;">R$ 65</div></div>
+                <div style="flex:1;background:#DBEAFE;border-radius:10px;padding:8px;text-align:center;"><div style="font-size:10px;font-weight:600;color:#1E40AF;">Cartão</div><div style="font-size:15px;font-weight:900;color:#1E40AF;">R$ 60</div></div>
+              </div>
+            </div>
+            <div class="tx-list" style="flex:1;overflow:hidden;">
+              <div class="tx-item"><div class="tx-dot" style="background:#1B8A5A;"></div><div class="tx-desc">Corte — Carlos Oliveira</div><div class="tx-amount" style="color:#1B8A5A;">+R$ 40</div></div>
+              <div class="tx-item"><div class="tx-dot" style="background:#1B8A5A;"></div><div class="tx-desc">Barba — Rafael Santos</div><div class="tx-amount" style="color:#1B8A5A;">+R$ 30</div></div>
+              <div class="tx-item"><div class="tx-dot" style="background:#EF4444;"></div><div class="tx-desc">Shampoo profissional</div><div class="tx-amount" style="color:#EF4444;">-R$ 85</div></div>
+              <div class="tx-item"><div class="tx-dot" style="background:#1B8A5A;"></div><div class="tx-desc">Combo — Pedro Alves</div><div class="tx-amount" style="color:#1B8A5A;">+R$ 60</div></div>
+            </div>
+            <div style="background:#1A3A6B;margin:8px;border-radius:12px;padding:12px;text-align:center;color:#fff;font-weight:700;font-size:14px;">🔒 Fechar caixa do dia</div>
+            <div class="tab-bar">
+              <div class="tab-item"><div class="tab-emoji">📊</div><div class="tab-label">Dashboard</div></div>
+              <div class="tab-item"><div class="tab-emoji">📅</div><div class="tab-label">Agenda</div></div>
+              <div class="tab-item"><div class="tab-emoji">👥</div><div class="tab-label">Clientes</div></div>
+              <div class="tab-item active"><div class="tab-emoji">💰</div><div class="tab-label">Financeiro</div></div>
+              <div class="tab-item"><div class="tab-emoji">⚙️</div><div class="tab-label">Mais</div></div>
+            </div>
+            <div class="screen-label">💰 FINANCEIRO</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ APP DO CLIENTE ═══════════════════════════════ -->
+  <div class="app-section">
+    <div class="app-title">👤 App do Cliente</div>
+    <div class="screens-row">
+
+      <!-- HOME -->
+      <div>
+        <div class="phone">
+          <div class="phone-inner" style="display:flex;flex-direction:column;">
+            <div class="client-header">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <div style="width:32px;height:32px;background:#F5A623;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1A3A6B;font-size:18px;">S</div>
+                <div style="font-size:20px;font-weight:900;color:#fff;">STYLO<span style="color:#F5A623;">GESTOR</span></div>
+              </div>
+              <div style="color:rgba(255,255,255,0.6);font-size:12px;">Agende na sua barbearia favorita</div>
+            </div>
+            <div class="demo-btn">⚡ Agendar na barbearia demo</div>
+            <div class="barb-list" style="flex:1;overflow:hidden;padding-top:4px;">
+              <div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:8px;">Barbearias disponíveis</div>
+              <div class="barb-card">
+                <div class="barb-avatar">B</div>
+                <div class="barb-info">
+                  <div class="barb-name">Barbearia do João</div>
+                  <div class="barb-city">📍 São Paulo, SP</div>
+                  <div class="barb-meta"><span>⭐ 4.9 (128)</span><span>✂️ 5 serviços</span></div>
+                </div>
+                <div><div class="barb-slot">14:00 hoje</div></div>
+              </div>
+              <div class="barb-card">
+                <div class="barb-avatar" style="background:#7C3AED;">B</div>
+                <div class="barb-info">
+                  <div class="barb-name">Barber King</div>
+                  <div class="barb-city">📍 BH, MG</div>
+                  <div class="barb-meta"><span>⭐ 4.7 (89)</span><span>✂️ 8 serviços</span></div>
+                </div>
+                <div><div class="barb-slot">15:30 hoje</div></div>
+              </div>
+              <div class="barb-card">
+                <div class="barb-avatar" style="background:#1B8A5A;">S</div>
+                <div class="barb-info">
+                  <div class="barb-name">Studio Beleza & Cia</div>
+                  <div class="barb-city">📍 Curitiba, PR</div>
+                  <div class="barb-meta"><span>⭐ 4.8 (234)</span><span>✂️ 12 serviços</span></div>
+                </div>
+                <div><div class="barb-slot" style="font-size:9px;">amanhã</div></div>
+              </div>
+            </div>
+            <div class="screen-label">🏠 HOME — LISTA DE BARBEARIAS</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENDAR — SERVIÇOS -->
+      <div>
+        <div class="phone">
+          <div class="phone-inner" style="display:flex;flex-direction:column;">
+            <div class="step-header">
+              <div class="back-btn">‹ Voltar</div>
+              <div class="white" style="font-size:14px;font-weight:700;margin-top:4px;">Barbearia do João</div>
+            </div>
+            <div class="progress-bar">
+              <div class="prog-dot active"></div>
+              <div class="prog-dot"></div>
+              <div class="prog-dot"></div>
+              <div class="prog-dot"></div>
+              <div class="prog-dot"></div>
+            </div>
+            <div class="step-title">Escolha os serviços</div>
+            <div class="svc-card selected">
+              <div><div class="svc-name">Corte masculino</div><div class="svc-dur">⏱ 30 minutos</div></div>
+              <div><div class="svc-price sel">R$ 40</div><div style="color:#1B8A5A;font-weight:700;font-size:14px;text-align:right;">✓</div></div>
+            </div>
+            <div class="svc-card">
+              <div><div class="svc-name">Barba</div><div class="svc-dur">⏱ 30 minutos</div></div>
+              <div class="svc-price">R$ 30</div>
+            </div>
+            <div class="svc-card selected">
+              <div><div class="svc-name">Corte + Barba</div><div class="svc-dur">⏱ 45 minutos</div></div>
+              <div><div class="svc-price sel">R$ 60</div><div style="color:#1B8A5A;font-weight:700;font-size:14px;text-align:right;">✓</div></div>
+            </div>
+            <div class="svc-card">
+              <div><div class="svc-name">Pigmentação</div><div class="svc-dur">⏱ 60 minutos</div></div>
+              <div class="svc-price">R$ 80</div>
+            </div>
+            <div style="flex:1;"></div>
+            <div class="bottom-bar" style="margin:8px;">
+              <div>
+                <div style="color:#F5A623;font-size:18px;font-weight:900;">R$ 100</div>
+                <div style="color:rgba(255,255,255,0.6);font-size:11px;">2 serviços · 75 min</div>
+              </div>
+              <div class="next-btn">Próximo →</div>
+            </div>
+            <div class="screen-label">✂️ PASSO 1 — SERVIÇOS</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENDAR — DATA/HORA -->
+      <div>
+        <div class="phone">
+          <div class="phone-inner" style="display:flex;flex-direction:column;">
+            <div class="step-header">
+              <div class="back-btn">‹ Voltar</div>
+              <div class="white" style="font-size:14px;font-weight:700;margin-top:4px;">Barbearia do João</div>
+            </div>
+            <div class="progress-bar">
+              <div class="prog-dot active"></div>
+              <div class="prog-dot active"></div>
+              <div class="prog-dot active"></div>
+              <div class="prog-dot"></div>
+              <div class="prog-dot"></div>
+            </div>
+            <div class="step-title">Data e horário</div>
+            <div style="display:flex;gap:6px;padding:0 14px;overflow:hidden;margin-bottom:14px;">
+              <div style="width:44px;height:66px;border-radius:12px;background:#F3F4F6;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <div style="font-size:10px;color:#6B7280;font-weight:600;">seg</div>
+                <div style="font-size:18px;font-weight:900;color:#111827;">12</div>
+              </div>
+              <div style="width:44px;height:66px;border-radius:12px;background:#1A3A6B;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <div style="font-size:10px;color:rgba(255,255,255,0.7);font-weight:600;">ter</div>
+                <div style="font-size:18px;font-weight:900;color:#fff;">13</div>
+              </div>
+              <div style="width:44px;height:66px;border-radius:12px;background:#F3F4F6;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <div style="font-size:10px;color:#6B7280;font-weight:600;">qua</div>
+                <div style="font-size:18px;font-weight:900;color:#111827;">14</div>
+              </div>
+              <div style="width:44px;height:66px;border-radius:12px;background:#F3F4F6;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <div style="font-size:10px;color:#6B7280;font-weight:600;">qui</div>
+                <div style="font-size:18px;font-weight:900;color:#111827;">15</div>
+              </div>
+              <div style="width:44px;height:66px;border-radius:12px;background:#F3F4F6;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <div style="font-size:10px;color:#6B7280;font-weight:600;">sex</div>
+                <div style="font-size:18px;font-weight:900;color:#111827;">16</div>
+              </div>
+            </div>
+            <div style="font-size:12px;font-weight:600;color:#6B7280;padding:0 14px;margin-bottom:10px;">Horários disponíveis</div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px;padding:0 14px;">
+              <div style="padding:10px 14px;border-radius:10px;background:#F3F4F6;border:1.5px solid #E5E7EB;font-size:13px;font-weight:600;color:#374151;">09:00</div>
+              <div style="padding:10px 14px;border-radius:10px;background:#F3F4F6;border:1.5px solid #E5E7EB;font-size:13px;font-weight:600;color:#374151;">09:30</div>
+              <div style="padding:10px 14px;border-radius:10px;background:#1A3A6B;border:1.5px solid #1A3A6B;font-size:13px;font-weight:600;color:#fff;">10:00</div>
+              <div style="padding:10px 14px;border-radius:10px;background:#F3F4F6;border:1.5px solid #E5E7EB;font-size:13px;font-weight:600;color:#374151;">10:30</div>
+              <div style="padding:10px 14px;border-radius:10px;background:#F3F4F6;border:1.5px solid #E5E7EB;font-size:13px;font-weight:600;color:#374151;">11:00</div>
+              <div style="padding:10px 14px;border-radius:10px;background:#F3F4F6;border:1.5px solid #E5E7EB;font-size:13px;font-weight:600;color:#374151;">14:00</div>
+              <div style="padding:10px 14px;border-radius:10px;background:#F3F4F6;border:1.5px solid #E5E7EB;font-size:13px;font-weight:600;color:#374151;">14:30</div>
+            </div>
+            <div style="flex:1;"></div>
+            <div style="background:#1A3A6B;margin:12px;border-radius:14px;padding:14px;text-align:center;color:#fff;font-weight:700;font-size:15px;">Próximo →</div>
+            <div class="screen-label">📅 PASSO 3 — DATA E HORÁRIO</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUCESSO -->
+      <div>
+        <div class="phone">
+          <div class="phone-inner" style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:#F8F6F2;padding:32px 24px;">
+            <div style="font-size:72px;margin-bottom:16px;">🎉</div>
+            <div style="font-size:22px;font-weight:900;color:#111827;text-align:center;margin-bottom:8px;">Agendado com sucesso!</div>
+            <div style="font-size:13px;color:#6B7280;text-align:center;line-height:20px;margin-bottom:24px;">Você receberá uma confirmação pelo WhatsApp em breve.</div>
+            <div style="background:#fff;border-radius:16px;padding:16px;width:100%;margin-bottom:24px;">
+              <div style="font-size:14px;color:#374151;font-weight:500;margin-bottom:8px;">📅 terça-feira, 13 de maio</div>
+              <div style="font-size:14px;color:#374151;font-weight:500;margin-bottom:8px;">⏰ 10:00</div>
+              <div style="font-size:14px;color:#374151;font-weight:500;margin-bottom:8px;">✂️ Corte + Barba</div>
+              <div style="font-size:14px;color:#374151;font-weight:500;">💰 R$ 100</div>
+            </div>
+            <div style="background:#1A3A6B;border-radius:14px;padding:14px 32px;color:#fff;font-weight:700;font-size:15px;">Voltar ao início</div>
+            <div class="screen-label">✅ AGENDAMENTO CONFIRMADO!</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div style="text-align:center;margin-top:48px;padding-bottom:40px;">
+  <p style="color:rgba(255,255,255,0.4);font-size:13px;">STYLOGESTOR Mobile Apps — React Native + Expo</p>
+  <p style="color:rgba(255,255,255,0.25);font-size:11px;margin-top:4px;">apps/mobile-gestor · apps/mobile-cliente</p>
+</div>
+
+</body>
+</html>

@@ -21,5 +21,20 @@
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@11.0.9"
+  "packageManager": "pnpm@11.0.9",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@clerk/shared",
+      "@prisma/client",
+      "@prisma/engines",
+      "@scarf/scarf",
+      "browser-tabs-lock",
+      "bufferutil",
+      "core-js",
+      "prisma",
+      "sharp",
+      "unrs-resolver",
+      "utf-8-validate"
+    ]
+  }
 }
