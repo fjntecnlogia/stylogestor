@@ -6,6 +6,7 @@
 
 set -e
 APP_DIR="/opt/stylogestor"
+ENV_FILE="$APP_DIR/apps/web/.env.production.local"
 
 echo "🚀 Iniciando deploy STYLOGESTOR..."
 
@@ -15,18 +16,32 @@ cd "$APP_DIR"
 echo "📥 Git pull..."
 git pull origin master
 
-# 2. Instalar dependências
+# 2. Carregar variáveis de ambiente
+if [ -f "$ENV_FILE" ]; then
+  echo "🔑 Carregando variáveis de ambiente..."
+  export $(grep -v '^#' "$ENV_FILE" | grep -v '^$' | xargs)
+else
+  echo "⚠️  Arquivo $ENV_FILE não encontrado!"
+  exit 1
+fi
+
+# Garantir DATABASE_URL sem # literal (% encoding)
+export DATABASE_URL="${DATABASE_URL//#/%23}"
+
+echo "🗄️  DATABASE_URL: ${DATABASE_URL:0:40}..."
+
+# 3. Instalar dependências
 echo "📦 Instalando dependências..."
 pnpm install --no-frozen-lockfile
 
-# 3. Rodar migrações do banco
+# 4. Rodar migrações do banco
 echo "🗄️ Rodando migrações Prisma..."
 cd "$APP_DIR/packages/database"
-pnpm exec prisma migrate deploy
+pnpm exec prisma db push --accept-data-loss
 pnpm exec prisma generate
 cd "$APP_DIR"
 
-# 4. Build dos apps
+# 5. Build dos apps
 echo "🔨 Build: site..."
 cd "$APP_DIR/apps/site"
 pnpm build
@@ -50,7 +65,7 @@ cd "$APP_DIR/apps/booking"
 pnpm build 2>/dev/null || echo "booking sem build configurado"
 cp -r .next/static .next/standalone/apps/booking/.next/ 2>/dev/null || true
 
-# 5. Restart PM2
+# 6. Restart PM2
 echo "♻️ Reiniciando PM2..."
 cd "$APP_DIR"
 pm2 restart stylo-site stylo-web stylo-admin stylo-booking 2>/dev/null || pm2 restart all
