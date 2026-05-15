@@ -4,6 +4,97 @@ import { useState } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { PortalButton } from '@/components/ui/portal-button'
 
+// ── Modal WhatsApp QR Code ──────────────────────────────────────
+function WhatsAppModal({ onClose }: { onClose: () => void }) {
+  const [qrcode, setQrcode] = useState<string | null>(null)
+  const [status, setStatus] = useState<'loading' | 'qr' | 'connected' | 'error'>('loading')
+  const [msg, setMsg] = useState('Conectando ao servidor WhatsApp...')
+
+  const fetchQR = async () => {
+    setStatus('loading')
+    setMsg('Buscando QR code...')
+    try {
+      const res = await fetch('/api/whatsapp/qr')
+      const data = await res.json()
+      if (data.status === 'connected') {
+        setStatus('connected')
+        setMsg('WhatsApp já está conectado!')
+      } else if (data.qrcode) {
+        setQrcode(data.qrcode)
+        setStatus('qr')
+        setMsg('Escaneie o QR code com o WhatsApp do seu celular')
+      } else {
+        // Tentar criar instância
+        const res2 = await fetch('/api/whatsapp/qr', { method: 'POST' })
+        const data2 = await res2.json()
+        if (data2.qrcode) {
+          setQrcode(data2.qrcode)
+          setStatus('qr')
+          setMsg('Escaneie o QR code com o WhatsApp do seu celular')
+        } else {
+          setStatus('error')
+          setMsg('Erro ao gerar QR code. Tente novamente.')
+        }
+      }
+    } catch {
+      setStatus('error')
+      setMsg('Erro de conexão com o servidor WhatsApp.')
+    }
+  }
+
+  useState(() => { fetchQR() })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+        <button onClick={onClose} className="absolute top-3 right-4 text-[#9CA3AF] hover:text-[#374151] text-2xl">×</button>
+        <p className="text-3xl mb-2">💬</p>
+        <h3 className="font-sora font-bold text-[#1C1C2E] text-lg mb-1">Conectar WhatsApp</h3>
+        <p className="text-xs text-[#6B7280] mb-4">{msg}</p>
+
+        {status === 'loading' && (
+          <div className="flex justify-center py-8">
+            <div className="w-10 h-10 border-4 border-[#1A3A6B] border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+
+        {status === 'qr' && qrcode && (
+          <div className="space-y-4">
+            <img src={qrcode} alt="QR Code WhatsApp" className="w-56 h-56 mx-auto rounded-xl border-4 border-[#25D366]/20" />
+            <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl p-3 text-xs text-[#166534] text-left">
+              <p className="font-semibold mb-1">Como conectar:</p>
+              <p>1. Abra o WhatsApp no celular</p>
+              <p>2. Menu → Aparelhos conectados → Conectar aparelho</p>
+              <p>3. Aponte a câmera para o QR code</p>
+            </div>
+            <button onClick={fetchQR} className="text-xs text-[#6B7280] hover:text-[#374151] underline">
+              🔄 Atualizar QR code
+            </button>
+          </div>
+        )}
+
+        {status === 'connected' && (
+          <div className="py-6">
+            <p className="text-5xl mb-3">✅</p>
+            <p className="font-bold text-[#1B8A5A]">WhatsApp conectado!</p>
+            <p className="text-xs text-[#6B7280] mt-1">Lembretes automáticos ativados.</p>
+          </div>
+        )}
+
+        {status === 'error' && (
+          <div className="space-y-3 py-4">
+            <p className="text-4xl">⚠️</p>
+            <button onClick={fetchQR} className="bg-[#1A3A6B] text-white text-sm font-bold px-6 py-2.5 rounded-xl hover:bg-[#142d55]">
+              Tentar novamente
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const PLANOS = [
   { id: 'STARTER', name: 'Starter', price: 79,  desc: '1 profissional · Agenda + Clientes' },
   { id: 'PRO',     name: 'Pro',     price: 149, desc: 'Até 5 profissionais · + Financeiro + WhatsApp', current: true },
@@ -28,7 +119,19 @@ const DEFAULT_HOURS = [
 export function ConfiguracoesView() {
   const [tab, setTab] = useState<'negocio' | 'horarios' | 'plano' | 'integracao'>('negocio')
   const [hours, setHours] = useState(DEFAULT_HOURS)
+  const [whatsappModal, setWhatsappModal] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const { success, error } = useToast()
+
+  const slug = 'joao-barber' // TODO: pegar do contexto real
+  const linkAgendamento = `https://${slug}.stylogestor.com.br`
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(linkAgendamento)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
+    success('Link copiado!')
+  }
 
   const toggleDay = (day: number) =>
     setHours((h) => h.map((d) => d.day === day ? { ...d, active: !d.active } : d))
@@ -167,30 +270,79 @@ export function ConfiguracoesView() {
 
         {tab === 'integracao' && (
           <div className="space-y-4">
-            {/* Integrações padrão */}
-            {[
-              { icon: '💬', name: 'WhatsApp Business', desc: 'Envie confirmações e lembretes automáticos', status: 'Não conectado', connected: false },
-              { icon: '📧', name: 'Resend (Email)', desc: 'Envie e-mails transacionais aos clientes', status: 'Configurado', connected: true },
-              { icon: '🔗', name: 'Link de agendamento', desc: 'Compartilhe seu link de agendamento online', status: 'joao-barber.stylogestor.com.br', connected: true },
-            ].map((item) => (
-              <div key={item.name} className="bg-white rounded-2xl border border-[#E8E6E2] p-5 flex items-center justify-between gap-3 flex-wrap">
+            {/* WhatsApp */}
+            <div className="bg-white rounded-2xl border border-[#E8E6E2] p-5 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-4">
+                <span className="text-3xl">💬</span>
+                <div>
+                  <p className="font-semibold text-[#1C1C2E]">WhatsApp Business</p>
+                  <p className="text-xs text-[#4A4A5A]">Envie confirmações e lembretes automáticos</p>
+                  <p className="text-xs mt-0.5 font-medium text-[#4A4A5A]">Não conectado</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setWhatsappModal(true)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl shrink-0 bg-[#25D366] text-white hover:bg-[#1ea855] transition-colors"
+              >
+                💬 Conectar
+              </button>
+            </div>
+
+            {/* Resend Email */}
+            <div className="bg-white rounded-2xl border border-[#E8E6E2] p-5 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-4">
+                <span className="text-3xl">📧</span>
+                <div>
+                  <p className="font-semibold text-[#1C1C2E]">Resend (Email)</p>
+                  <p className="text-xs text-[#4A4A5A]">Envie e-mails transacionais aos clientes</p>
+                  <p className="text-xs mt-0.5 font-medium text-[#1B8A5A]">✓ Configurado</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { success('Email configurado! Clientes receberão confirmações automáticas.') }}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl shrink-0 border border-[#E8E6E2] text-[#4A4A5A] hover:bg-[#F8F6F2] transition-colors"
+              >
+                Configurar
+              </button>
+            </div>
+
+            {/* Link de agendamento */}
+            <div className="bg-white rounded-2xl border border-[#E8E6E2] p-5 gap-3">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-4">
-                  <span className="text-3xl">{item.icon}</span>
+                  <span className="text-3xl">🔗</span>
                   <div>
-                    <p className="font-semibold text-[#1C1C2E]">{item.name}</p>
-                    <p className="text-xs text-[#4A4A5A]">{item.desc}</p>
-                    <p className={`text-xs mt-0.5 font-medium ${item.connected ? 'text-[#1B8A5A]' : 'text-[#4A4A5A]'}`}>
-                      {item.connected ? '✓ ' : ''}{item.status}
-                    </p>
+                    <p className="font-semibold text-[#1C1C2E]">Link de agendamento</p>
+                    <p className="text-xs text-[#4A4A5A]">Compartilhe com seus clientes</p>
+                    <p className="text-xs mt-0.5 font-medium text-[#1B8A5A]">✓ {slug}.stylogestor.com.br</p>
                   </div>
                 </div>
-                <button className={`text-xs font-semibold px-3 py-1.5 rounded-xl shrink-0 ${
-                  item.connected ? 'border border-[#E8E6E2] text-[#4A4A5A] hover:bg-[#F8F6F2]' : 'bg-[#1A3A6B] text-white hover:bg-[#142d55]'
-                }`}>
-                  {item.connected ? 'Configurar' : 'Conectar'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCopyLink}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-[#E8E6E2] text-[#4A4A5A] hover:bg-[#F8F6F2] transition-colors"
+                  >
+                    {linkCopied ? '✓ Copiado!' : '📋 Copiar link'}
+                  </button>
+                  <a
+                    href={linkAgendamento}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#1A3A6B] text-white hover:bg-[#142d55] transition-colors"
+                  >
+                    🔗 Abrir
+                  </a>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`Agende seu horário: ${linkAgendamento}`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#25D366] text-white hover:opacity-90 transition-opacity"
+                  >
+                    💬 Compartilhar
+                  </a>
+                </div>
               </div>
-            ))}
+            </div>
 
             {/* Stripe Connect — Add-on opcional */}
             <div className="bg-white rounded-2xl border-2 border-[#1A3A6B]/20 overflow-hidden">
@@ -248,5 +400,8 @@ export function ConfiguracoesView() {
         )}
       </div>
     </div>
+
+    {/* Modal WhatsApp QR Code */}
+    {whatsappModal && <WhatsAppModal onClose={() => setWhatsappModal(false)} />}
   )
 }
