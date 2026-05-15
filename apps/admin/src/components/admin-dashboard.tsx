@@ -117,7 +117,7 @@ export function AdminDashboard() {
   const [page, setPage] = useState('dashboard')
   const [search, setSearch] = useState('')
   const [ticketFiltro, setTicketFiltro] = useState<'todos' | 'aberto' | 'andamento' | 'resolvido'>('todos')
-  const [selectedTicket, setSelectedTicket] = useState<typeof TICKETS[0] | null>(null)
+  const [selectedTicket, setSelectedTicket] = useState<typeof TICKETS_INICIAL[0] | null>(null)
   const [selectedTenant, setSelectedTenant] = useState<typeof TENANTS[0] | null>(null)
   const [resposta, setResposta] = useState('')
   const [ticketResolvido, setTicketResolvido] = useState<string | null>(null)
