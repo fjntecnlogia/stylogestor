@@ -1,19 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe'
 import { clerkClient } from '@clerk/nextjs/server'
+import { sendWelcomeEmail, sendPaymentFailedEmail } from '@/lib/resend'
 import Stripe from 'stripe'
 
-async function updateUserSubscription(userId: string, status: string) {
+// ── Atualiza metadata no Clerk ───────────────────────────────────
+async function updateUserSubscription(
+  userId: string,
+  status: string,
+  plan?: string,
+  stripeSubId?: string,
+) {
   try {
     const clerk = await clerkClient()
     await clerk.users.updateUserMetadata(userId, {
-      publicMetadata: { subscriptionStatus: status },
+      publicMetadata: {
+        subscriptionStatus: status,
+        ...(plan && { plan }),
+        ...(stripeSubId && { stripeSubId }),
+      },
     })
-    console.log(`[CLERK_META] userId=${userId} subscriptionStatus=${status}`)
+    console.log(`[CLERK_META] userId=${userId} status=${status} plan=${plan}`)
   } catch (err) {
     console.error('[CLERK_META_ERROR]', err)
   }
 }
+
+// ── Salva/atualiza no banco via API interna ──────────────────────
+async function syncSubscriptionDB(params: {
+  clerkUserId: string
+  stripeSubId: string
+  stripeCustomerId: string
+  plan: string
+  status: string
+  currentPeriodStart?: Date
+  currentPeriodEnd?: Date
+  canceledAt?: Date
+}) {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+  const apiKey = process.env.INTERNAL_API_KEY || ''
+  try {
+    await fetch(`${apiUrl}/api/v1/subscriptions/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-key': apiKey,
+      },
+      body: JSON.stringify(params),
+    })
+  } catch (err) {
+    // Não crítico — Clerk já foi atualizado
+    console.error('[SYNC_DB_ERROR]', err)
+  }
+}
+
+export const config = { api: { bodyParser: false } }
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -34,80 +75,168 @@ export async function POST(req: NextRequest) {
   }
 
   console.log(`[STRIPE_WEBHOOK] ${event.type}`)
+  const stripe = getStripe()
 
   switch (event.type) {
 
-    // Checkout concluído (cartão/boleto)
+    // ── Checkout concluído ──────────────────────────────────────
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
-      const { userId, planId, paymentType } = session.metadata || {}
+      const { userId, planId, tenantSlug } = session.metadata || {}
+      if (!userId) break
 
-      if (paymentType === 'pix_first_month' && userId && planId) {
-        // PIX pago — criar assinatura com 29 dias trial
-        const stripe = getStripe()
+      // Se for trial por PIX pago → criar subscription com 29 dias extra
+      if (session.metadata?.paymentType === 'pix_first_month' && planId) {
         const customer = await stripe.customers.create({
           metadata: { userId, planId },
+          email: session.customer_details?.email ?? undefined,
+          name: session.customer_details?.name ?? undefined,
         })
-        await stripe.subscriptions.create({
+        const PLAN_PRICES: Record<string, number> = {
+          STARTER: 7900, PRO: 14900, PREMIUM: 24900,
+        }
+        const sub = await stripe.subscriptions.create({
           customer: customer.id,
-          items: [{ price_data: { currency: 'brl', product_data: { name: `STYLOGESTOR ${planId}` }, unit_amount: 14900, recurring: { interval: 'month' } } }],
+          items: [{
+            price_data: {
+              currency: 'brl',
+              product_data: { name: `STYLOGESTOR ${planId}` },
+              unit_amount: PLAN_PRICES[planId] ?? 14900,
+              recurring: { interval: 'month' },
+            },
+          }],
           trial_period_days: 29,
-          metadata: { userId, planId },
+          metadata: { userId, planId, tenantSlug: tenantSlug ?? '' },
         })
-        await updateUserSubscription(userId, 'trial')
-      } else if (userId) {
-        await updateUserSubscription(userId, 'trial')
+        await updateUserSubscription(userId, 'trial', planId, sub.id)
+        await syncSubscriptionDB({
+          clerkUserId: userId,
+          stripeSubId: sub.id,
+          stripeCustomerId: customer.id,
+          plan: planId,
+          status: 'trial',
+          currentPeriodStart: new Date(sub.current_period_start * 1000),
+          currentPeriodEnd: new Date(sub.current_period_end * 1000),
+        })
+      } else {
+        await updateUserSubscription(userId, 'trial', planId)
+      }
+
+      // Email de boas-vindas
+      if (session.customer_details?.email && session.customer_details?.name) {
+        await sendWelcomeEmail(
+          session.customer_details.email,
+          session.customer_details.name,
+        )
       }
       break
     }
 
-    // Assinatura ativa/renovada
+    // ── Subscription criada ─────────────────────────────────────
+    case 'customer.subscription.created': {
+      const sub = event.data.object as Stripe.Subscription
+      const { userId, planId } = sub.metadata || {}
+      if (!userId) break
+      const status = sub.status === 'trialing' ? 'trial' : sub.status === 'active' ? 'active' : sub.status
+      await updateUserSubscription(userId, status, planId, sub.id)
+      const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id
+      await syncSubscriptionDB({
+        clerkUserId: userId,
+        stripeSubId: sub.id,
+        stripeCustomerId: customerId,
+        plan: planId ?? 'PRO',
+        status,
+        currentPeriodStart: new Date(sub.current_period_start * 1000),
+        currentPeriodEnd: new Date(sub.current_period_end * 1000),
+      })
+      break
+    }
+
+    // ── Subscription atualizada (mudança de plano, status, etc.) ─
     case 'customer.subscription.updated': {
       const sub = event.data.object as Stripe.Subscription
-      const userId = sub.metadata?.userId
+      const { userId, planId } = sub.metadata || {}
       if (!userId) break
       const statusMap: Record<string, string> = {
-        active: 'active',
-        trialing: 'trial',
-        past_due: 'past_due',
-        canceled: 'canceled',
-        unpaid: 'past_due',
-        paused: 'past_due',
+        active: 'active', trialing: 'trial',
+        past_due: 'past_due', canceled: 'canceled',
+        unpaid: 'past_due', paused: 'past_due',
       }
-      const newStatus = statusMap[sub.status] || sub.status
-      await updateUserSubscription(userId, newStatus)
+      const newStatus = statusMap[sub.status] ?? sub.status
+      await updateUserSubscription(userId, newStatus, planId, sub.id)
+      const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id
+      await syncSubscriptionDB({
+        clerkUserId: userId,
+        stripeSubId: sub.id,
+        stripeCustomerId: customerId,
+        plan: planId ?? 'PRO',
+        status: newStatus,
+        currentPeriodStart: new Date(sub.current_period_start * 1000),
+        currentPeriodEnd: new Date(sub.current_period_end * 1000),
+      })
       break
     }
 
-    // Assinatura cancelada
+    // ── Subscription cancelada ──────────────────────────────────
     case 'customer.subscription.deleted': {
       const sub = event.data.object as Stripe.Subscription
-      const userId = sub.metadata?.userId
-      if (userId) await updateUserSubscription(userId, 'canceled')
+      const { userId } = sub.metadata || {}
+      if (!userId) break
+      await updateUserSubscription(userId, 'canceled')
+      const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id
+      await syncSubscriptionDB({
+        clerkUserId: userId,
+        stripeSubId: sub.id,
+        stripeCustomerId: customerId,
+        plan: 'FREE',
+        status: 'canceled',
+        canceledAt: new Date(),
+      })
       break
     }
 
-    // Pagamento falhou → bloquear
+    // ── Pagamento falhou ────────────────────────────────────────
     case 'invoice.payment_failed': {
       const invoice = event.data.object as Stripe.Invoice
       const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
       if (!subId) break
-      const stripe = getStripe()
       const sub = await stripe.subscriptions.retrieve(subId)
-      const userId = sub.metadata?.userId
-      if (userId) await updateUserSubscription(userId, 'past_due')
+      const { userId } = sub.metadata || {}
+      if (!userId) break
+      await updateUserSubscription(userId, 'past_due')
+      // Email de cobrança falhou
+      const customer = typeof invoice.customer === 'string'
+        ? await stripe.customers.retrieve(invoice.customer)
+        : invoice.customer
+      if (customer && !('deleted' in customer) && customer.email) {
+        const amount = new Intl.NumberFormat('pt-BR', {
+          style: 'currency', currency: 'BRL',
+        }).format((invoice.amount_due ?? 0) / 100)
+        await sendPaymentFailedEmail(customer.email, customer.name ?? 'Cliente', amount)
+      }
       break
     }
 
-    // Pagamento bem-sucedido → desbloquear
+    // ── Pagamento bem-sucedido ──────────────────────────────────
     case 'invoice.payment_succeeded': {
       const invoice = event.data.object as Stripe.Invoice
+      if (invoice.billing_reason === 'subscription_create') break // já tratado em created
       const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
       if (!subId) break
-      const stripe = getStripe()
       const sub = await stripe.subscriptions.retrieve(subId)
-      const userId = sub.metadata?.userId
-      if (userId) await updateUserSubscription(userId, 'active')
+      const { userId, planId } = sub.metadata || {}
+      if (!userId) break
+      await updateUserSubscription(userId, 'active', planId, sub.id)
+      const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id
+      await syncSubscriptionDB({
+        clerkUserId: userId,
+        stripeSubId: sub.id,
+        stripeCustomerId: customerId,
+        plan: planId ?? 'PRO',
+        status: 'active',
+        currentPeriodStart: new Date(sub.current_period_start * 1000),
+        currentPeriodEnd: new Date(sub.current_period_end * 1000),
+      })
       break
     }
 
