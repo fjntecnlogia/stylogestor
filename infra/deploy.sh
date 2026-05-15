@@ -17,7 +17,7 @@ git pull origin master
 
 # 2. Instalar dependências
 echo "📦 Instalando dependências..."
-pnpm install --frozen-lockfile
+pnpm install --no-frozen-lockfile
 
 # 3. Rodar migrações do banco
 echo "🗄️ Rodando migrações Prisma..."
