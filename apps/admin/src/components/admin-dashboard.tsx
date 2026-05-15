@@ -1,6 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+
+// ── Helper localStorage com fallback seguro ──────────────────────
+function loadLS<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const v = localStorage.getItem(key)
+    return v ? JSON.parse(v) : fallback
+  } catch { return fallback }
+}
+function saveLS<T>(key: string, value: T) {
+  if (typeof window === 'undefined') return
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+}
 
 const TENANTS = [
   { id: '1', name: 'Barbearia do João',    slug: 'joao-barber',   plan: 'PRO',     status: 'active',   mrr: 149, since: '01/03/2026', city: 'São Paulo',    clients: 148, appts: 312, lastLogin: '11/05/2026', email: 'joao@barbearia.com',    phone: '5511999990001' },
@@ -129,17 +142,31 @@ export function AdminDashboard() {
   const [selectedTenant, setSelectedTenant] = useState<typeof TENANTS[0] | null>(null)
   const [resposta, setResposta] = useState('')
   const [ticketResolvido, setTicketResolvido] = useState<string | null>(null)
-  const [tickets, setTickets] = useState(TICKETS_INICIAL)
-  const [campanhas, setCampanhas] = useState(CAMPANHAS_INICIAL)
+
+  // ── Estados persistidos no localStorage ─────────────────────────
+  const [tenants, setTenants] = useState(() => loadLS('sg_tenants', TENANTS))
+  const [tickets, setTickets] = useState(() => loadLS('sg_tickets', TICKETS_INICIAL))
+  const [campanhas, setCampanhas] = useState(() => loadLS('sg_campanhas', CAMPANHAS_INICIAL))
+  const [automacoes, setAutomacoes] = useState(() => loadLS('sg_automacoes', AUTOMACOES))
+  const [afiliados, setAfiliados] = useState(() => loadLS('sg_afiliados', AFILIADOS))
+  const [tenantsSuspended, setTenantsSuspended] = useState<string[]>(() => loadLS('sg_suspended', []))
+
+  // Sincronizar com localStorage sempre que mudam
+  useEffect(() => { saveLS('sg_tenants', tenants) }, [tenants])
+  useEffect(() => { saveLS('sg_tickets', tickets) }, [tickets])
+  useEffect(() => { saveLS('sg_campanhas', campanhas) }, [campanhas])
+  useEffect(() => { saveLS('sg_automacoes', automacoes) }, [automacoes])
+  useEffect(() => { saveLS('sg_afiliados', afiliados) }, [afiliados])
+  useEffect(() => { saveLS('sg_suspended', tenantsSuspended) }, [tenantsSuspended])
+
+  // ── Estados de UI (não precisam persistir) ───────────────────────
   const [novaCampanhaOpen, setNovaCampanhaOpen] = useState(false)
   const [formCampanha, setFormCampanha] = useState({ nome: '', canal: 'google', orcamento: '', objetivo: 'leads' })
   const [selectedLead, setSelectedLead] = useState<typeof LEADS[0] | null>(null)
   const [novaAutomacaoOpen, setNovaAutomacaoOpen] = useState(false)
-  const [automacoes, setAutomacoes] = useState(AUTOMACOES)
   const [formAutomacao, setFormAutomacao] = useState({ nome: '', tipo: 'email', gatilho: 'cadastro', delay: '0', mensagem: '' })
   const [selectedAutomacao, setSelectedAutomacao] = useState<typeof AUTOMACOES[0] | null>(null)
   const [editAutomacao, setEditAutomacao] = useState({ nome: '', descricao: '' })
-  const [afiliados, setAfiliados] = useState(AFILIADOS)
   const [selectedAfiliado, setSelectedAfiliado] = useState<typeof AFILIADOS[0] | null>(null)
   const [novoAfiliadoOpen, setNovoAfiliadoOpen] = useState(false)
   const [formAfiliado, setFormAfiliado] = useState({ nome: '', email: '', codigo: '', comissao: 15 })
@@ -148,17 +175,19 @@ export function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [cobrancaEnviada, setCobrancaEnviada] = useState<string | null>(null)
   const [suspenderConfirm, setSuspenderConfirm] = useState(false)
-  const [tenantsSuspended, setTenantsSuspended] = useState<string[]>([])
   const [tenantTab, setTenantTab] = useState<'overview'|'financeiro'|'atividade'|'suporte'>('overview')
+  const [novoTenantOpen, setNovoTenantOpen] = useState(false)
+  const [formTenant, setFormTenant] = useState({ name: '', email: '', phone: '', city: '', plan: 'PRO', slug: '' })
 
-  const active   = TENANTS.filter((t) => t.status === 'active')
-  const trials   = TENANTS.filter((t) => t.status === 'trial')
-  const pastDue  = TENANTS.filter((t) => t.status === 'past_due')
+  // ── Derivados ────────────────────────────────────────────────────
+  const active   = tenants.filter((t) => t.status === 'active')
+  const trials   = tenants.filter((t) => t.status === 'trial')
+  const pastDue  = tenants.filter((t) => t.status === 'past_due')
   const totalMRR = [...active, ...pastDue].reduce((s, t) => s + t.mrr, 0)
-  const totalClients = TENANTS.reduce((s, t) => s + t.clients, 0)
-  const totalAppts = TENANTS.reduce((s, t) => s + t.appts, 0)
+  const totalClients = tenants.reduce((s, t) => s + t.clients, 0)
+  const totalAppts = tenants.reduce((s, t) => s + t.appts, 0)
 
-  const filteredTenants = TENANTS.filter((t) =>
+  const filteredTenants = tenants.filter((t) =>
     t.name.toLowerCase().includes(search.toLowerCase()) || t.city.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -169,6 +198,31 @@ export function AdminDashboard() {
   const ticketsAbertos = tickets.filter((t) => t.status === 'aberto').length
 
   const maxPageView = Math.max(...ANALYTICS.pageViews)
+
+  // Adicionar novo tenant
+  const handleAdicionarTenant = useCallback(() => {
+    if (!formTenant.name || !formTenant.email) return
+    const PLAN_MRR: Record<string, number> = { STARTER: 79, PRO: 149, PREMIUM: 249 }
+    const slug = formTenant.slug || formTenant.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 20)
+    const newTenant = {
+      id: String(Date.now()),
+      name: formTenant.name,
+      slug,
+      plan: formTenant.plan,
+      status: 'trial' as const,
+      mrr: 0,
+      since: new Date().toLocaleDateString('pt-BR'),
+      city: formTenant.city || '—',
+      clients: 0,
+      appts: 0,
+      lastLogin: new Date().toLocaleDateString('pt-BR'),
+      email: formTenant.email,
+      phone: formTenant.phone.replace(/\D/g, '') || '5500000000000',
+    }
+    setTenants(prev => [newTenant, ...prev])
+    setFormTenant({ name: '', email: '', phone: '', city: '', plan: 'PRO', slug: '' })
+    setNovoTenantOpen(false)
+  }, [formTenant])
 
   const handleNav = (id: string) => { setPage(id); setSidebarOpen(false) }
 
@@ -571,7 +625,7 @@ export function AdminDashboard() {
                     <button onClick={() => setPage('tenants')} className="text-xs text-[#F5A623] hover:underline">Ver todos →</button>
                   </div>
                   <div className="space-y-3">
-                    {TENANTS.slice(0,5).map((t) => {
+                    {tenants.slice(0,5).map((t) => {
                       const st = STATUS_TENANT[t.status as keyof typeof STATUS_TENANT]
                       return (
                         <div key={t.id} className="flex items-center justify-between">
@@ -706,14 +760,24 @@ export function AdminDashboard() {
           {/* ── TENANTS ── */}
           {page === 'tenants' && (
             <>
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex-1">
                   <h1 className="font-sora font-bold text-2xl text-white">Barbearias e Salões</h1>
-                  <p className="text-white/40 text-sm mt-0.5">{TENANTS.length} tenants cadastrados</p>
+                  <p className="text-white/40 text-sm mt-0.5">{tenants.length} tenants cadastrados · {active.length} ativos · {trials.length} em trial</p>
                 </div>
                 <input value={search} onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar..."
-                  className="bg-white/5 border border-white/10 text-white placeholder-white/30 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-white/20" />
+                  className="bg-white/5 border border-white/10 text-white placeholder-white/30 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 w-48" />
+                <button onClick={() => setNovoTenantOpen(true)}
+                  className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:opacity-90 whitespace-nowrap">
+                  + Nova Barbearia
+                </button>
+                <button onClick={() => {
+                  if (confirm('Redefinir para dados iniciais? Perderá todas as alterações.')) {
+                    ['sg_tenants','sg_tickets','sg_campanhas','sg_automacoes','sg_afiliados','sg_suspended'].forEach(k => localStorage.removeItem(k))
+                    window.location.reload()
+                  }
+                }} className="text-xs text-white/20 hover:text-white/40 transition-colors px-2 py-1.5 rounded-lg" title="Redefinir dados">↺</button>
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
@@ -2087,6 +2151,83 @@ export function AdminDashboard() {
                 className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity"
               >
                 ✓ Criar campanha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL NOVA BARBEARIA ── */}
+      {novoTenantOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setNovoTenantOpen(false)} />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <div>
+                <h3 className="font-sora font-bold text-white text-lg">✂️ Cadastrar nova barbearia</h3>
+                <p className="text-xs text-white/40 mt-0.5">Entra como Trial · pode alterar plano depois</p>
+              </div>
+              <button onClick={() => setNovoTenantOpen(false)} className="text-white/40 hover:text-white text-2xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Nome da barbearia *</label>
+                  <input value={formTenant.name} onChange={e => setFormTenant(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Ex: Barbearia do Silva"
+                    className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+                </div>
+                <div>
+                  <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">E-mail *</label>
+                  <input type="email" value={formTenant.email} onChange={e => setFormTenant(f => ({ ...f, email: e.target.value }))}
+                    placeholder="dono@barbearia.com"
+                    className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+                </div>
+                <div>
+                  <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">WhatsApp</label>
+                  <input value={formTenant.phone} onChange={e => setFormTenant(f => ({ ...f, phone: e.target.value }))}
+                    placeholder="(11) 99999-0000"
+                    className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+                </div>
+                <div>
+                  <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Cidade</label>
+                  <input value={formTenant.city} onChange={e => setFormTenant(f => ({ ...f, city: e.target.value }))}
+                    placeholder="São Paulo"
+                    className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+                </div>
+                <div>
+                  <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Plano inicial</label>
+                  <select value={formTenant.plan} onChange={e => setFormTenant(f => ({ ...f, plan: e.target.value }))}
+                    className="w-full bg-[#0F172A] border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50">
+                    <option value="STARTER">Starter — R$79/mês</option>
+                    <option value="PRO">Pro — R$149/mês</option>
+                    <option value="PREMIUM">Premium — R$249/mês</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Slug personalizado (opcional)</label>
+                  <div className="flex items-center gap-2">
+                    <input value={formTenant.slug} onChange={e => setFormTenant(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'') }))}
+                      placeholder={formTenant.name ? formTenant.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'').slice(0,20) : 'minha-barbearia'}
+                      className="flex-1 bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+                    <span className="text-xs text-white/30 shrink-0">.stylogestor.com.br</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-[#F5A623]/5 border border-[#F5A623]/20 rounded-xl p-3 flex items-start gap-2">
+                <span className="text-lg">💡</span>
+                <p className="text-xs text-white/50">O cliente entrará em <strong className="text-white/80">Trial gratuito de 14 dias</strong>. Você pode alterar o plano e status depois clicando em &quot;Ver&quot; na listagem.</p>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-white/10 flex gap-3">
+              <button onClick={() => setNovoTenantOpen(false)}
+                className="flex-1 border border-white/10 text-white/60 text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5">
+                Cancelar
+              </button>
+              <button onClick={handleAdicionarTenant}
+                disabled={!formTenant.name.trim() || !formTenant.email.trim()}
+                className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity">
+                ✓ Cadastrar barbearia
               </button>
             </div>
           </div>
