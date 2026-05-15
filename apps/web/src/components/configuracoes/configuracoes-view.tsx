@@ -137,6 +137,7 @@ export function ConfiguracoesView() {
     setHours((h) => h.map((d) => d.day === day ? { ...d, active: !d.active } : d))
 
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
       {/* Menu lateral */}
       <div className="bg-white rounded-2xl border border-[#E8E6E2] p-2 h-fit">
@@ -403,5 +404,6 @@ export function ConfiguracoesView() {
 
     {/* Modal WhatsApp QR Code */}
     {whatsappModal && <WhatsAppModal onClose={() => setWhatsappModal(false)} />}
+    </>
   )
 }
