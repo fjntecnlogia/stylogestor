@@ -44,11 +44,37 @@ export function OnboardingFlow() {
   const [commission, setCommission] = useState('40')
   const [services, setServices] = useState(DEFAULT_SERVICES)
 
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+
   const toggleService = (id: string) =>
     setServices((s) => s.map((sv) => sv.id === id ? { ...sv, selected: !sv.selected } : sv))
 
   const handleFinish = async () => {
-    router.push('/dashboard')
+    setSaving(true)
+    setSaveError('')
+    try {
+      const res = await fetch('/api/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          type,
+          phone,
+          city,
+          plan: 'FREE',
+          schedules: schedules.map(s => ({ day: s.day, start: s.start, end: s.end, active: s.active })),
+          professionals: profName ? [{ name: profName, role: profRole, commission }] : [],
+          services: services.filter(s => s.selected).map(s => ({ name: s.name, price: s.price, duration: s.duration })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao salvar')
+      router.push('/dashboard')
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Erro ao salvar configurações')
+      setSaving(false)
+    }
   }
 
   return (
@@ -346,10 +372,14 @@ export function OnboardingFlow() {
                 </button>
                 <button
                   onClick={handleFinish}
-                  className="flex-1 bg-[#1B8A5A] text-white font-bold py-3 rounded-xl hover:bg-[#156b47] transition-colors shadow-sm text-base">
-                  🎉 Concluir configuração
+                  disabled={saving}
+                  className="flex-1 bg-[#1B8A5A] text-white font-bold py-3 rounded-xl hover:bg-[#156b47] transition-colors shadow-sm text-base disabled:opacity-60 disabled:cursor-not-allowed">
+                  {saving ? '⏳ Salvando...' : '🎉 Concluir configuração'}
                 </button>
               </div>
+              {saveError && (
+                <p className="text-red-500 text-sm text-center mt-2">⚠️ {saveError}</p>
+              )}
             </div>
           )}
         </div>
