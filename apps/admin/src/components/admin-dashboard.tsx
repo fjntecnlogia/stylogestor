@@ -139,6 +139,12 @@ export function AdminDashboard() {
   const [formAutomacao, setFormAutomacao] = useState({ nome: '', tipo: 'email', gatilho: 'cadastro', delay: '0', mensagem: '' })
   const [selectedAutomacao, setSelectedAutomacao] = useState<typeof AUTOMACOES[0] | null>(null)
   const [editAutomacao, setEditAutomacao] = useState({ nome: '', descricao: '' })
+  const [afiliados, setAfiliados] = useState(AFILIADOS)
+  const [selectedAfiliado, setSelectedAfiliado] = useState<typeof AFILIADOS[0] | null>(null)
+  const [novoAfiliadoOpen, setNovoAfiliadoOpen] = useState(false)
+  const [formAfiliado, setFormAfiliado] = useState({ nome: '', email: '', codigo: '', comissao: 15 })
+  const [selectedCampanha, setSelectedCampanha] = useState<typeof CAMPANHAS_INICIAL[0] | null>(null)
+  const [editCampanha, setEditCampanha] = useState({ nome: '', gasto: 0 })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [cobrancaEnviada, setCobrancaEnviada] = useState<string | null>(null)
   const [suspenderConfirm, setSuspenderConfirm] = useState(false)
@@ -444,7 +450,7 @@ export function AdminDashboard() {
                     {campanhas.map((c) => {
                       const canais: Record<string, string> = { google: '🔵', meta: '🟦', insta: '🩷', yt: '🔴' }
                       return (
-                        <div key={c.id} className="bg-white/5 rounded-xl p-3">
+                        <div key={c.id} onClick={() => { setSelectedCampanha(c); setEditCampanha({ nome: c.nome, gasto: c.gasto }) }} className="bg-white/5 rounded-xl p-3 cursor-pointer hover:bg-white/10 transition-colors border border-transparent hover:border-[#F5A623]/20">
                           <div className="flex items-start justify-between mb-2">
                             <div>
                               <div className="flex items-center gap-2">
@@ -470,11 +476,11 @@ export function AdminDashboard() {
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-sora font-bold text-white">🤝 Programa de Afiliados</h3>
-                    <button className="text-xs text-[#F5A623] hover:underline">+ Novo afiliado</button>
+                    <button onClick={() => setNovoAfiliadoOpen(true)} className="text-xs bg-[#F5A623] text-[#1A3A6B] font-bold px-3 py-1.5 rounded-lg hover:opacity-90">+ Novo afiliado</button>
                   </div>
                   <div className="space-y-3">
-                    {AFILIADOS.map((a) => (
-                      <div key={a.id} className="bg-white/5 rounded-xl p-3">
+                    {afiliados.map((a) => (
+                      <div key={a.id} onClick={() => setSelectedAfiliado(a)} className="bg-white/5 rounded-xl p-3 cursor-pointer hover:bg-white/10 transition-colors border border-transparent hover:border-[#F5A623]/20">
                         <div className="flex items-center justify-between mb-2">
                           <div>
                             <p className="text-sm font-semibold text-white">{a.nome}</p>
@@ -495,8 +501,8 @@ export function AdminDashboard() {
                     ))}
                   </div>
                   <div className="mt-4 pt-3 border-t border-white/5 grid grid-cols-2 gap-4 text-center text-xs">
-                    <div><p className="text-white/30">Total pago afiliados</p><p className="font-bold text-[#10B981] text-base">R${AFILIADOS.reduce((s,a)=>s+a.pago,0).toFixed(0)}</p></div>
-                    <div><p className="text-white/30">MRR gerado afiliados</p><p className="font-bold text-[#F5A623] text-base">R${AFILIADOS.reduce((s,a)=>s+a.mrr,0).toLocaleString()}</p></div>
+                    <div><p className="text-white/30">Total pago afiliados</p><p className="font-bold text-[#10B981] text-base">R${afiliados.reduce((s,a)=>s+a.pago,0).toFixed(0)}</p></div>
+                    <div><p className="text-white/30">MRR gerado afiliados</p><p className="font-bold text-[#F5A623] text-base">R${afiliados.reduce((s,a)=>s+a.mrr,0).toLocaleString()}</p></div>
                   </div>
                 </div>
               </div>
@@ -1223,6 +1229,215 @@ export function AdminDashboard() {
         </div>
       </main>
       </div>
+
+      {/* ── MODAL CAMPANHA ── */}
+      {selectedCampanha && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedCampanha(null)} />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <div>
+                <h3 className="font-sora font-bold text-white">📣 Campanha</h3>
+                <p className="text-xs text-white/40 mt-0.5">{selectedCampanha.canal.toUpperCase()} · {selectedCampanha.status.toUpperCase()}</p>
+              </div>
+              <button onClick={() => setSelectedCampanha(null)} className="text-white/40 hover:text-white text-2xl">×</button>
+            </div>
+
+            {/* Métricas completas */}
+            <div className="grid grid-cols-3 divide-x divide-white/5 border-b border-white/10">
+              {[
+                { label: 'Gasto total', value: `R$${selectedCampanha.gasto}`, color: 'text-white' },
+                { label: 'Leads', value: selectedCampanha.leads, color: 'text-[#3B82F6]' },
+                { label: 'Conversões', value: selectedCampanha.conversoes, color: 'text-[#10B981]' },
+              ].map(s => (
+                <div key={s.label} className="px-4 py-3 text-center">
+                  <p className={`font-sora font-bold text-xl ${s.color}`}>{s.value}</p>
+                  <p className="text-xs text-white/30 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 divide-x divide-white/5 border-b border-white/10">
+              {[
+                { label: 'CPL', value: `R$${selectedCampanha.custo_lead}`, color: 'text-[#F5A623]' },
+                { label: 'CAC', value: `R$${selectedCampanha.cac.toFixed(0)}`, color: 'text-[#F5A623]' },
+                { label: 'Cliques', value: selectedCampanha.cliques.toLocaleString(), color: 'text-white/60' },
+              ].map(s => (
+                <div key={s.label} className="px-4 py-3 text-center">
+                  <p className={`font-sora font-bold text-lg ${s.color}`}>{s.value}</p>
+                  <p className="text-xs text-white/30 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Nome da campanha</label>
+                <input value={editCampanha.nome} onChange={e => setEditCampanha(f => ({ ...f, nome: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Orçamento mensal (R$)</label>
+                <input type="number" value={editCampanha.gasto} onChange={e => setEditCampanha(f => ({ ...f, gasto: Number(e.target.value) }))}
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => { setCampanhas(p => p.map(x => x.id === selectedCampanha.id ? { ...x, status: x.status === 'ativo' ? 'pausado' : 'ativo' } : x)); setSelectedCampanha(prev => prev ? { ...prev, status: prev.status === 'ativo' ? 'pausado' : 'ativo' } : null) }}
+                  className={`py-2.5 rounded-xl border text-sm font-bold transition-all ${selectedCampanha.status === 'ativo' ? 'border-[#F5A623]/30 bg-[#F5A623]/10 text-[#F5A623]' : 'border-[#1B8A5A]/30 bg-[#1B8A5A]/10 text-[#1B8A5A]'}`}>
+                  {selectedCampanha.status === 'ativo' ? '⏸ Pausar' : '▶ Ativar'}
+                </button>
+                <button onClick={() => { if (confirm(`Excluir "${selectedCampanha.nome}"?`)) { setCampanhas(p => p.filter(x => x.id !== selectedCampanha.id)); setSelectedCampanha(null) } }}
+                  className="py-2.5 rounded-xl border border-red-500/20 bg-red-500/5 text-red-400 text-sm font-bold hover:bg-red-500/10">
+                  🗑️ Excluir
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-white/10 flex gap-3">
+              <button onClick={() => setSelectedCampanha(null)} className="flex-1 border border-white/10 text-white/60 text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5">Cancelar</button>
+              <button onClick={() => { setCampanhas(p => p.map(x => x.id === selectedCampanha.id ? { ...x, nome: editCampanha.nome, gasto: editCampanha.gasto } : x)); setSelectedCampanha(null) }}
+                className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90">
+                ✓ Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL AFILIADO ── */}
+      {selectedAfiliado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedAfiliado(null)} />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <div>
+                <h3 className="font-sora font-bold text-white">🤝 {selectedAfiliado.nome}</h3>
+                <p className="text-xs text-white/40 mt-0.5">Código: <span className="font-mono text-[#F5A623]">{selectedAfiliado.codigo}</span> · {selectedAfiliado.comissao}% comissão</p>
+              </div>
+              <button onClick={() => setSelectedAfiliado(null)} className="text-white/40 hover:text-white text-2xl">×</button>
+            </div>
+
+            {/* KPIs */}
+            <div className="grid grid-cols-4 divide-x divide-white/5 border-b border-white/10">
+              {[
+                { label: 'Cliques', value: selectedAfiliado.cliques, color: 'text-white/70' },
+                { label: 'Cadastros', value: selectedAfiliado.cadastros, color: 'text-[#3B82F6]' },
+                { label: 'Ativos', value: selectedAfiliado.ativos, color: 'text-[#10B981]' },
+                { label: 'MRR gerado', value: `R$${selectedAfiliado.mrr.toLocaleString()}`, color: 'text-[#F5A623]' },
+              ].map(s => (
+                <div key={s.label} className="px-3 py-3 text-center">
+                  <p className={`font-sora font-bold text-lg ${s.color}`}>{s.value}</p>
+                  <p className="text-[10px] text-white/30 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {/* Comissões */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-[#1B8A5A]/10 border border-[#1B8A5A]/20 rounded-xl p-4 text-center">
+                  <p className="text-xs text-white/40 mb-1">Total já pago</p>
+                  <p className="font-sora font-bold text-2xl text-[#1B8A5A]">R${selectedAfiliado.pago.toFixed(0)}</p>
+                </div>
+                <div className="bg-[#F5A623]/10 border border-[#F5A623]/20 rounded-xl p-4 text-center">
+                  <p className="text-xs text-white/40 mb-1">Pendente pagamento</p>
+                  <p className="font-sora font-bold text-2xl text-[#F5A623]">R${selectedAfiliado.pendente.toFixed(0)}</p>
+                </div>
+              </div>
+
+              {/* Link de afiliado */}
+              <div className="bg-white/5 rounded-xl p-3">
+                <p className="text-xs text-white/40 mb-1">Link de indicação</p>
+                <div className="flex items-center gap-2">
+                  <code className="text-xs text-white/70 flex-1 truncate">app.stylogestor.com.br/cadastro?ref={selectedAfiliado.codigo}</code>
+                  <button onClick={() => navigator.clipboard.writeText(`https://app.stylogestor.com.br/cadastro?ref=${selectedAfiliado.codigo}`)}
+                    className="text-xs bg-white/10 text-white px-2 py-1 rounded-lg hover:bg-white/20 shrink-0">
+                    📋 Copiar
+                  </button>
+                </div>
+              </div>
+
+              {/* Ações */}
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => {
+                  setAfiliados(p => p.map(x => x.id === selectedAfiliado.id ? { ...x, pago: x.pago + x.pendente, pendente: 0 } : x))
+                  setSelectedAfiliado(prev => prev ? { ...prev, pago: prev.pago + prev.pendente, pendente: 0 } : null)
+                }} className="py-2.5 rounded-xl bg-[#1B8A5A]/20 border border-[#1B8A5A]/30 text-[#1B8A5A] text-sm font-bold hover:bg-[#1B8A5A]/30 transition-colors">
+                  💸 Marcar comissão paga
+                </button>
+                <button onClick={() => {
+                  const link = `https://app.stylogestor.com.br/cadastro?ref=${selectedAfiliado.codigo}`
+                  const msg = encodeURIComponent(`Oi ${selectedAfiliado.nome}! 🎉 Aqui está seu link de afiliado STYLOGESTOR: ${link}\nComissão: ${selectedAfiliado.comissao}%`)
+                  window.open(`https://wa.me/?text=${msg}`, '_blank')
+                }} className="py-2.5 rounded-xl bg-[#1B8A5A] text-white text-sm font-bold hover:bg-[#156b47] transition-colors">
+                  💬 Enviar link WA
+                </button>
+                <button onClick={() => { if (confirm(`Remover ${selectedAfiliado.nome}?`)) { setAfiliados(p => p.filter(x => x.id !== selectedAfiliado.id)); setSelectedAfiliado(null) } }}
+                  className="col-span-2 py-2 rounded-xl border border-red-500/20 bg-red-500/5 text-red-400 text-sm font-bold hover:bg-red-500/10 transition-colors">
+                  🗑️ Remover afiliado
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-white/10">
+              <button onClick={() => setSelectedAfiliado(null)} className="w-full border border-white/10 text-white/60 text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5">
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL NOVO AFILIADO ── */}
+      {novoAfiliadoOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setNovoAfiliadoOpen(false)} />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <h3 className="font-sora font-bold text-white">🤝 Novo Afiliado</h3>
+              <button onClick={() => setNovoAfiliadoOpen(false)} className="text-white/40 hover:text-white text-2xl">×</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Nome *</label>
+                <input value={formAfiliado.nome} onChange={e => setFormAfiliado(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: João Barber SP"
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">E-mail</label>
+                <input value={formAfiliado.email} onChange={e => setFormAfiliado(f => ({ ...f, email: e.target.value }))} placeholder="afiliado@email.com" type="email"
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Código de indicação *</label>
+                <input value={formAfiliado.codigo} onChange={e => setFormAfiliado(f => ({ ...f, codigo: e.target.value.toUpperCase() }))} placeholder="Ex: JOAO10"
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 font-mono focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+                <p className="text-xs text-white/30 mt-1">Link gerado: app.stylogestor.com.br/cadastro?ref={formAfiliado.codigo || 'CODIGO'}</p>
+              </div>
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Comissão: {formAfiliado.comissao}%</label>
+                <input type="range" min="5" max="30" step="5" value={formAfiliado.comissao} onChange={e => setFormAfiliado(f => ({ ...f, comissao: Number(e.target.value) }))}
+                  className="w-full accent-[#F5A623]" />
+                <div className="flex justify-between text-xs text-white/30 mt-1">
+                  <span>5%</span><span>10%</span><span>15%</span><span>20%</span><span>25%</span><span>30%</span>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-white/10 flex gap-3">
+              <button onClick={() => setNovoAfiliadoOpen(false)} className="flex-1 border border-white/10 text-white/60 text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5">Cancelar</button>
+              <button onClick={() => {
+                if (!formAfiliado.nome || !formAfiliado.codigo) return
+                const novo = { id: `AF${afiliados.length+1}`, nome: formAfiliado.nome, codigo: formAfiliado.codigo, comissao: formAfiliado.comissao, cliques: 0, cadastros: 0, ativos: 0, mrr: 0, pago: 0, pendente: 0 }
+                setAfiliados(p => [...p, novo])
+                setNovoAfiliadoOpen(false)
+                setFormAfiliado({ nome: '', email: '', codigo: '', comissao: 15 })
+              }} disabled={!formAfiliado.nome || !formAfiliado.codigo}
+                className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40">
+                ✓ Cadastrar afiliado
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL EDITAR AUTOMAÇÃO ── */}
       {selectedAutomacao && (
