@@ -220,6 +220,7 @@ model Service {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   appointmentServices AppointmentService[]
 
   @@index([tenantId])
@@ -296,6 +297,7 @@ model Appointment {
   services     AppointmentService[]
   payments     Payment[]
   commission   Commission?
+  transactions Transaction[]
 
   @@index([tenantId, date])
   @@index([tenantId, status])
