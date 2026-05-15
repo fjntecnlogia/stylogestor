@@ -55,24 +55,27 @@ cp -r public .next/standalone/apps/site/ 2>/dev/null || true
 echo "🔨 Build: web..."
 cd "$APP_DIR/apps/web"
 pnpm build
-cp -r .next/static .next/standalone/apps/web/.next/
+\cp -rf .next/static .next/standalone/apps/web/.next/
 cp -r public .next/standalone/apps/web/ 2>/dev/null || true
+# Copiar .env para o standalone (Next.js standalone não lê do dir original)
+cp "$APP_DIR/apps/web/.env.production.local" .next/standalone/apps/web/.env.production.local 2>/dev/null || true
 
 echo "🔨 Build: admin..."
 cd "$APP_DIR/apps/admin"
 pnpm build
-cp -r .next/static .next/standalone/apps/admin/.next/
+\cp -rf .next/static .next/standalone/apps/admin/.next/
 cp -r public .next/standalone/apps/admin/ 2>/dev/null || true
+cp "$APP_DIR/apps/admin/.env.production.local" .next/standalone/apps/admin/.env.production.local 2>/dev/null || true
 
 echo "🔨 Build: booking..."
 cd "$APP_DIR/apps/booking"
 pnpm build 2>/dev/null || echo "booking sem build configurado"
-cp -r .next/static .next/standalone/apps/booking/.next/ 2>/dev/null || true
+\cp -rf .next/static .next/standalone/apps/booking/.next/ 2>/dev/null || true
 
-# 6. Restart PM2
+# 6. Restart PM2 com reload de env
 echo "♻️ Reiniciando PM2..."
 cd "$APP_DIR"
-pm2 restart stylo-site stylo-web stylo-admin stylo-booking 2>/dev/null || pm2 restart all
+pm2 restart stylo-site stylo-web stylo-admin stylo-booking --update-env 2>/dev/null || pm2 restart all --update-env
 pm2 save
 
 echo "✅ Deploy completo!"
