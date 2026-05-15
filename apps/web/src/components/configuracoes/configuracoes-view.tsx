@@ -380,13 +380,16 @@ export function ConfiguracoesView() {
 
                 <button
                   onClick={async () => {
-                    const res = await fetch('/api/stripe/connect/onboard', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ tenantName: (document.querySelector('input[placeholder="Barbearia do João"]') as HTMLInputElement)?.value || 'Minha Barbearia', email: (document.querySelector('input[type="email"]') as HTMLInputElement)?.value || '' }),
-                    })
-                    const data = await res.json()
-                    if (data.url) window.location.href = data.url
+                    try {
+                      const res = await fetch('/api/stripe/connect/onboard', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tenantName: 'Minha Barbearia', email: '' }),
+                      })
+                      const data = await res.json()
+                      if (data.url) window.location.href = data.url
+                      else if (data.error) alert('Erro: ' + data.error)
+                    } catch { alert('Erro ao conectar com Stripe. Tente novamente.') }
                   }}
                   className="w-full bg-[#1A3A6B] text-white font-bold py-3 rounded-xl hover:bg-[#142d55] transition-colors text-sm"
                 >
