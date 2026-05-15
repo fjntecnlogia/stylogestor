@@ -149,6 +149,7 @@ export function AdminDashboard() {
   const [cobrancaEnviada, setCobrancaEnviada] = useState<string | null>(null)
   const [suspenderConfirm, setSuspenderConfirm] = useState(false)
   const [tenantsSuspended, setTenantsSuspended] = useState<string[]>([])
+  const [tenantTab, setTenantTab] = useState<'overview'|'financeiro'|'atividade'|'suporte'>('overview')
 
   const active   = TENANTS.filter((t) => t.status === 'active')
   const trials   = TENANTS.filter((t) => t.status === 'trial')
@@ -789,13 +790,12 @@ export function AdminDashboard() {
             const diasSemLogin = t.lastLogin === '11/05/2026' ? 0 : t.lastLogin === '10/05/2026' ? 1 : t.lastLogin === '08/05/2026' ? 3 : 45
             const churnRisk = t.status === 'past_due' ? 'alto' : t.status === 'canceled' ? 'churned' : diasSemLogin > 7 ? 'medio' : 'baixo'
             const churnColor = { alto: '#EF4444', medio: '#F59E0B', baixo: '#1B8A5A', churned: '#6B7280' }[churnRisk]
-            const [tenantTab, setTenantTab] = useState<'overview'|'financeiro'|'atividade'|'suporte'>('overview')
 
             return (
               <>
                 {/* Header */}
                 <div className="flex items-center gap-3 flex-wrap">
-                  <button onClick={() => { setPage('tenants'); setSelectedTenant(null) }} className="text-white/50 hover:text-white text-sm transition-colors">← Voltar</button>
+                  <button onClick={() => { setPage('tenants'); setSelectedTenant(null); setTenantTab('overview') }} className="text-white/50 hover:text-white text-sm transition-colors">← Voltar</button>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-[#1A3A6B] text-lg" style={{ background: PLAN_COLORS[t.plan] }}>{t.name.charAt(0)}</div>
                   <div>
                     <h1 className="font-sora font-bold text-2xl text-white">{t.name}</h1>
