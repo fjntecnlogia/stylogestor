@@ -106,11 +106,19 @@ const ESTADOS_BR = [
   { uf: 'SC', nome: 'Santa Catarina',     clientes: 3,  mrr: 447,  cor: '#9CA3AF' },
 ]
 
-const CAMPANHAS = [
+const CAMPANHAS_INICIAL = [
   { id: 'C1', nome: 'Google Ads — Barbearia Sistema', canal: 'google', gasto: 1240, cliques: 3420, leads: 312, custo_lead: 3.97, conversoes: 28, cac: 44.28, status: 'ativo' },
   { id: 'C2', nome: 'Meta Ads — Donos de Salão',      canal: 'meta',   gasto: 890,  cliques: 2180, leads: 198, custo_lead: 4.49, conversoes: 19, cac: 46.84, status: 'ativo' },
   { id: 'C3', nome: 'Instagram — Vídeo Depoimento',   canal: 'insta',  gasto: 340,  cliques: 1890, leads: 87,  custo_lead: 3.91, conversoes: 11, cac: 30.91, status: 'ativo' },
   { id: 'C4', nome: 'YouTube — Tutorial Gestão',      canal: 'yt',     gasto: 180,  cliques: 890,  leads: 43,  custo_lead: 4.19, conversoes: 6,  cac: 30.00, status: 'pausado' },
+]
+
+const CANAIS_OPCOES = [
+  { value: 'google', label: '🔵 Google Ads' },
+  { value: 'meta',   label: '🟦 Meta Ads (Facebook)' },
+  { value: 'insta',  label: '🩷 Instagram' },
+  { value: 'yt',     label: '🔴 YouTube' },
+  { value: 'outros', label: '⚫ Outros' },
 ]
 
 export function AdminDashboard() {
@@ -122,6 +130,9 @@ export function AdminDashboard() {
   const [resposta, setResposta] = useState('')
   const [ticketResolvido, setTicketResolvido] = useState<string | null>(null)
   const [tickets, setTickets] = useState(TICKETS_INICIAL)
+  const [campanhas, setCampanhas] = useState(CAMPANHAS_INICIAL)
+  const [novaCampanhaOpen, setNovaCampanhaOpen] = useState(false)
+  const [formCampanha, setFormCampanha] = useState({ nome: '', canal: 'google', orcamento: '', objetivo: 'leads' })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [cobrancaEnviada, setCobrancaEnviada] = useState<string | null>(null)
   const [suspenderConfirm, setSuspenderConfirm] = useState(false)
@@ -230,7 +241,7 @@ export function AdminDashboard() {
                   <p className="text-white/40 text-sm mt-0.5">Visão completa da máquina de vendas automática</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => alert('Em breve: criar nova campanha!')} className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">+ Nova Campanha</button>
+                  <button onClick={() => setNovaCampanhaOpen(true)} className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">+ Nova Campanha</button>
                   <button onClick={() => { const d='Visitantes,Leads,Trials,Assinantes\n12840,1923,312,87'; const b=new Blob([d],{type:'text/csv'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='funil.csv'; a.click() }} className="bg-white/10 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-white/15 transition-colors">📤 Exportar CSV</button>
                 </div>
               </div>
@@ -406,10 +417,10 @@ export function AdminDashboard() {
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-sora font-bold text-white">📣 Campanhas Pagas</h3>
-                    <span className="text-xs text-white/40">Gasto total: R${CAMPANHAS.reduce((s,c)=>s+c.gasto,0).toLocaleString()}</span>
+                    <span className="text-xs text-white/40">Gasto total: R${campanhas.reduce((s,c)=>s+c.gasto,0).toLocaleString()}</span>
                   </div>
                   <div className="space-y-3">
-                    {CAMPANHAS.map((c) => {
+                    {campanhas.map((c) => {
                       const canais: Record<string, string> = { google: '🔵', meta: '🟦', insta: '🩷', yt: '🔴' }
                       return (
                         <div key={c.id} className="bg-white/5 rounded-xl p-3">
@@ -1191,6 +1202,106 @@ export function AdminDashboard() {
         </div>
       </main>
       </div>
+
+      {/* ── MODAL NOVA CAMPANHA ── */}
+      {novaCampanhaOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setNovaCampanhaOpen(false)} />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <h3 className="font-sora font-bold text-white text-lg">📣 Nova Campanha</h3>
+              <button onClick={() => setNovaCampanhaOpen(false)} className="text-white/40 hover:text-white text-2xl leading-none">×</button>
+            </div>
+
+            {/* Form */}
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Nome da campanha *</label>
+                <input
+                  value={formCampanha.nome}
+                  onChange={e => setFormCampanha(f => ({ ...f, nome: e.target.value }))}
+                  placeholder="Ex: Google Ads — Novos Barbeiros"
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Canal *</label>
+                <select
+                  value={formCampanha.canal}
+                  onChange={e => setFormCampanha(f => ({ ...f, canal: e.target.value }))}
+                  className="w-full bg-[#0F172A] border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                >
+                  {CANAIS_OPCOES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Objetivo</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'leads', label: '📧 Leads' },
+                    { value: 'trial', label: '⚡ Trials' },
+                    { value: 'brand', label: '👁️ Awareness' },
+                  ].map(o => (
+                    <button key={o.value} onClick={() => setFormCampanha(f => ({ ...f, objetivo: o.value }))}
+                      className={`py-2 rounded-xl border text-xs font-semibold transition-all ${formCampanha.objetivo === o.value ? 'border-[#F5A623] bg-[#F5A623]/10 text-[#F5A623]' : 'border-white/10 text-white/50 hover:border-white/20'}`}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Orçamento mensal (R$)</label>
+                <input
+                  type="number"
+                  value={formCampanha.orcamento}
+                  onChange={e => setFormCampanha(f => ({ ...f, orcamento: e.target.value }))}
+                  placeholder="Ex: 500"
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                />
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-3 text-xs text-white/40 space-y-1">
+                <p>💡 <strong className="text-white/60">Dica:</strong> Após criar, acesse o painel do canal para configurar os anúncios.</p>
+                <p>Os dados de cliques e leads serão atualizados automaticamente quando integrados via API.</p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-white/10 flex gap-3">
+              <button onClick={() => setNovaCampanhaOpen(false)}
+                className="flex-1 border border-white/10 text-white/60 text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5 transition-colors">
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (!formCampanha.nome.trim()) return
+                  const nova = {
+                    id: `C${campanhas.length + 1}`,
+                    nome: formCampanha.nome,
+                    canal: formCampanha.canal,
+                    gasto: Number(formCampanha.orcamento) || 0,
+                    cliques: 0, leads: 0,
+                    custo_lead: 0, conversoes: 0, cac: 0,
+                    status: 'ativo',
+                  }
+                  setCampanhas(prev => [...prev, nova])
+                  setNovaCampanhaOpen(false)
+                  setFormCampanha({ nome: '', canal: 'google', orcamento: '', objetivo: 'leads' })
+                }}
+                disabled={!formCampanha.nome.trim()}
+                className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity"
+              >
+                ✓ Criar campanha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
