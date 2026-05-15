@@ -20,8 +20,8 @@ const TICKETS = [
 ]
 
 const ANALYTICS = {
-  pageViews: [420, 380, 510, 490, 620, 580, 710, 680, 750, 820, 790, 940, 1020, 980],
-  signups: [2, 1, 3, 2, 4, 2, 3, 5, 3, 4, 6, 4, 5, 7],
+  pageViews: [420, 380, 510, 490, 620, 580, 710, 680, 750, 820, 790, 940, 1020],
+  signups: [2, 1, 3, 2, 4, 2, 3, 5, 3, 4, 6, 4, 5],
   days: ['29/04','30/04','01/05','02/05','03/05','04/05','05/05','06/05','07/05','08/05','09/05','10/05','11/05'],
 }
 
@@ -120,6 +120,7 @@ export function AdminDashboard() {
   const [selectedTicket, setSelectedTicket] = useState<typeof TICKETS[0] | null>(null)
   const [selectedTenant, setSelectedTenant] = useState<typeof TENANTS[0] | null>(null)
   const [resposta, setResposta] = useState('')
+  const [ticketResolvido, setTicketResolvido] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [cobrancaEnviada, setCobrancaEnviada] = useState<string | null>(null)
   const [suspenderConfirm, setSuspenderConfirm] = useState(false)
@@ -228,8 +229,8 @@ export function AdminDashboard() {
                   <p className="text-white/40 text-sm mt-0.5">Visão completa da máquina de vendas automática</p>
                 </div>
                 <div className="flex gap-2">
-                  <button className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">+ Nova Campanha</button>
-                  <button className="bg-white/10 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-white/15 transition-colors">📤 Exportar</button>
+                  <button onClick={() => alert('Em breve: criar nova campanha!')} className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">+ Nova Campanha</button>
+                  <button onClick={() => { const d='Visitantes,Leads,Trials,Assinantes\n12840,1923,312,87'; const b=new Blob([d],{type:'text/csv'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='funil.csv'; a.click() }} className="bg-white/10 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-white/15 transition-colors">📤 Exportar CSV</button>
                 </div>
               </div>
 
@@ -986,10 +987,29 @@ export function AdminDashboard() {
                       </div>
 
                       <div className="flex gap-2">
-                        <button className="flex-1 bg-[#1B8A5A] text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#156b47]">
-                          ✓ Responder e Resolver
+                        <button
+                          onClick={() => {
+                            if (!resposta.trim()) {
+                              setTicketResolvido('erro')
+                              setTimeout(() => setTicketResolvido(null), 3000)
+                              return
+                            }
+                            setTicketResolvido(selectedTicket!.id)
+                            setTimeout(() => {
+                              setSelectedTicket(null)
+                              setResposta('')
+                              setTicketResolvido(null)
+                            }, 2000)
+                          }}
+                          className="flex-1 bg-[#1B8A5A] text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#156b47]">
+                          {ticketResolvido === selectedTicket?.id ? '✅ Resolvido!' : '✓ Responder e Resolver'}
                         </button>
-                        <button className="flex-1 border border-white/10 text-white/60 text-xs font-semibold py-2.5 rounded-xl hover:bg-white/5">
+                        {ticketResolvido === 'erro' && (
+                          <p className="text-xs text-red-400 mt-1 text-center w-full">⚠️ Digite uma resposta antes de resolver.</p>
+                        )}
+                        <button
+                          onClick={() => setTicketResolvido('assumido')}
+                          className="flex-1 border border-white/10 text-white/60 text-xs font-semibold py-2.5 rounded-xl hover:bg-white/5">
                           📋 Assumir
                         </button>
                       </div>
