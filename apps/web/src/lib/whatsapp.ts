@@ -1,47 +1,113 @@
-const EVOLUTION_URL = process.env.EVOLUTION_API_URL || 'http://localhost:8080'
-const EVOLUTION_KEY = process.env.EVOLUTION_API_KEY || 'stylo-whatsapp-key-2026'
-const INSTANCE     = process.env.EVOLUTION_INSTANCE || 'stylogestor'
+// ============================================================
+// STYLOGESTOR — WhatsApp via Z-API
+// https://developer.z-api.io/
+// ============================================================
+
+const ZAPI_INSTANCE    = process.env.ZAPI_INSTANCE_ID    || ''
+const ZAPI_TOKEN       = process.env.ZAPI_TOKEN           || ''
+const ZAPI_CLIENT_TOKEN= process.env.ZAPI_CLIENT_TOKEN    || ''
+const ZAPI_BASE        = `https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}`
 
 interface SendMessageParams {
-  phone: string   // formato: 5511999999999
+  phone: string   // qualquer formato — limpamos aqui
   message: string
 }
 
-export async function sendWhatsApp({ phone, message }: SendMessageParams) {
+export async function sendWhatsApp({ phone, message }: SendMessageParams): Promise<boolean> {
+  if (!ZAPI_INSTANCE || !ZAPI_TOKEN) {
+    console.warn('[ZAPI] Credenciais não configuradas — mensagem não enviada')
+    return false
+  }
+
+  const cleaned = phone.replace(/\D/g, '')
+  const number  = cleaned.startsWith('55') ? cleaned : `55${cleaned}`
+
   try {
-    const res = await fetch(`${EVOLUTION_URL}/message/sendText/${INSTANCE}`, {
+    const res = await fetch(`${ZAPI_BASE}/send-text`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': EVOLUTION_KEY,
+        ...(ZAPI_CLIENT_TOKEN ? { 'Client-Token': ZAPI_CLIENT_TOKEN } : {}),
       },
-      body: JSON.stringify({
-        number: phone,
-        text: message,
-      }),
+      body: JSON.stringify({ phone: number, message }),
     })
+
     if (!res.ok) {
-      console.error('[WHATSAPP_ERROR]', await res.text())
+      const err = await res.text()
+      console.error('[ZAPI_ERROR]', res.status, err)
       return false
     }
+
     return true
   } catch (err) {
-    console.error('[WHATSAPP_ERROR]', err)
+    console.error('[ZAPI_EXCEPTION]', err)
     return false
   }
 }
 
-// Templates de mensagem
-export const WA_TEMPLATES = {
-  confirmacao: (nome: string, servico: string, data: string, hora: string, barbearia: string) =>
-    `✅ *Agendamento confirmado!*\n\nOlá ${nome}! Seu horário foi marcado com sucesso.\n\n📋 *${servico}*\n📅 ${data} às ${hora}\n📍 ${barbearia}\n\nAté lá! 😊\n\n_STYLOGESTOR_`,
+// ── Templates de mensagem ────────────────────────────────────────
 
-  lembrete: (nome: string, servico: string, hora: string) =>
-    `⏰ *Lembrete de agendamento*\n\nOlá ${nome}! Você tem um horário hoje às *${hora}*.\n\n✂️ ${servico}\n\nNos vemos em breve! 💈\n\n_STYLOGESTOR_`,
+export function msgConfirmacaoAgendamento(params: {
+  clientName: string
+  date: string
+  time: string
+  service: string
+  professional: string
+  barbershop: string
+}) {
+  return `✂️ *Agendamento confirmado!*
 
-  cancelamento: (nome: string, data: string, hora: string) =>
-    `❌ *Agendamento cancelado*\n\nOlá ${nome}! Seu agendamento de ${data} às ${hora} foi cancelado.\n\nPara reagendar, acesse o link da barbearia.\n\n_STYLOGESTOR_`,
+Olá, ${params.clientName.split(' ')[0]}! Seu horário foi confirmado.
 
-  cobranca: (nome: string, valor: string, link: string) =>
-    `💳 *Pagamento pendente*\n\nOlá ${nome}! Sua assinatura STYLOGESTOR de *R$ ${valor}* está vencida.\n\nRegularize agora para não perder acesso: ${link}\n\n_STYLOGESTOR_`,
+📅 *Data:* ${params.date}
+🕐 *Horário:* ${params.time}
+✂️ *Serviço:* ${params.service}
+💈 *Profissional:* ${params.professional}
+🏪 *Barbearia:* ${params.barbershop}
+
+Para cancelar, entre em contato com a barbearia.
+
+_Powered by STYLOGESTOR_ 🚀`
+}
+
+export function msgLembreteAgendamento(params: {
+  clientName: string
+  date: string
+  time: string
+  barbershop: string
+}) {
+  return `⏰ *Lembrete de agendamento!*
+
+Oi, ${params.clientName.split(' ')[0]}! Não esqueça do seu horário.
+
+📅 *Data:* ${params.date}
+🕐 *Horário:* ${params.time}
+🏪 *Barbearia:* ${params.barbershop}
+
+Até lá! ✂️`
+}
+
+export function msgAniversario(params: { clientName: string; barbershop: string }) {
+  return `🎂 *Feliz aniversário, ${params.clientName.split(' ')[0]}!*
+
+A equipe da ${params.barbershop} deseja um dia especial para você! 🎉
+
+Temos uma oferta exclusiva esperando por você. Venha nos visitar! ✂️
+
+_STYLOGESTOR_`
+}
+
+export function msgFidelidade(params: {
+  clientName: string; stamps: number; goal: number; reward: string
+}) {
+  const left = params.goal - params.stamps
+  return `⭐ *Programa de Fidelidade*
+
+Oi, ${params.clientName.split(' ')[0]}! Você tem *${params.stamps}/${params.goal}* carimbos.
+
+${left > 0
+  ? `Faltam *${left} visita${left > 1 ? 's' : ''}* para ganhar: *${params.reward}* 🎁`
+  : `🎉 Você ganhou: *${params.reward}*! Resgate na próxima visita.`}
+
+✂️ _STYLOGESTOR_`
 }
