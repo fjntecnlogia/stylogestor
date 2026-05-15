@@ -133,6 +133,10 @@ export function AdminDashboard() {
   const [campanhas, setCampanhas] = useState(CAMPANHAS_INICIAL)
   const [novaCampanhaOpen, setNovaCampanhaOpen] = useState(false)
   const [formCampanha, setFormCampanha] = useState({ nome: '', canal: 'google', orcamento: '', objetivo: 'leads' })
+  const [selectedLead, setSelectedLead] = useState<typeof LEADS[0] | null>(null)
+  const [novaAutomacaoOpen, setNovaAutomacaoOpen] = useState(false)
+  const [automacoes, setAutomacoes] = useState(AUTOMACOES)
+  const [formAutomacao, setFormAutomacao] = useState({ nome: '', tipo: 'email', gatilho: 'cadastro', delay: '0', mensagem: '' })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [cobrancaEnviada, setCobrancaEnviada] = useState<string | null>(null)
   const [suspenderConfirm, setSuspenderConfirm] = useState(false)
@@ -318,7 +322,7 @@ export function AdminDashboard() {
                       const statusCor: Record<string, string> = { quente: '#EF4444', morno: '#F59E0B', frio: '#6B7280', trial: '#3B82F6', perdido: '#374151' }
                       const statusLabel: Record<string, string> = { quente: '🔴 Quente', morno: '🟡 Morno', frio: '🔵 Frio', trial: '⚡ Trial', perdido: '❌ Perdido' }
                       return (
-                        <div key={l.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                        <div key={l.id} onClick={() => setSelectedLead(selectedLead?.id === l.id ? null : l)} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
                           <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center font-bold text-white text-sm shrink-0">{l.nome.charAt(0)}</div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -366,7 +370,7 @@ export function AdminDashboard() {
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-sora font-bold text-white">⚙️ Automações Ativas</h3>
-                  <button className="text-xs bg-[#F5A623] text-[#1A3A6B] font-bold px-3 py-1.5 rounded-lg hover:opacity-90">+ Nova automação</button>
+                  <button onClick={() => setNovaAutomacaoOpen(true)} className="text-xs bg-[#F5A623] text-[#1A3A6B] font-bold px-3 py-1.5 rounded-lg hover:opacity-90">+ Nova automação</button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -381,7 +385,7 @@ export function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {AUTOMACOES.map((a) => (
+                      {automacoes.map((a) => (
                         <tr key={a.id} className="hover:bg-white/5 transition-colors">
                           <td className="py-3 pr-4">
                             <p className="font-semibold text-white">{a.nome}</p>
@@ -1202,6 +1206,180 @@ export function AdminDashboard() {
         </div>
       </main>
       </div>
+
+      {/* ── MODAL DETALHE DO LEAD ── */}
+      {selectedLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedLead(null)} />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <h3 className="font-sora font-bold text-white text-lg">👤 Detalhes do Lead</h3>
+              <button onClick={() => setSelectedLead(null)} className="text-white/40 hover:text-white text-2xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {/* Avatar + nome */}
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-[#1A3A6B] flex items-center justify-center text-white text-2xl font-bold">
+                  {selectedLead.nome.charAt(0)}
+                </div>
+                <div>
+                  <p className="font-sora font-bold text-white text-lg">{selectedLead.nome}</p>
+                  <p className="text-white/50 text-sm">{selectedLead.email}</p>
+                </div>
+                {/* Score ring */}
+                <div className="ml-auto w-14 h-14 relative shrink-0">
+                  <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+                    <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
+                    <circle cx="28" cy="28" r="22" fill="none"
+                      stroke={selectedLead.score > 70 ? '#1B8A5A' : selectedLead.score > 40 ? '#F59E0B' : '#6B7280'}
+                      strokeWidth="4"
+                      strokeDasharray={`${selectedLead.score * 1.382} 138.2`}
+                      strokeLinecap="round" />
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">{selectedLead.score}</span>
+                </div>
+              </div>
+
+              {/* Dados */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Cidade', value: selectedLead.cidade },
+                  { label: 'Origem', value: selectedLead.origem },
+                  { label: 'Plano interesse', value: selectedLead.plano },
+                  { label: 'Data cadastro', value: selectedLead.data },
+                ].map(d => (
+                  <div key={d.label} className="bg-white/5 rounded-xl p-3">
+                    <p className="text-xs text-white/40 mb-0.5">{d.label}</p>
+                    <p className="text-sm font-semibold text-white">{d.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Status badge */}
+              <div className="flex items-center justify-between bg-white/5 rounded-xl p-3">
+                <span className="text-sm text-white/60">Status atual</span>
+                <span className="text-sm font-bold px-3 py-1 rounded-full"
+                  style={{ background: selectedLead.status === 'quente' ? '#EF4444' + '20' : selectedLead.status === 'trial' ? '#3B82F620' : '#6B728020', color: selectedLead.status === 'quente' ? '#EF4444' : selectedLead.status === 'trial' ? '#3B82F6' : '#9CA3AF' }}>
+                  {selectedLead.status.charAt(0).toUpperCase() + selectedLead.status.slice(1)}
+                </span>
+              </div>
+            </div>
+
+            {/* Ações */}
+            <div className="px-6 py-4 border-t border-white/10 grid grid-cols-2 gap-2">
+              <a href={`mailto:${selectedLead.email}`}
+                className="flex items-center justify-center gap-2 bg-[#1A3A6B] text-white text-sm font-bold py-2.5 rounded-xl hover:bg-[#142d55] transition-colors">
+                📧 Enviar email
+              </a>
+              <a href={`https://wa.me/55?text=${encodeURIComponent(`Oi ${selectedLead.nome.split(' ')[0]}! Vi que você se cadastrou no STYLOGESTOR. Posso te ajudar a configurar tudo? 😊`)}`}
+                target="_blank"
+                className="flex items-center justify-center gap-2 bg-[#1B8A5A] text-white text-sm font-bold py-2.5 rounded-xl hover:bg-[#156b47] transition-colors">
+                💬 WhatsApp
+              </a>
+              <button onClick={() => setSelectedLead(null)}
+                className="col-span-2 border border-white/10 text-white/50 text-sm py-2 rounded-xl hover:bg-white/5 transition-colors">
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL NOVA AUTOMAÇÃO ── */}
+      {novaAutomacaoOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setNovaAutomacaoOpen(false)} />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 sticky top-0 bg-[#1C2333]">
+              <h3 className="font-sora font-bold text-white text-lg">⚙️ Nova Automação</h3>
+              <button onClick={() => setNovaAutomacaoOpen(false)} className="text-white/40 hover:text-white text-2xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Nome da automação *</label>
+                <input value={formAutomacao.nome} onChange={e => setFormAutomacao(f => ({ ...f, nome: e.target.value }))}
+                  placeholder="Ex: Follow-up após trial expirar"
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+              </div>
+
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Tipo de mensagem</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[{ value: 'email', label: '📧 Email' }, { value: 'whatsapp', label: '💬 WhatsApp' }].map(t => (
+                    <button key={t.value} onClick={() => setFormAutomacao(f => ({ ...f, tipo: t.value }))}
+                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${formAutomacao.tipo === t.value ? 'border-[#F5A623] bg-[#F5A623]/10 text-[#F5A623]' : 'border-white/10 text-white/50 hover:border-white/20'}`}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Gatilho (quando disparar)</label>
+                <select value={formAutomacao.gatilho} onChange={e => setFormAutomacao(f => ({ ...f, gatilho: e.target.value }))}
+                  className="w-full bg-[#0F172A] border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50">
+                  <option value="cadastro">🆕 Cadastro no trial</option>
+                  <option value="trial_expira">⏰ Trial expirando (D-2)</option>
+                  <option value="inativo">💤 Sem login por 5 dias</option>
+                  <option value="pagamento">💳 Após pagamento</option>
+                  <option value="cancelamento">❌ Cancelamento</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Delay após gatilho</label>
+                <select value={formAutomacao.delay} onChange={e => setFormAutomacao(f => ({ ...f, delay: e.target.value }))}
+                  className="w-full bg-[#0F172A] border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50">
+                  <option value="0">⚡ Imediatamente</option>
+                  <option value="1">📅 1 dia depois</option>
+                  <option value="3">📅 3 dias depois</option>
+                  <option value="7">📅 7 dias depois</option>
+                  <option value="14">📅 14 dias depois</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Mensagem / Assunto</label>
+                <textarea value={formAutomacao.mensagem} onChange={e => setFormAutomacao(f => ({ ...f, mensagem: e.target.value }))}
+                  placeholder={formAutomacao.tipo === 'email' ? 'Assunto do email ou conteúdo da mensagem...' : 'Texto da mensagem WhatsApp... Use {{nome}} para personalizar.'}
+                  rows={4}
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50 resize-none" />
+              </div>
+
+              <div className="bg-[#F5A623]/10 border border-[#F5A623]/20 rounded-xl p-3 text-xs text-white/50">
+                <p className="font-semibold text-[#F5A623] mb-1">💡 Variáveis disponíveis:</p>
+                <p><code className="text-white/70">{'{{nome}}'}</code> — Nome do gestor · <code className="text-white/70">{'{{barbearia}}'}</code> — Nome da barbearia · <code className="text-white/70">{'{{plano}}'}</code> — Plano atual</p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-white/10 flex gap-3 sticky bottom-0 bg-[#1C2333]">
+              <button onClick={() => setNovaAutomacaoOpen(false)}
+                className="flex-1 border border-white/10 text-white/60 text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5 transition-colors">
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (!formAutomacao.nome.trim()) return
+                  const nova = {
+                    id: `A${automacoes.length + 1}`,
+                    nome: formAutomacao.nome,
+                    tipo: formAutomacao.tipo,
+                    status: 'ativo',
+                    enviados: 0, abertos: 0, cliques: 0, conversoes: 0,
+                    descricao: `${formAutomacao.gatilho === 'cadastro' ? 'Após cadastro' : formAutomacao.gatilho} · D+${formAutomacao.delay}`,
+                  }
+                  setAutomacoes(prev => [...prev, nova])
+                  setNovaAutomacaoOpen(false)
+                  setFormAutomacao({ nome: '', tipo: 'email', gatilho: 'cadastro', delay: '0', mensagem: '' })
+                }}
+                disabled={!formAutomacao.nome.trim()}
+                className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity">
+                ✓ Criar automação
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL NOVA CAMPANHA ── */}
       {novaCampanhaOpen && (
