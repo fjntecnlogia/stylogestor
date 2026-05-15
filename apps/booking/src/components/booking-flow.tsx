@@ -54,6 +54,9 @@ export function BookingFlow({ slug }: Props) {
   const handleConfirm = async () => {
     setSubmitting(true)
     try {
+      const selectedProf = MOCK_PROFESSIONALS.find(p => p.id === professional)
+      const selectedSvcs = MOCK_SERVICES.filter(s => selectedServices.includes(s.id))
+
       const body = {
         slug,
         clientName: name,
@@ -65,16 +68,39 @@ export function BookingFlow({ slug }: Props) {
         totalPrice,
         totalDuration,
       }
+
+      // Salvar agendamento
       const res = await fetch(`/api/booking/${slug}/appointments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      })
-      const data = await res.json()
-      if (data.id) setBookingId(data.id)
+      }).catch(() => null)
+
+      const data = await res?.json().catch(() => ({}))
+      if (data?.id) setBookingId(data.id)
+
+      // Disparar automação (WhatsApp + Email) sem bloquear
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
+      fetch(`${appUrl}/api/automations/appointment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'confirmation',
+          appointment: {
+            clientName:       name,
+            clientPhone:      phone.replace(/\D/g, ''),
+            clientEmail:      '',
+            date:             selectedDay?.toISOString(),
+            time:             selectedSlot,
+            serviceName:      selectedSvcs.map(s => s.name).join(', '),
+            professionalName: selectedProf?.name ?? '',
+            barbershopName:   MOCK_TENANT.name,
+          },
+        }),
+      }).catch(() => {})
+
       setStep('success')
     } catch {
-      // Se a API não existir ainda, avança mesmo assim (graceful degradation)
       setStep('success')
     } finally {
       setSubmitting(false)
