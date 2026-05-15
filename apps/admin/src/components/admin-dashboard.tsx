@@ -915,12 +915,179 @@ export function AdminDashboard() {
                           <p className="font-sora font-bold text-white">📈 Receita gerada pela barbearia</p>
                           <p className="text-xs text-white/40 mt-0.5">Estimativa baseada em agendamentos · últimos 5 meses</p>
                         </div>
-                        <button onClick={() => {
-                          const csv = 'Mês,Receita,Agendamentos\n' + finMensal.map(d=>`${d.mes},${d.receita},${d.agend}`).join('\n')
-                          const b = new Blob([csv],{type:'text/csv'}); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href=u; a.download=`relatorio-${t.slug}.csv`; a.click()
-                        }} className="text-xs bg-[#F5A623]/20 text-[#F5A623] font-bold px-3 py-1.5 rounded-lg hover:bg-[#F5A623]/30">
-                          📥 Exportar CSV
-                        </button>
+                        <div className="flex gap-2">
+                          {/* CSV EXPORT */}
+                          <button onClick={() => {
+                            const BOM = '﻿'
+                            const sep = ';'
+                            const now = new Date().toLocaleDateString('pt-BR')
+                            const totalRec = finMensal.reduce((s,d)=>s+d.receita,0)
+                            const mediaRec = Math.round(totalRec/finMensal.length)
+                            const crescimento = finMensal[0].receita > 0 ? `${Math.round(((finMensal[4].receita/finMensal[0].receita)-1)*100)}%` : 'N/A'
+                            const rows = [
+                              [`RELATORIO FINANCEIRO - STYLOGESTOR`],
+                              [`Gerado em${sep}${now}`],
+                              [],
+                              [`DADOS DA BARBEARIA`],
+                              [`Nome${sep}${t.name}`],
+                              [`Slug${sep}${t.slug}.stylogestor.com.br`],
+                              [`Cidade${sep}${t.city}`],
+                              [`Plano${sep}${t.plan}`],
+                              [`Status${sep}${st.label}`],
+                              [`Cliente desde${sep}${t.since}`],
+                              [`E-mail${sep}${t.email}`],
+                              [],
+                              [`METRICAS FINANCEIRAS`],
+                              [`MRR atual${sep}R$ ${t.mrr}`],
+                              [`ARR estimado${sep}R$ ${(t.mrr*12).toLocaleString('pt-BR')}`],
+                              [`LTV estimado (14m)${sep}R$ ${ltv.toLocaleString('pt-BR')}`],
+                              [`Ticket medio${sep}R$ ${ticketMedio}`],
+                              [`Total pago (5 meses)${sep}R$ ${(t.mrr*5).toLocaleString('pt-BR')}`],
+                              [],
+                              [`RECEITA MENSAL`],
+                              [`Mes${sep}Receita (R$)${sep}Agendamentos${sep}Status`],
+                              ...finMensal.map((d,i) => [
+                                `${d.mes}/2026${sep}${d.receita.toLocaleString('pt-BR')}${sep}${d.agend}${sep}${i===finMensal.length-1&&t.status==='past_due'?'Pendente':'Pago'}`
+                              ]),
+                              [],
+                              [`RESUMO`],
+                              [`Receita total (5m)${sep}R$ ${totalRec.toLocaleString('pt-BR')}`],
+                              [`Media mensal${sep}R$ ${mediaRec.toLocaleString('pt-BR')}`],
+                              [`Crescimento${sep}${crescimento}`],
+                              [`Total clientes${sep}${t.clients}`],
+                              [`Total agendamentos${sep}${t.appts}`],
+                            ]
+                            const csv = BOM + rows.map(r => r.join('')).join('\r\n')
+                            const b = new Blob([csv],{type:'text/csv;charset=utf-8;'})
+                            const u = URL.createObjectURL(b)
+                            const a = document.createElement('a')
+                            a.href = u; a.download = `relatorio-${t.slug}-${now.replace(/\//g,'-')}.csv`; a.click()
+                          }} className="text-xs bg-[#F5A623]/20 text-[#F5A623] font-bold px-3 py-1.5 rounded-lg hover:bg-[#F5A623]/30">
+                            📥 CSV
+                          </button>
+                          {/* PDF EXPORT */}
+                          <button onClick={() => {
+                            const now = new Date().toLocaleDateString('pt-BR')
+                            const totalRec = finMensal.reduce((s,d)=>s+d.receita,0)
+                            const mediaRec = Math.round(totalRec/finMensal.length)
+                            const crescimento = finMensal[0].receita > 0 ? `${Math.round(((finMensal[4].receita/finMensal[0].receita)-1)*100)}%` : 'N/A'
+                            const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório — ${t.name}</title>
+                            <style>
+                              *{margin:0;padding:0;box-sizing:border-box}
+                              body{font-family:Arial,sans-serif;color:#1C1C2E;padding:32px;font-size:13px}
+                              .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1A3A6B;padding-bottom:16px;margin-bottom:24px}
+                              .logo{font-size:22px;font-weight:900;color:#1A3A6B;letter-spacing:-1px}
+                              .logo span{color:#F5A623}
+                              .doc-title{text-align:right;color:#6B7280;font-size:12px}
+                              .doc-title h2{color:#1C1C2E;font-size:16px;margin-bottom:4px}
+                              .section{margin-bottom:24px}
+                              .section-title{font-size:14px;font-weight:700;color:#1A3A6B;border-left:4px solid #F5A623;padding-left:10px;margin-bottom:12px}
+                              .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+                              .info-row{display:flex;justify-content:space-between;padding:6px 10px;background:#F9FAFB;border-radius:6px}
+                              .info-label{color:#6B7280;font-size:12px}
+                              .info-value{font-weight:700;color:#1C1C2E}
+                              table{width:100%;border-collapse:collapse;margin-top:8px}
+                              thead tr{background:#1A3A6B;color:white}
+                              thead th{padding:10px 12px;text-align:left;font-size:12px;font-weight:600}
+                              tbody tr:nth-child(even){background:#F9FAFB}
+                              tbody td{padding:9px 12px;border-bottom:1px solid #E5E7EB;font-size:12px}
+                              .badge{padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700}
+                              .pago{background:#D1FAE5;color:#065F46}
+                              .pendente{background:#FEE2E2;color:#991B1B}
+                              .kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px}
+                              .kpi-card{background:#F0F4FF;border-radius:10px;padding:12px;text-align:center;border:1px solid #BFDBFE}
+                              .kpi-label{font-size:11px;color:#6B7280;margin-bottom:4px}
+                              .kpi-value{font-size:18px;font-weight:900;color:#1A3A6B}
+                              .footer{margin-top:40px;padding-top:16px;border-top:1px solid #E5E7EB;display:flex;justify-content:space-between;color:#9CA3AF;font-size:11px}
+                              .status-badge{padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;display:inline-block}
+                              @media print{body{padding:20px}.no-print{display:none}}
+                            </style></head><body>
+                            <div class="header">
+                              <div>
+                                <div class="logo">STYLO<span>GESTOR</span></div>
+                                <div style="font-size:11px;color:#6B7280;margin-top:4px">Sistema de Gestão para Barbearias e Salões</div>
+                              </div>
+                              <div class="doc-title">
+                                <h2>Relatório Financeiro</h2>
+                                <div>Gerado em: ${now}</div>
+                                <div style="margin-top:4px;font-weight:700;color:#1A3A6B">${t.name}</div>
+                              </div>
+                            </div>
+
+                            <div class="section">
+                              <div class="section-title">Dados da Barbearia</div>
+                              <div class="info-grid">
+                                <div class="info-row"><span class="info-label">Nome</span><span class="info-value">${t.name}</span></div>
+                                <div class="info-row"><span class="info-label">Plano</span><span class="info-value">${t.plan}</span></div>
+                                <div class="info-row"><span class="info-label">Status</span><span class="info-value">${st.label}</span></div>
+                                <div class="info-row"><span class="info-label">Cidade</span><span class="info-value">${t.city}</span></div>
+                                <div class="info-row"><span class="info-label">Cliente desde</span><span class="info-value">${t.since}</span></div>
+                                <div class="info-row"><span class="info-label">E-mail</span><span class="info-value">${t.email}</span></div>
+                                <div class="info-row"><span class="info-label">Clientes cadastrados</span><span class="info-value">${t.clients}</span></div>
+                                <div class="info-row"><span class="info-label">Total agendamentos</span><span class="info-value">${t.appts}</span></div>
+                              </div>
+                            </div>
+
+                            <div class="section">
+                              <div class="section-title">KPIs Financeiros</div>
+                              <div class="kpi-row">
+                                <div class="kpi-card"><div class="kpi-label">MRR Atual</div><div class="kpi-value">R$ ${t.mrr}</div></div>
+                                <div class="kpi-card"><div class="kpi-label">ARR Estimado</div><div class="kpi-value">R$ ${(t.mrr*12).toLocaleString('pt-BR')}</div></div>
+                                <div class="kpi-card"><div class="kpi-label">LTV Estimado (14m)</div><div class="kpi-value">R$ ${ltv.toLocaleString('pt-BR')}</div></div>
+                                <div class="kpi-card"><div class="kpi-label">Receita Total (5m)</div><div class="kpi-value">R$ ${totalRec.toLocaleString('pt-BR')}</div></div>
+                                <div class="kpi-card"><div class="kpi-label">Média Mensal</div><div class="kpi-value">R$ ${mediaRec.toLocaleString('pt-BR')}</div></div>
+                                <div class="kpi-card"><div class="kpi-label">Crescimento</div><div class="kpi-value" style="color:#1B8A5A">${crescimento}</div></div>
+                              </div>
+                            </div>
+
+                            <div class="section">
+                              <div class="section-title">Receita Mensal (últimos 5 meses)</div>
+                              <table>
+                                <thead><tr><th>Mês</th><th>Receita (R$)</th><th>Agendamentos</th><th>Assinatura</th><th>Status</th></tr></thead>
+                                <tbody>
+                                  ${finMensal.map((d,i)=>`<tr>
+                                    <td><strong>${d.mes}/2026</strong></td>
+                                    <td><strong style="color:#1B8A5A">R$ ${d.receita.toLocaleString('pt-BR')}</strong></td>
+                                    <td>${d.agend}</td>
+                                    <td>${t.plan}</td>
+                                    <td><span class="badge ${i===finMensal.length-1&&t.status==='past_due'?'pendente':'pago'}">${i===finMensal.length-1&&t.status==='past_due'?'Pendente':'Pago'}</span></td>
+                                  </tr>`).join('')}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            <div class="section">
+                              <div class="section-title">Histórico de Pagamentos (Assinatura SaaS)</div>
+                              <table>
+                                <thead><tr><th>Competência</th><th>Plano</th><th>Valor (R$)</th><th>Status</th></tr></thead>
+                                <tbody>
+                                  ${finMensal.map((d,i)=>`<tr>
+                                    <td>${d.mes}/2026</td>
+                                    <td>${t.plan}</td>
+                                    <td><strong>R$ ${t.mrr}</strong></td>
+                                    <td><span class="badge ${i===finMensal.length-1&&t.status==='past_due'?'pendente':'pago'}">${i===finMensal.length-1&&t.status==='past_due'?'Pendente':'Pago'}</span></td>
+                                  </tr>`).join('')}
+                                  <tr style="background:#F0F4FF;font-weight:700">
+                                    <td colspan="2"><strong>Total</strong></td>
+                                    <td><strong style="color:#1B8A5A">R$ ${(t.mrr*5).toLocaleString('pt-BR')}</strong></td>
+                                    <td></td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+
+                            <div class="footer">
+                              <div>© ${new Date().getFullYear()} STYLOGESTOR — admin.stylogestor.com.br</div>
+                              <div>Relatório gerado automaticamente em ${now} | Documento confidencial</div>
+                            </div>
+                            <script>window.onload=()=>window.print()</script>
+                            </body></html>`
+                            const w = window.open('','_blank','width=900,height=700')
+                            if(w){ w.document.write(html); w.document.close() }
+                          }} className="text-xs bg-[#60A5FA]/20 text-[#60A5FA] font-bold px-3 py-1.5 rounded-lg hover:bg-[#60A5FA]/30">
+                            🖨️ PDF
+                          </button>
+                        </div>
                       </div>
                       <div className="flex items-end gap-3 h-40">
                         {finMensal.map((d) => (
