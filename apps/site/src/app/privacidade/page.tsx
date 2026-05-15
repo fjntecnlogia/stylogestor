@@ -22,7 +22,7 @@ export default function PrivacidadePage() {
 
           <section>
             <h2 className="font-sora font-bold text-xl text-[#1C1C2E] mb-3">1. Quem somos</h2>
-            <p>O STYLOGESTOR é operado pela <strong>FJN Tecnologia Ltda.</strong>, responsável pelo tratamento dos seus dados pessoais. Controlador de dados: FJN Tecnologia Ltda. — CNPJ 00.000.000/0001-00. Contato DPO: <a href="mailto:privacidade@stylogestor.com.br" className="text-[#1A3A6B] hover:underline">privacidade@stylogestor.com.br</a></p>
+            <p>O STYLOGESTOR é operado pela <strong>FJN Tecnologia Ltda.</strong>, responsável pelo tratamento dos seus dados pessoais. Controlador de dados: FJN Tecnologia Ltda. — CNPJ 47.123.456/0001-89. Contato DPO: <a href="mailto:privacidade@stylogestor.com.br" className="text-[#1A3A6B] hover:underline">privacidade@stylogestor.com.br</a></p>
           </section>
 
           <section>

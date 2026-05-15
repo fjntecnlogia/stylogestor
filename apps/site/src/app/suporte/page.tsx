@@ -36,7 +36,7 @@ export default function SuportePage() {
               title: 'WhatsApp',
               desc: 'Resposta mais rápida — ideal para dúvidas rápidas e suporte técnico urgente.',
               action: 'Iniciar conversa',
-              href: 'https://wa.me/5511999999999?text=Olá! Preciso de ajuda com o STYLOGESTOR.',
+              href: 'https://wa.me/5565996952828?text=Olá! Preciso de ajuda com o STYLOGESTOR.',
               color: '#1B8A5A',
               bg: '#ECFDF5',
             },
@@ -113,7 +113,7 @@ export default function SuportePage() {
         <div className="mt-16 text-center">
           <p className="text-[#4A4A5A] mb-4">Não encontrou o que procura?</p>
           <a
-            href="https://wa.me/5511999999999?text=Olá! Preciso de ajuda com o STYLOGESTOR."
+            href="https://wa.me/5565996952828?text=Olá! Preciso de ajuda com o STYLOGESTOR."
             target="_blank"
             className="inline-block bg-[#1B8A5A] text-white font-bold px-8 py-4 rounded-2xl hover:bg-[#166347] transition-colors"
           >

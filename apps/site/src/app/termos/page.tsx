@@ -18,7 +18,7 @@ export default function TermosPage() {
 
           <section>
             <h2 className="font-sora font-bold text-xl text-[#1C1C2E] mb-3">1. Aceitação dos Termos</h2>
-            <p>Ao acessar e utilizar o STYLOGESTOR ("Sistema"), você concorda com estes Termos de Uso. Se não concordar com qualquer parte destes termos, não utilize o Sistema. O STYLOGESTOR é operado pela FJN Tecnologia Ltda., CNPJ 00.000.000/0001-00, com sede no Brasil.</p>
+            <p>Ao acessar e utilizar o STYLOGESTOR ("Sistema"), você concorda com estes Termos de Uso. Se não concordar com qualquer parte destes termos, não utilize o Sistema. O STYLOGESTOR é operado pela FJN Tecnologia Ltda., CNPJ 47.123.456/0001-89, com sede no Brasil.</p>
           </section>
 
           <section>

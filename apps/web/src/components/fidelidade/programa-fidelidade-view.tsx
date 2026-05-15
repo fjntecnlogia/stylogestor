@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useToast } from '@/components/ui/toast'
 
 // Dados mock — conectar à API depois
 const MOCK_CLIENTES_FIDELIDADE = [
@@ -24,6 +25,27 @@ export function ProgramaFidelidadeView() {
   const [stampsGoal, setStampsGoal] = useState(10)
   const [reward, setReward] = useState('1 serviço grátis')
   const [selected, setSelected] = useState<typeof MOCK_CLIENTES_FIDELIDADE[0] | null>(null)
+  const [clients, setClients] = useState(MOCK_CLIENTES_FIDELIDADE)
+  const { success } = useToast()
+
+  const handleDarCarimbo = (id: string) => {
+    setClients(p => p.map(c => c.id === id ? { ...c, stamps: Math.min(c.stamps + 1, stampsGoal), totalVisits: c.totalVisits + 1, nextReward: Math.max(c.nextReward - 1, 0) } : c))
+    success('Carimbo adicionado! ✅')
+  }
+
+  const handleResgatar = (id: string, name: string) => {
+    setClients(p => p.map(c => c.id === id ? { ...c, stamps: 0, nextReward: stampsGoal } : c))
+    success(`Prêmio resgatado para ${name}! 🎁`)
+  }
+
+  const handleWhatsApp = (phone: string, name: string) => {
+    const msg = encodeURIComponent(`Oi ${name.split(' ')[0]}! 🎂 Feliz aniversário! Temos um presente especial esperando por você na barbearia. Venha nos visitar! ✂️`)
+    window.open(`https://wa.me/55${phone.replace(/\D/g,'')}?text=${msg}`, '_blank')
+  }
+
+  const handleSalvarConfig = () => {
+    success(`Programa salvo: ${tipo === 'carimbo' ? `${stampsGoal} visitas` : 'pontos'} → ${reward}`)
+  }
 
   const aniversariantes = [
     { name: 'Carlos Oliveira', date: '15/05', phone: '(11) 99999-0001' },
@@ -101,7 +123,7 @@ export function ProgramaFidelidadeView() {
                 className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-sm text-[#111827] font-medium focus:outline-none focus:ring-2 focus:ring-[#1A3A6B] bg-white" />
             </div>
 
-            <button className="w-full bg-[#1A3A6B] text-white font-bold py-2.5 rounded-xl hover:bg-[#142d55] text-sm transition-colors">
+            <button onClick={handleSalvarConfig} className="w-full bg-[#1A3A6B] text-white font-bold py-2.5 rounded-xl hover:bg-[#142d55] text-sm transition-colors">
               Salvar configurações
             </button>
           </div>
@@ -115,7 +137,7 @@ export function ProgramaFidelidadeView() {
                   <p className="text-sm font-semibold text-[#111827]">{a.name}</p>
                   <p className="text-xs text-[#6B7280]">{a.date}</p>
                 </div>
-                <button className="text-xs bg-[#F5A623]/10 text-[#92400E] font-semibold px-2.5 py-1 rounded-lg hover:bg-[#F5A623]/20">
+                <button onClick={() => handleWhatsApp(a.phone, a.name)} className="text-xs bg-[#F5A623]/10 text-[#92400E] font-semibold px-2.5 py-1 rounded-lg hover:bg-[#F5A623]/20">
                   💬 Parabenizar
                 </button>
               </div>
@@ -126,7 +148,7 @@ export function ProgramaFidelidadeView() {
         {/* Lista de clientes */}
         <div className="lg:col-span-2 space-y-3">
           <h3 className="font-sora font-bold text-[#111827]">Clientes no programa</h3>
-          {MOCK_CLIENTES_FIDELIDADE.map((c) => {
+          {clients.map((c) => {
             const tier = TIER_CONFIG[c.tier as keyof typeof TIER_CONFIG]
             const progress = (c.stamps / stampsGoal) * 100
             return (
@@ -185,13 +207,16 @@ export function ProgramaFidelidadeView() {
                 {/* Ações (quando selecionado) */}
                 {selected?.id === c.id && (
                   <div className="mt-3 pt-3 border-t border-[#E5E7EB] flex gap-2 flex-wrap">
-                    <button className="text-xs bg-[#1A3A6B] text-white font-semibold px-3 py-1.5 rounded-lg hover:bg-[#142d55]">
+                    <button onClick={(e) => { e.stopPropagation(); handleDarCarimbo(c.id) }}
+                      className="text-xs bg-[#1A3A6B] text-white font-semibold px-3 py-1.5 rounded-lg hover:bg-[#142d55]">
                       ➕ Dar carimbo
                     </button>
-                    <button className="text-xs bg-[#1B8A5A]/10 text-[#1B8A5A] font-semibold px-3 py-1.5 rounded-lg hover:bg-[#1B8A5A]/20">
+                    <button onClick={(e) => { e.stopPropagation(); handleResgatar(c.id, c.name) }}
+                      className="text-xs bg-[#1B8A5A]/10 text-[#1B8A5A] font-semibold px-3 py-1.5 rounded-lg hover:bg-[#1B8A5A]/20">
                       🎁 Resgatar prêmio
                     </button>
-                    <button className="text-xs bg-[#F5A623]/10 text-[#92400E] font-semibold px-3 py-1.5 rounded-lg hover:bg-[#F5A623]/20">
+                    <button onClick={(e) => { e.stopPropagation(); handleWhatsApp(c.phone, c.name) }}
+                      className="text-xs bg-[#F5A623]/10 text-[#92400E] font-semibold px-3 py-1.5 rounded-lg hover:bg-[#F5A623]/20">
                       💬 Enviar WhatsApp
                     </button>
                   </div>

@@ -774,166 +774,304 @@ export function AdminDashboard() {
             const t = selectedTenant
             const st = STATUS_TENANT[t.status as keyof typeof STATUS_TENANT]
             const tenantTickets = tickets.filter((tk) => tk.tenant === t.name)
+            const isSuspended = tenantsSuspended.includes(t.id)
+            // Dados financeiros simulados por tenant
+            const finMensal = [
+              { mes: 'Jan', receita: Math.round(t.mrr * 0.85), agend: Math.round(t.appts * 0.7) },
+              { mes: 'Fev', receita: Math.round(t.mrr * 0.90), agend: Math.round(t.appts * 0.75) },
+              { mes: 'Mar', receita: Math.round(t.mrr * 0.95), agend: Math.round(t.appts * 0.85) },
+              { mes: 'Abr', receita: Math.round(t.mrr * 1.00), agend: Math.round(t.appts * 0.90) },
+              { mes: 'Mai', receita: Math.round(t.mrr * 1.05), agend: t.appts },
+            ]
+            const maxRec = Math.max(...finMensal.map(d => d.receita))
+            const ltv = t.mrr * 14
+            const ticketMedio = t.appts > 0 ? Math.round((t.mrr * 1000 / t.appts) / 100) * 100 : 0
+            const diasSemLogin = t.lastLogin === '11/05/2026' ? 0 : t.lastLogin === '10/05/2026' ? 1 : t.lastLogin === '08/05/2026' ? 3 : 45
+            const churnRisk = t.status === 'past_due' ? 'alto' : t.status === 'canceled' ? 'churned' : diasSemLogin > 7 ? 'medio' : 'baixo'
+            const churnColor = { alto: '#EF4444', medio: '#F59E0B', baixo: '#1B8A5A', churned: '#6B7280' }[churnRisk]
+            const [tenantTab, setTenantTab] = useState<'overview'|'financeiro'|'atividade'|'suporte'>('overview')
+
             return (
               <>
+                {/* Header */}
                 <div className="flex items-center gap-3 flex-wrap">
-                  <button
-                    onClick={() => { setPage('tenants'); setSelectedTenant(null) }}
-                    className="text-white/50 hover:text-white text-sm transition-colors"
-                  >← Voltar</button>
-                  <h1 className="font-sora font-bold text-2xl text-white">{t.name}</h1>
+                  <button onClick={() => { setPage('tenants'); setSelectedTenant(null) }} className="text-white/50 hover:text-white text-sm transition-colors">← Voltar</button>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-[#1A3A6B] text-lg" style={{ background: PLAN_COLORS[t.plan] }}>{t.name.charAt(0)}</div>
+                  <div>
+                    <h1 className="font-sora font-bold text-2xl text-white">{t.name}</h1>
+                    <p className="text-white/40 text-xs">{t.slug}.stylogestor.com.br · {t.city}</p>
+                  </div>
                   <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${st.cls}`}>{st.label}</span>
+                  {isSuspended && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-900/30 text-red-400">⛔ Suspensa</span>}
+                  <div className="ml-auto flex gap-2">
+                    <a href={`mailto:${t.email}`} className="text-xs bg-white/10 text-white px-3 py-2 rounded-xl hover:bg-white/20">📧 Email</a>
+                    <a href={`https://wa.me/${t.phone}?text=${encodeURIComponent('Olá! Sou da equipe STYLOGESTOR.')}`} target="_blank" className="text-xs bg-[#25D366] text-white px-3 py-2 rounded-xl hover:opacity-90">💬 WhatsApp</a>
+                    <a href="https://app.stylogestor.com.br/dashboard" target="_blank" className="text-xs bg-white/10 text-white px-3 py-2 rounded-xl hover:bg-white/20">🔑 Painel</a>
+                    {!isSuspended && t.status !== 'canceled' && (
+                      <button onClick={() => { if (confirm(`Suspender ${t.name}?`)) setTenantsSuspended(p => [...p, t.id]) }} className="text-xs bg-red-500/20 text-red-400 px-3 py-2 rounded-xl hover:bg-red-500/30 font-bold">⛔ Suspender</button>
+                    )}
+                    {isSuspended && (
+                      <button onClick={() => setTenantsSuspended(p => p.filter(i => i !== t.id))} className="text-xs bg-[#1B8A5A] text-white px-3 py-2 rounded-xl hover:bg-[#156b47] font-bold">🔄 Reativar</button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* KPIs principais */}
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                   {[
-                    { label: 'Plano', value: t.plan, color: PLAN_COLORS[t.plan] },
-                    { label: 'MRR', value: t.mrr > 0 ? `R$ ${t.mrr}` : '—', color: '#1B8A5A' },
-                    { label: 'Clientes', value: t.clients, color: '#60A5FA' },
-                    { label: 'Agendamentos', value: t.appts, color: '#F5A623' },
+                    { label: 'Plano', value: t.plan, color: PLAN_COLORS[t.plan], icon: '💎' },
+                    { label: 'MRR', value: t.mrr > 0 ? `R$${t.mrr}` : '—', color: '#1B8A5A', icon: '💰' },
+                    { label: 'LTV estimado', value: `R$${ltv.toLocaleString()}`, color: '#60A5FA', icon: '📈' },
+                    { label: 'Clientes', value: t.clients, color: '#A78BFA', icon: '👥' },
+                    { label: 'Agendamentos', value: t.appts, color: '#F5A623', icon: '📅' },
+                    { label: 'Risco churn', value: churnRisk.charAt(0).toUpperCase()+churnRisk.slice(1), color: churnColor, icon: '⚠️' },
                   ].map((k) => (
                     <div key={k.label} className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                      <p className="text-[10px] text-white/40 font-bold uppercase tracking-wide">{k.label}</p>
-                      <p className="font-sora font-extrabold text-2xl mt-1" style={{ color: k.color }}>{k.value}</p>
+                      <div className="flex items-center gap-1.5 mb-2"><span className="text-lg">{k.icon}</span><p className="text-[10px] text-white/40 font-bold uppercase tracking-wide">{k.label}</p></div>
+                      <p className="font-sora font-extrabold text-xl" style={{ color: k.color }}>{k.value}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Informações */}
-                  <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
-                    <p className="font-sora font-bold text-white">Informações</p>
-                    {[
-                      { label: 'Slug / Link', value: `${t.slug}.stylogestor.com.br` },
-                      { label: 'Cidade', value: t.city },
-                      { label: 'Cliente desde', value: t.since },
-                      { label: 'Último login', value: t.lastLogin },
-                    ].map((r) => (
-                      <div key={r.label} className="flex justify-between text-sm border-b border-white/5 pb-2">
-                        <span className="text-white/40">{r.label}</span>
-                        <span className="text-white font-medium">{r.value}</span>
+                {/* Abas */}
+                <div className="flex bg-white/5 rounded-xl p-1 gap-1">
+                  {([['overview','📊 Visão Geral'],['financeiro','💰 Financeiro'],['atividade','📈 Atividade'],['suporte','🎧 Suporte']] as const).map(([id, label]) => (
+                    <button key={id} onClick={() => setTenantTab(id)}
+                      className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${tenantTab === id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* ABA: VISÃO GERAL */}
+                {tenantTab === 'overview' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
+                      <p className="font-sora font-bold text-white">📋 Informações da conta</p>
+                      {[
+                        { label: 'E-mail', value: t.email },
+                        { label: 'Telefone', value: `+${t.phone}` },
+                        { label: 'Cidade', value: t.city },
+                        { label: 'Cliente desde', value: t.since },
+                        { label: 'Último login', value: t.lastLogin },
+                        { label: 'Dias sem login', value: `${diasSemLogin} dias`, color: diasSemLogin > 7 ? '#EF4444' : '#1B8A5A' },
+                      ].map((r) => (
+                        <div key={r.label} className="flex justify-between text-sm border-b border-white/5 pb-2">
+                          <span className="text-white/40">{r.label}</span>
+                          <span className="font-medium" style={{ color: r.color ?? 'white' }}>{r.value}</span>
+                        </div>
+                      ))}
+                      <div className="flex gap-2 pt-1">
+                        <a href={`https://${t.slug}.stylogestor.com.br`} target="_blank" className="flex-1 text-center text-xs bg-white/10 text-white py-2 rounded-xl hover:bg-white/20">🔗 Link agendamento</a>
+                        {t.status === 'past_due' && (
+                          <button onClick={() => { setCobrancaEnviada(t.id); setTimeout(() => setCobrancaEnviada(null), 3000) }}
+                            className="flex-1 text-xs bg-[#FEE2E2] text-[#991B1B] font-bold py-2 rounded-xl hover:bg-[#FECACA]">
+                            {cobrancaEnviada === t.id ? '✓ Enviado!' : '💳 Cobrar'}
+                          </button>
+                        )}
+                        {t.status === 'canceled' && (
+                          <button onClick={() => setTenantsSuspended(p => p.filter(i => i !== t.id))} className="flex-1 text-xs bg-[#1B8A5A] text-white font-bold py-2 rounded-xl">🔄 Reativar</button>
+                        )}
                       </div>
-                    ))}
-                    <div className="flex gap-2 pt-2">
-                      <a
-                        href={`https://${t.slug}.stylogestor.com.br`}
-                        target="_blank"
-                        className="flex-1 text-center text-xs bg-white/10 text-white py-2 rounded-xl hover:bg-white/20 transition-colors"
-                      >
-                        🔗 Ver agendamento
-                      </a>
-                      {t.status === 'past_due' && (
-                        <button
-                          onClick={() => setCobrancaEnviada(t.id)}
-                          className="flex-1 text-xs bg-[#FEE2E2] text-[#991B1B] font-bold py-2 rounded-xl hover:bg-[#FECACA] transition-colors"
-                        >
-                          💳 Enviar cobrança
-                        </button>
-                      )}
-                      {t.status === 'canceled' && (
-                        <button className="flex-1 text-xs bg-[#1B8A5A] text-white font-bold py-2 rounded-xl hover:bg-[#156b47] transition-colors">
-                          🔄 Reativar
-                        </button>
-                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Saúde da conta */}
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                        <p className="font-sora font-bold text-white mb-3">🏥 Saúde da conta</p>
+                        {[
+                          { label: 'Engajamento', pct: Math.min(100, Math.round(t.appts / 5)), color: '#60A5FA' },
+                          { label: 'Satisfação (suporte)', pct: tenantTickets.filter(x=>x.tipo==='elogio').length > 0 ? 95 : 72, color: '#1B8A5A' },
+                          { label: 'Risco de churn', pct: churnRisk === 'alto' ? 85 : churnRisk === 'medio' ? 45 : 15, color: churnColor },
+                        ].map(m => (
+                          <div key={m.label} className="mb-2">
+                            <div className="flex justify-between text-xs mb-1"><span className="text-white/50">{m.label}</span><span className="font-bold" style={{ color: m.color }}>{m.pct}%</span></div>
+                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${m.pct}%`, background: m.color }} /></div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Plano e cobrança */}
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                        <p className="font-sora font-bold text-white mb-3">💎 Plano e cobrança</p>
+                        <div className="grid grid-cols-2 gap-3 text-center">
+                          <div><p className="text-xs text-white/40">Plano atual</p><p className="font-bold text-lg" style={{ color: PLAN_COLORS[t.plan] }}>{t.plan}</p></div>
+                          <div><p className="text-xs text-white/40">MRR</p><p className="font-bold text-lg text-[#1B8A5A]">R${t.mrr}</p></div>
+                          <div><p className="text-xs text-white/40">LTV estimado</p><p className="font-bold text-[#60A5FA]">R${ltv.toLocaleString()}</p></div>
+                          <div><p className="text-xs text-white/40">Ticket médio</p><p className="font-bold text-[#F5A623]">R${ticketMedio}</p></div>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  {/* Tickets deste tenant */}
-                  <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-                    <div className="px-5 py-4 border-b border-white/10">
-                      <p className="font-sora font-bold text-white">Chamados de suporte</p>
+                {/* ABA: FINANCEIRO */}
+                {tenantTab === 'financeiro' && (
+                  <div className="space-y-4">
+                    {/* Gráfico de receita mensal */}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-5">
+                        <div>
+                          <p className="font-sora font-bold text-white">📈 Receita gerada pela barbearia</p>
+                          <p className="text-xs text-white/40 mt-0.5">Estimativa baseada em agendamentos · últimos 5 meses</p>
+                        </div>
+                        <button onClick={() => {
+                          const csv = 'Mês,Receita,Agendamentos\n' + finMensal.map(d=>`${d.mes},${d.receita},${d.agend}`).join('\n')
+                          const b = new Blob([csv],{type:'text/csv'}); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href=u; a.download=`relatorio-${t.slug}.csv`; a.click()
+                        }} className="text-xs bg-[#F5A623]/20 text-[#F5A623] font-bold px-3 py-1.5 rounded-lg hover:bg-[#F5A623]/30">
+                          📥 Exportar CSV
+                        </button>
+                      </div>
+                      <div className="flex items-end gap-3 h-40">
+                        {finMensal.map((d) => (
+                          <div key={d.mes} className="flex-1 flex flex-col items-center gap-1">
+                            <span className="text-[10px] text-white/50">R${d.receita >= 1000 ? (d.receita/1000).toFixed(1)+'k' : d.receita}</span>
+                            <div className="w-full rounded-t-lg transition-all"
+                              style={{ height: `${(d.receita/maxRec)*120}px`, background: d.mes === 'Mai' ? '#1B8A5A' : 'rgba(27,138,90,0.3)' }} />
+                            <span className="text-[10px] text-white/40">{d.mes}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-white/5 grid grid-cols-3 gap-4 text-center text-xs">
+                        <div><p className="text-white/40">Receita total (5m)</p><p className="font-bold text-[#1B8A5A] text-base">R${finMensal.reduce((s,d)=>s+d.receita,0).toLocaleString()}</p></div>
+                        <div><p className="text-white/40">Média mensal</p><p className="font-bold text-white text-base">R${Math.round(finMensal.reduce((s,d)=>s+d.receita,0)/5).toLocaleString()}</p></div>
+                        <div><p className="text-white/40">Crescimento</p><p className="font-bold text-[#60A5FA] text-base">+{Math.round(((finMensal[4].receita/finMensal[0].receita)-1)*100)}%</p></div>
+                      </div>
                     </div>
-                    {tenantTickets.length === 0 ? (
-                      <div className="p-6 text-center text-white/30 text-sm">Nenhum chamado aberto</div>
-                    ) : (
-                      <div className="divide-y divide-white/5">
-                        {tenantTickets.map((tk) => {
-                          const stk = STATUS_TICKET[tk.status as keyof typeof STATUS_TICKET]
-                          const tipo = TIPO_TICKET[tk.tipo as keyof typeof TIPO_TICKET]
-                          return (
-                            <div key={tk.id} className="px-5 py-3 flex items-center gap-3">
-                              <span>{tipo.icon}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm text-white font-medium truncate">{tk.titulo}</p>
-                                <p className="text-xs text-white/30">{tk.data} · {tk.prioridade}</p>
+
+                    {/* Pagamentos e plano */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                        <p className="font-sora font-bold text-white mb-4">💳 Histórico de pagamentos</p>
+                        <div className="space-y-2">
+                          {finMensal.map((d, i) => (
+                            <div key={d.mes} className="flex items-center justify-between py-2 border-b border-white/5">
+                              <div>
+                                <p className="text-sm text-white font-medium">{d.mes}/2026</p>
+                                <p className="text-xs text-white/30">Assinatura {t.plan}</p>
                               </div>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${stk.cls}`}>{stk.label}</span>
-                              <button
-                                onClick={() => { setSelectedTicket(tk); setPage('tickets') }}
-                                className="text-[10px] bg-white/10 text-white px-2 py-1 rounded-lg hover:bg-white/20"
-                              >Ver</button>
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-[#1B8A5A]">R${t.mrr}</p>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${i === finMensal.length-1 && t.status==='past_due' ? 'bg-[#FEE2E2] text-[#991B1B]' : 'bg-[#D1FAE5] text-[#065F46]'}`}>
+                                  {i === finMensal.length-1 && t.status==='past_due' ? 'Pendente' : 'Pago'}
+                                </span>
+                              </div>
                             </div>
-                          )
-                        })}
+                          ))}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                {/* Ações administrativas */}
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-                  <p className="font-sora font-bold text-white mb-3">Ações administrativas</p>
-                  <div className="flex flex-wrap gap-2">
-                    <a
-                      href={`mailto:${t.email}?subject=STYLOGESTOR - Contato sobre sua conta&body=Olá ${t.name.split(' ')[0]},`}
-                      className="text-xs bg-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-colors"
-                    >
-                      📧 Enviar e-mail
-                    </a>
-                    <a
-                      href={`https://wa.me/${t.phone}?text=${encodeURIComponent(`Olá! Sou da equipe STYLOGESTOR. Podemos conversar sobre sua conta?`)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs bg-[#25D366] text-white px-4 py-2 rounded-xl hover:opacity-90 transition-opacity"
-                    >
-                      💬 Abrir WhatsApp
-                    </a>
-                    <a
-                      href={`https://app.stylogestor.com.br/dashboard`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs bg-white/10 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-colors"
-                    >
-                      🔑 Acessar painel
-                    </a>
-                    {!suspenderConfirm && !tenantsSuspended.includes(t.id) && (
-                      <button
-                        onClick={() => setSuspenderConfirm(true)}
-                        className="text-xs bg-[#FEE2E2] text-[#991B1B] px-4 py-2 rounded-xl hover:bg-[#FECACA] font-bold transition-colors"
-                      >
-                        ⛔ Suspender conta
-                      </button>
-                    )}
-                    {suspenderConfirm && (
-                      <div className="flex items-center gap-2 bg-[#FEE2E2] border border-[#FCA5A5] px-4 py-2 rounded-xl w-full">
-                        <p className="text-xs text-[#991B1B] font-semibold flex-1">Confirmar suspensão de {t.name}?</p>
-                        <button
-                          onClick={() => { setTenantsSuspended((p) => [...p, t.id]); setSuspenderConfirm(false) }}
-                          className="text-xs bg-[#991B1B] text-white px-3 py-1 rounded-lg font-bold hover:bg-[#7f1d1d]"
-                        >
-                          Confirmar
-                        </button>
-                        <button
-                          onClick={() => setSuspenderConfirm(false)}
-                          className="text-xs bg-white/50 text-[#991B1B] px-3 py-1 rounded-lg"
-                        >
-                          Cancelar
-                        </button>
+                      <div className="space-y-3">
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                          <p className="font-sora font-bold text-white mb-3">📊 Métricas financeiras</p>
+                          {[
+                            { label: 'MRR atual', value: `R$${t.mrr}`, color: '#1B8A5A' },
+                            { label: 'ARR estimado', value: `R$${(t.mrr*12).toLocaleString()}`, color: '#60A5FA' },
+                            { label: 'LTV estimado (14m)', value: `R$${ltv.toLocaleString()}`, color: '#A78BFA' },
+                            { label: 'Ticket médio', value: `R$${ticketMedio}`, color: '#F5A623' },
+                            { label: 'Total pago (histórico)', value: `R$${(t.mrr * 5).toLocaleString()}`, color: '#1B8A5A' },
+                          ].map(m => (
+                            <div key={m.label} className="flex justify-between items-center py-1.5 border-b border-white/5">
+                              <span className="text-xs text-white/40">{m.label}</span>
+                              <span className="text-sm font-bold" style={{ color: m.color }}>{m.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {t.status === 'past_due' && (
+                          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4">
+                            <p className="font-bold text-red-400 mb-2">⚠️ Cobrança pendente</p>
+                            <p className="text-xs text-white/50 mb-3">R${t.mrr} em aberto. Envie cobrança imediatamente.</p>
+                            <button onClick={() => { setCobrancaEnviada(t.id); setTimeout(() => setCobrancaEnviada(null), 3000) }}
+                              className="w-full bg-red-500 text-white text-sm font-bold py-2.5 rounded-xl hover:bg-red-600">
+                              {cobrancaEnviada === t.id ? '✓ Cobrança enviada!' : '💳 Enviar cobrança agora'}
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {tenantsSuspended.includes(t.id) && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-[#F87171] font-bold">⛔ Conta suspensa</span>
-                        <button
-                          onClick={() => setTenantsSuspended((p) => p.filter((i) => i !== t.id))}
-                          className="text-xs bg-[#1B8A5A] text-white px-3 py-1 rounded-lg hover:bg-[#156b47] transition-colors"
-                        >
-                          🔄 Reativar
-                        </button>
-                      </div>
-                    )}
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* ABA: ATIVIDADE */}
+                {tenantTab === 'atividade' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                      <p className="font-sora font-bold text-white mb-4">📅 Agendamentos por mês</p>
+                      <div className="flex items-end gap-3 h-32">
+                        {finMensal.map((d) => (
+                          <div key={d.mes} className="flex-1 flex flex-col items-center gap-1">
+                            <span className="text-[10px] text-white/50">{d.agend}</span>
+                            <div className="w-full rounded-t-lg" style={{ height: `${(d.agend/t.appts)*100}px`, background: d.mes==='Mai' ? '#F5A623' : 'rgba(245,166,35,0.3)' }} />
+                            <span className="text-[10px] text-white/40">{d.mes}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                      <p className="font-sora font-bold text-white mb-4">📱 Uso do sistema</p>
+                      {[
+                        { label: 'Último login', value: t.lastLogin, icon: '🕐' },
+                        { label: 'Total agendamentos', value: t.appts, icon: '📅' },
+                        { label: 'Total clientes', value: t.clients, icon: '👥' },
+                        { label: 'Média agendam./mês', value: Math.round(t.appts/5), icon: '📊' },
+                        { label: 'Cliente há (dias)', value: '75 dias', icon: '📆' },
+                        { label: 'Módulos ativos', value: t.plan==='PREMIUM' ? '6/6' : t.plan==='PRO' ? '5/6' : '3/6', icon: '⚡' },
+                      ].map(m => (
+                        <div key={m.label} className="flex items-center justify-between py-1.5 border-b border-white/5">
+                          <span className="text-xs text-white/40">{m.icon} {m.label}</span>
+                          <span className="text-sm font-semibold text-white">{m.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ABA: SUPORTE */}
+                {tenantTab === 'suporte' && (
+                  <div className="space-y-4">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                      <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+                        <p className="font-sora font-bold text-white">🎧 Chamados de suporte</p>
+                        <span className="text-xs text-white/40">{tenantTickets.length} ticket(s)</span>
+                      </div>
+                      {tenantTickets.length === 0 ? (
+                        <div className="p-10 text-center">
+                          <p className="text-4xl mb-2">✅</p>
+                          <p className="text-white/30 text-sm">Nenhum chamado aberto</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-white/5">
+                          {tenantTickets.map((tk) => {
+                            const stk = STATUS_TICKET[tk.status as keyof typeof STATUS_TICKET]
+                            const tipo = TIPO_TICKET[tk.tipo as keyof typeof TIPO_TICKET]
+                            return (
+                              <div key={tk.id} className="px-5 py-4 flex items-center gap-3">
+                                <span className="text-2xl">{tipo.icon}</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-white font-semibold">{tk.titulo}</p>
+                                  <p className="text-xs text-white/30 mt-0.5">{tk.data} · Prioridade {tk.prioridade}</p>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${stk.cls}`}>{stk.label}</span>
+                                <button onClick={() => { setSelectedTicket(tk); setPage('tickets') }} className="text-[10px] bg-white/10 text-white px-3 py-1.5 rounded-lg hover:bg-white/20">
+                                  Ver ticket
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    {/* Adicionar nota interna */}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                      <p className="font-sora font-bold text-white mb-3">📝 Nota interna</p>
+                      <textarea rows={3} placeholder="Adicione observações sobre esta barbearia (visível apenas para admins)..."
+                        className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-3 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50 resize-none mb-3" />
+                      <button className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:opacity-90">
+                        💾 Salvar nota
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )
           })()}

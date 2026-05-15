@@ -42,6 +42,19 @@ export function AgendaView() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [fechamentoOpen, setFechamentoOpen] = useState(false)
   const [selectedAppt, setSelectedAppt] = useState<typeof MOCK_APPOINTMENTS[0] | null>(null)
+  const [appointments, setAppointments] = useState(MOCK_APPOINTMENTS)
+
+  const handleConcluir = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setAppointments(p => p.map(a => a.id === id ? { ...a, status: 'COMPLETED' } : a))
+  }
+
+  const handleCancelar = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirm('Cancelar este agendamento?')) {
+      setAppointments(p => p.map(a => a.id === id ? { ...a, status: 'CANCELED' } : a))
+    }
+  }
   const [selectedTime, setSelectedTime] = useState('')
   const [selectedProfId, setSelectedProfId] = useState('')
 
@@ -307,13 +320,13 @@ export function AgendaView() {
                       <div className="flex gap-1">
                         {appt.status !== 'COMPLETED' && appt.status !== 'CANCELED' && (
                           <button className="text-[10px] bg-[#1B8A5A]/10 text-[#1B8A5A] font-bold px-2 py-1 rounded-lg hover:bg-[#1B8A5A]/20"
-                            onClick={(e) => { e.stopPropagation() }}>
+                            onClick={(e) => handleConcluir(appt.id, e)}>
                             ✓ Concluir
                           </button>
                         )}
                         {appt.status !== 'CANCELED' && (
                           <button className="text-[10px] bg-red-50 text-red-500 font-bold px-2 py-1 rounded-lg hover:bg-red-100"
-                            onClick={(e) => { e.stopPropagation() }}>
+                            onClick={(e) => handleCancelar(appt.id, e)}>
                             ✗
                           </button>
                         )}
@@ -385,7 +398,7 @@ export function AgendaView() {
       {/* Modais */}
       <AppointmentModal open={newModalOpen} onClose={() => setNewModalOpen(false)} defaultDate="" />
       {selectedAppt && (
-        <AppointmentDetailModal open={detailOpen} onClose={() => setDetailOpen(false)} event={null} />
+        <AppointmentDetailModal open={detailOpen} onClose={() => setDetailOpen(false)} event={selectedAppt} />
       )}
       <FechamentoDiaModal open={fechamentoOpen} onClose={() => setFechamentoOpen(false)} appointments={MOCK_APPOINTMENTS} totalDia={totalDia} />
     </div>

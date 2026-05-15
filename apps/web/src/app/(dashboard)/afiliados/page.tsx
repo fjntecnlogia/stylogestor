@@ -9,7 +9,8 @@ export default function AfiliadosPage() {
 
   const userId = user?.id || 'carregando'
   const codigoAfiliado = user ? `STYLO-${userId.slice(-8).toUpperCase()}` : '...'
-  const linkAfiliado = `https://stylogestor.com.br/cadastro?ref=${codigoAfiliado}`
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
+  const linkAfiliado = `${APP_URL}/cadastro?ref=${codigoAfiliado}`
 
   const handleCopy = () => {
     navigator.clipboard.writeText(linkAfiliado)

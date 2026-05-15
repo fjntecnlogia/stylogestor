@@ -76,11 +76,17 @@ export function ConfiguracoesView() {
             </div>
             <div>
               <label className="text-xs font-medium text-[#4A4A5A] block mb-1">Logo da barbearia</label>
-              <div className="border-2 border-dashed border-[#E8E6E2] rounded-xl p-6 text-center cursor-pointer hover:border-[#1A3A6B]/40 transition-colors">
+              <label className="border-2 border-dashed border-[#E8E6E2] rounded-xl p-6 text-center cursor-pointer hover:border-[#1A3A6B]/40 transition-colors block">
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml" className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file && file.size > 2 * 1024 * 1024) { error('Arquivo muito grande. Máximo 2MB.'); return }
+                    if (file) success(`Logo "${file.name}" selecionada! Salve para aplicar.`)
+                  }} />
                 <p className="text-3xl mb-2">🖼️</p>
                 <p className="text-sm text-[#4A4A5A]">Clique para fazer upload da logo</p>
                 <p className="text-xs text-[#4A4A5A]/60">PNG, JPG ou SVG até 2MB</p>
-              </div>
+              </label>
             </div>
             <button
               onClick={() => success('Configurações salvas com sucesso!')}
@@ -224,7 +230,7 @@ export function ConfiguracoesView() {
                     const res = await fetch('/api/stripe/connect/onboard', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ tenantName: 'Minha Barbearia', email: '' }),
+                      body: JSON.stringify({ tenantName: (document.querySelector('input[placeholder="Barbearia do João"]') as HTMLInputElement)?.value || 'Minha Barbearia', email: (document.querySelector('input[type="email"]') as HTMLInputElement)?.value || '' }),
                     })
                     const data = await res.json()
                     if (data.url) window.location.href = data.url

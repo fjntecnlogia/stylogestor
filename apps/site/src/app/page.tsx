@@ -391,7 +391,7 @@ export default function Home() {
               <p className="font-semibold text-white/60 text-sm mb-3">Contato</p>
               <div className="space-y-2 text-xs">
                 <a href="mailto:contato@stylogestor.com.br" className="block hover:text-white/70 transition-colors">contato@stylogestor.com.br</a>
-                <a href="https://wa.me/5511999999999" className="block hover:text-white/70 transition-colors">WhatsApp Suporte</a>
+                <a href="https://wa.me/5565996952828" className="block hover:text-white/70 transition-colors">WhatsApp Suporte</a>
                 <a href="https://instagram.com/stylogestor" className="block hover:text-white/70 transition-colors">@stylogestor</a>
               </div>
             </div>

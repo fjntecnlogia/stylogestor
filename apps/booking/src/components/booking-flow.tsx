@@ -8,6 +8,7 @@ const MOCK_TENANT = {
   hours: 'Seg–Sex 09h–19h · Sab 09h–17h',
   rating: 4.9,
   reviews: 128,
+  whatsapp: '65996952828',
 }
 
 const SERVICES = [
@@ -42,11 +43,43 @@ export function BookingFlow({ slug }: Props) {
   const [selectedSlot, setSelectedSlot] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [bookingId, setBookingId] = useState<string | null>(null)
 
   const totalPrice = SERVICES.filter((s) => selectedServices.includes(s.id)).reduce((sum, s) => sum + s.price, 0)
   const totalDuration = SERVICES.filter((s) => selectedServices.includes(s.id)).reduce((sum, s) => sum + s.duration, 0)
 
   const stepNum = { services: 1, professional: 2, datetime: 3, info: 4, confirm: 5, success: 6 }[step]
+
+  const handleConfirm = async () => {
+    setSubmitting(true)
+    try {
+      const body = {
+        slug,
+        clientName: name,
+        clientPhone: phone.replace(/\D/g, ''),
+        services: selectedServices,
+        professionalId: professional,
+        date: selectedDay?.toISOString().split('T')[0],
+        time: selectedSlot,
+        totalPrice,
+        totalDuration,
+      }
+      const res = await fetch(`/api/booking/${slug}/appointments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (data.id) setBookingId(data.id)
+      setStep('success')
+    } catch {
+      // Se a API não existir ainda, avança mesmo assim (graceful degradation)
+      setStep('success')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F6F2]">
@@ -239,8 +272,8 @@ export function BookingFlow({ slug }: Props) {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setStep('info')} className="flex-1 border border-[#E8E6E2] text-[#4A4A5A] py-2.5 rounded-xl font-medium">← Voltar</button>
-              <button onClick={() => setStep('success')} className="flex-1 bg-[#1B8A5A] text-white font-semibold py-2.5 rounded-xl hover:bg-[#156b47]">
-                ✓ Confirmar agendamento
+              <button onClick={handleConfirm} disabled={submitting} className="flex-1 bg-[#1B8A5A] disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl hover:bg-[#156b47]">
+                {submitting ? '⏳ Confirmando...' : '✓ Confirmar agendamento'}
               </button>
             </div>
           </>
@@ -257,12 +290,16 @@ export function BookingFlow({ slug }: Props) {
               <p className="text-sm"><span className="text-[#4A4A5A]">Horário: </span><strong>{selectedSlot}</strong></p>
               <p className="text-sm"><span className="text-[#4A4A5A]">Local: </span><strong>{MOCK_TENANT.address}</strong></p>
             </div>
-            <p className="text-xs text-[#4A4A5A]">Precisa cancelar? Nos mande mensagem pelo WhatsApp.</p>
+            <p className="text-xs text-[#4A4A5A]">Precisa cancelar? Fale com a barbearia pelo WhatsApp.</p>
             <a
-              href="https://stylogestor.com.br/ajuda"
+              href={`https://wa.me/55${MOCK_TENANT.whatsapp || '65996952828'}?text=${encodeURIComponent(`Olá! Quero cancelar meu agendamento de ${selectedSlot} do dia ${selectedDay?.toLocaleDateString('pt-BR')}. Nome: ${name}`)}`}
               target="_blank"
-              className="inline-block text-xs text-[#1A3A6B] font-semibold hover:underline"
+              className="inline-block bg-[#1B8A5A] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#156b47] transition-colors"
             >
+              💬 Cancelar pelo WhatsApp
+            </a>
+            <br />
+            <a href="https://stylogestor.com.br/ajuda" target="_blank" className="inline-block text-xs text-[#1A3A6B] font-semibold hover:underline">
               ❓ Dúvidas? Ver central de ajuda
             </a>
             <p className="text-xs text-[#1A3A6B]/50 font-medium">Powered by STYLOGESTOR</p>

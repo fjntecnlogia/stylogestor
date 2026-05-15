@@ -1,6 +1,8 @@
 import { SiteHeader } from '@/components/site-header'
 import Link from 'next/link'
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
+
 export const metadata = { title: 'Sobre nós — STYLOGESTOR' }
 
 const VALORES = [
@@ -133,7 +135,7 @@ export default function SobrePage() {
           </h2>
           <p className="text-white/60 mb-8">Junte-se a mais de 1.200 barbearias e salões que confiam no STYLOGESTOR.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="https://app.stylogestor.com.br/cadastro"
+            <Link href={`${APP_URL}/cadastro`}
               className="bg-[#F5A623] text-[#1A3A6B] font-bold px-8 py-4 rounded-2xl hover:bg-[#e09610] transition-colors">
               Começar grátis por 14 dias →
             </Link>
