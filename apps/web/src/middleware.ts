@@ -15,6 +15,10 @@ const isPublicRoute = createRouteMatcher([
   '/sucesso(.*)',
   '/bloqueado(.*)',
   '/api/webhooks(.*)',
+  '/api/whatsapp/webhook(.*)',  // Evolution API webhook — sem auth
+  '/api/whatsapp/qr(.*)',       // QR code endpoint — auth no middleware mas não no clerk
+  '/api/tenants(.*)',           // Onboarding create tenant
+  '/api/notifications(.*)',     // Email notifications
   '/api/v1/tenants/by-slug(.*)',
 ])
 
