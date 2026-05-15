@@ -1,113 +1,103 @@
 // ============================================================
-// STYLOGESTOR — WhatsApp via Z-API
-// https://developer.z-api.io/
+// STYLOGESTOR — WhatsApp via Ultra MSG
+// https://ultramsg.com/
 // ============================================================
 
-const ZAPI_INSTANCE    = process.env.ZAPI_INSTANCE_ID    || ''
-const ZAPI_TOKEN       = process.env.ZAPI_TOKEN           || ''
-const ZAPI_CLIENT_TOKEN= process.env.ZAPI_CLIENT_TOKEN    || ''
-const ZAPI_BASE        = `https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}`
+const ULTRA_INSTANCE = process.env.ULTRAMSG_INSTANCE || ''
+const ULTRA_TOKEN    = process.env.ULTRAMSG_TOKEN    || ''
+const ULTRA_BASE     = `https://api.ultramsg.com/${ULTRA_INSTANCE}`
 
 interface SendMessageParams {
-  phone: string   // qualquer formato — limpamos aqui
+  phone: string
   message: string
 }
 
 export async function sendWhatsApp({ phone, message }: SendMessageParams): Promise<boolean> {
-  if (!ZAPI_INSTANCE || !ZAPI_TOKEN) {
-    console.warn('[ZAPI] Credenciais não configuradas — mensagem não enviada')
+  if (!ULTRA_INSTANCE || !ULTRA_TOKEN) {
+    console.warn('[ULTRAMSG] Credenciais não configuradas')
     return false
   }
 
   const cleaned = phone.replace(/\D/g, '')
-  const number  = cleaned.startsWith('55') ? cleaned : `55${cleaned}`
+  const number  = cleaned.startsWith('55') ? `+${cleaned}` : `+55${cleaned}`
 
   try {
-    const res = await fetch(`${ZAPI_BASE}/send-text`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(ZAPI_CLIENT_TOKEN ? { 'Client-Token': ZAPI_CLIENT_TOKEN } : {}),
-      },
-      body: JSON.stringify({ phone: number, message }),
+    const body = new URLSearchParams({
+      token: ULTRA_TOKEN,
+      to: number,
+      body: message,
+      priority: '1',
     })
 
-    if (!res.ok) {
-      const err = await res.text()
-      console.error('[ZAPI_ERROR]', res.status, err)
-      return false
-    }
+    const res = await fetch(`${ULTRA_BASE}/messages/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
 
-    return true
+    const data = await res.json()
+    if (data.sent === 'true' || data.sent === true) return true
+
+    console.error('[ULTRAMSG_ERROR]', data)
+    return false
   } catch (err) {
-    console.error('[ZAPI_EXCEPTION]', err)
+    console.error('[ULTRAMSG_EXCEPTION]', err)
     return false
   }
 }
 
-// ── Templates de mensagem ────────────────────────────────────────
+// ── Templates ────────────────────────────────────────────────────
 
-export function msgConfirmacaoAgendamento(params: {
-  clientName: string
-  date: string
-  time: string
-  service: string
-  professional: string
-  barbershop: string
+export function msgConfirmacaoAgendamento(p: {
+  clientName: string; date: string; time: string
+  service: string; professional: string; barbershop: string
 }) {
   return `✂️ *Agendamento confirmado!*
 
-Olá, ${params.clientName.split(' ')[0]}! Seu horário foi confirmado.
+Olá, ${p.clientName.split(' ')[0]}! Seu horário foi confirmado.
 
-📅 *Data:* ${params.date}
-🕐 *Horário:* ${params.time}
-✂️ *Serviço:* ${params.service}
-💈 *Profissional:* ${params.professional}
-🏪 *Barbearia:* ${params.barbershop}
-
-Para cancelar, entre em contato com a barbearia.
+📅 *Data:* ${p.date}
+🕐 *Horário:* ${p.time}
+✂️ *Serviço:* ${p.service}
+💈 *Profissional:* ${p.professional}
+🏪 *Barbearia:* ${p.barbershop}
 
 _Powered by STYLOGESTOR_ 🚀`
 }
 
-export function msgLembreteAgendamento(params: {
-  clientName: string
-  date: string
-  time: string
-  barbershop: string
+export function msgLembreteAgendamento(p: {
+  clientName: string; date: string; time: string; barbershop: string
 }) {
   return `⏰ *Lembrete de agendamento!*
 
-Oi, ${params.clientName.split(' ')[0]}! Não esqueça do seu horário.
+Oi, ${p.clientName.split(' ')[0]}! Não esqueça do seu horário.
 
-📅 *Data:* ${params.date}
-🕐 *Horário:* ${params.time}
-🏪 *Barbearia:* ${params.barbershop}
+📅 *Data:* ${p.date}
+🕐 *Horário:* ${p.time}
+🏪 *Barbearia:* ${p.barbershop}
 
 Até lá! ✂️`
 }
 
-export function msgAniversario(params: { clientName: string; barbershop: string }) {
-  return `🎂 *Feliz aniversário, ${params.clientName.split(' ')[0]}!*
+export function msgAniversario(p: { clientName: string; barbershop: string }) {
+  return `🎂 *Feliz aniversário, ${p.clientName.split(' ')[0]}!*
 
-A equipe da ${params.barbershop} deseja um dia especial para você! 🎉
+A equipe da ${p.barbershop} deseja um dia especial para você! 🎉
 
-Temos uma oferta exclusiva esperando por você. Venha nos visitar! ✂️
-
-_STYLOGESTOR_`
+Temos um presente esperando por você. Venha nos visitar! ✂️`
 }
 
-export function msgFidelidade(params: {
+export function msgFidelidade(p: {
   clientName: string; stamps: number; goal: number; reward: string
 }) {
-  const left = params.goal - params.stamps
+  const left = p.goal - p.stamps
   return `⭐ *Programa de Fidelidade*
 
-Oi, ${params.clientName.split(' ')[0]}! Você tem *${params.stamps}/${params.goal}* carimbos.
+Oi, ${p.clientName.split(' ')[0]}! Você tem *${p.stamps}/${p.goal}* carimbos.
 
 ${left > 0
-  ? `Faltam *${left} visita${left > 1 ? 's' : ''}* para ganhar: *${params.reward}* 🎁`
-  : `🎉 Você ganhou: *${params.reward}*! Resgate na próxima visita.`}
+  ? `Faltam *${left} visita${left > 1 ? 's' : ''}* para ganhar: *${p.reward}* 🎁`
+  : `🎉 Você ganhou: *${p.reward}*! Resgate na próxima visita.`}
 
 ✂️ _STYLOGESTOR_`
 }
