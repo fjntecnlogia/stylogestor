@@ -1,48 +1,67 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { PortalButton } from '@/components/ui/portal-button'
 
 // ── Modal WhatsApp QR Code ──────────────────────────────────────
 function WhatsAppModal({ onClose }: { onClose: () => void }) {
   const [qrcode, setQrcode] = useState<string | null>(null)
-  const [status, setStatus] = useState<'loading' | 'qr' | 'connected' | 'error'>('loading')
-  const [msg, setMsg] = useState('Conectando ao servidor WhatsApp...')
+  const [status, setStatus] = useState<'loading' | 'qr' | 'connected' | 'error' | 'waiting'>('loading')
+  const [msg, setMsg] = useState('Iniciando conexão WhatsApp...')
+  const [countdown, setCountdown] = useState(60)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const countRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const fetchQR = async () => {
-    setStatus('loading')
-    setMsg('Buscando QR code...')
-    try {
-      const res = await fetch('/api/whatsapp/qr')
-      const data = await res.json()
-      if (data.status === 'connected') {
-        setStatus('connected')
-        setMsg('WhatsApp já está conectado!')
-      } else if (data.qrcode) {
-        setQrcode(data.qrcode)
-        setStatus('qr')
-        setMsg('Escaneie o QR code com o WhatsApp do seu celular')
-      } else {
-        // Tentar criar instância
-        const res2 = await fetch('/api/whatsapp/qr', { method: 'POST' })
-        const data2 = await res2.json()
-        if (data2.qrcode) {
-          setQrcode(data2.qrcode)
-          setStatus('qr')
-          setMsg('Escaneie o QR code com o WhatsApp do seu celular')
-        } else {
-          setStatus('error')
-          setMsg('Erro ao gerar QR code. Tente novamente.')
+  const stopPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    if (countRef.current) { clearInterval(countRef.current); countRef.current = null }
+  }
+
+  const startPolling = () => {
+    stopPolling()
+    setCountdown(60)
+    // Polling do webhook store (a cada 3s)
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await fetch('/api/whatsapp/webhook')
+        const d = await r.json()
+        if (d.status === 'connected') {
+          stopPolling(); setStatus('connected'); setMsg('WhatsApp conectado!')
+        } else if (d.status === 'qr' && d.qrcode) {
+          setQrcode(d.qrcode); setStatus('qr'); setMsg('Escaneie com o WhatsApp do celular')
         }
-      }
+      } catch {}
+    }, 3000)
+    // Countdown visual
+    countRef.current = setInterval(() => {
+      setCountdown(c => { if (c <= 1) { stopPolling(); setStatus('error'); setMsg('QR code expirou. Tente novamente.'); return 0 } return c - 1 })
+    }, 1000)
+  }
+
+  const initWhatsApp = async () => {
+    setStatus('loading')
+    setMsg('Iniciando conexão...')
+    setQrcode(null)
+    try {
+      // Verificar estado atual
+      const r = await fetch('/api/whatsapp/qr')
+      const d = await r.json()
+      if (d.status === 'connected') { setStatus('connected'); setMsg('WhatsApp já está conectado!'); return }
+      if (d.status === 'qr' && d.qrcode) { setQrcode(d.qrcode); setStatus('qr'); setMsg('Escaneie com o WhatsApp do celular'); startPolling(); return }
+      // Aguardar QR via webhook
+      setStatus('waiting')
+      setMsg('Aguardando QR code... (pode levar 15-30 segundos)')
+      startPolling()
     } catch {
       setStatus('error')
-      setMsg('Erro de conexão com o servidor WhatsApp.')
+      setMsg('Erro de conexão.')
     }
   }
 
-  useState(() => { fetchQR() })
+  useEffect(() => { initWhatsApp(); return stopPolling }, [])
+
+  const fetchQR = initWhatsApp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -53,9 +72,14 @@ function WhatsAppModal({ onClose }: { onClose: () => void }) {
         <h3 className="font-sora font-bold text-[#1C1C2E] text-lg mb-1">Conectar WhatsApp</h3>
         <p className="text-xs text-[#6B7280] mb-4">{msg}</p>
 
-        {status === 'loading' && (
-          <div className="flex justify-center py-8">
-            <div className="w-10 h-10 border-4 border-[#1A3A6B] border-t-transparent rounded-full animate-spin" />
+        {(status === 'loading' || status === 'waiting') && (
+          <div className="py-6 space-y-3">
+            <div className="flex justify-center">
+              <div className="w-10 h-10 border-4 border-[#25D366] border-t-transparent rounded-full animate-spin" />
+            </div>
+            {status === 'waiting' && (
+              <p className="text-xs text-[#6B7280]">Aguardando: {countdown}s</p>
+            )}
           </div>
         )}
 
