@@ -137,6 +137,8 @@ export function AdminDashboard() {
   const [novaAutomacaoOpen, setNovaAutomacaoOpen] = useState(false)
   const [automacoes, setAutomacoes] = useState(AUTOMACOES)
   const [formAutomacao, setFormAutomacao] = useState({ nome: '', tipo: 'email', gatilho: 'cadastro', delay: '0', mensagem: '' })
+  const [selectedAutomacao, setSelectedAutomacao] = useState<typeof AUTOMACOES[0] | null>(null)
+  const [editAutomacao, setEditAutomacao] = useState({ nome: '', descricao: '' })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [cobrancaEnviada, setCobrancaEnviada] = useState<string | null>(null)
   const [suspenderConfirm, setSuspenderConfirm] = useState(false)
@@ -382,11 +384,14 @@ export function AdminDashboard() {
                         <th className="text-right pb-3 font-medium">Enviados</th>
                         <th className="text-right pb-3 font-medium">Abertos</th>
                         <th className="text-right pb-3 font-medium">Conversões</th>
+                        <th className="text-center pb-3 font-medium">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {automacoes.map((a) => (
-                        <tr key={a.id} className="hover:bg-white/5 transition-colors">
+                        <tr key={a.id}
+                          onClick={() => { setSelectedAutomacao(a); setEditAutomacao({ nome: a.nome, descricao: a.descricao }) }}
+                          className="hover:bg-white/5 transition-colors cursor-pointer">
                           <td className="py-3 pr-4">
                             <p className="font-semibold text-white">{a.nome}</p>
                             <p className="text-xs text-white/30 mt-0.5">{a.descricao}</p>
@@ -407,6 +412,18 @@ export function AdminDashboard() {
                           </td>
                           <td className="py-3 text-right">
                             <span className="font-bold text-[#10B981]">{a.conversoes}</span>
+                          </td>
+                          <td className="py-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={e => { e.stopPropagation(); setAutomacoes(p => p.map(x => x.id === a.id ? { ...x, status: x.status === 'ativo' ? 'pausado' : 'ativo' } : x)) }}
+                                className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-colors ${a.status === 'ativo' ? 'bg-[#FEF3C7]/20 text-[#F5A623] hover:bg-[#FEF3C7]/30' : 'bg-[#D1FAE5]/20 text-[#1B8A5A] hover:bg-[#D1FAE5]/30'}`}>
+                                {a.status === 'ativo' ? '⏸ Pausar' : '▶ Ativar'}
+                              </button>
+                              <button onClick={e => { e.stopPropagation(); setSelectedAutomacao(a); setEditAutomacao({ nome: a.nome, descricao: a.descricao }) }}
+                                className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white/5 text-white/50 hover:bg-white/10 transition-colors">
+                                ✏️
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1206,6 +1223,82 @@ export function AdminDashboard() {
         </div>
       </main>
       </div>
+
+      {/* ── MODAL EDITAR AUTOMAÇÃO ── */}
+      {selectedAutomacao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedAutomacao(null)} />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <div>
+                <h3 className="font-sora font-bold text-white">⚙️ Editar Automação</h3>
+                <p className="text-xs text-white/40 mt-0.5">{selectedAutomacao.nome}</p>
+              </div>
+              <button onClick={() => setSelectedAutomacao(null)} className="text-white/40 hover:text-white text-2xl leading-none">×</button>
+            </div>
+
+            {/* Stats rápidos */}
+            <div className="grid grid-cols-3 divide-x divide-white/5 border-b border-white/10">
+              {[
+                { label: 'Enviados', value: selectedAutomacao.enviados, color: 'text-white' },
+                { label: 'Taxa abertura', value: `${selectedAutomacao.enviados > 0 ? Math.round(selectedAutomacao.abertos/selectedAutomacao.enviados*100) : 0}%`, color: 'text-[#3B82F6]' },
+                { label: 'Conversões', value: selectedAutomacao.conversoes, color: 'text-[#10B981]' },
+              ].map(s => (
+                <div key={s.label} className="px-4 py-3 text-center">
+                  <p className={`font-sora font-bold text-xl ${s.color}`}>{s.value}</p>
+                  <p className="text-xs text-white/30 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Nome</label>
+                <input value={editAutomacao.nome} onChange={e => setEditAutomacao(f => ({ ...f, nome: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Descrição</label>
+                <input value={editAutomacao.descricao} onChange={e => setEditAutomacao(f => ({ ...f, descricao: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50" />
+              </div>
+
+              {/* Ações rápidas */}
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-2">Ações rápidas</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => { setAutomacoes(p => p.map(x => x.id === selectedAutomacao.id ? { ...x, status: x.status === 'ativo' ? 'pausado' : 'ativo' } : x)); setSelectedAutomacao(prev => prev ? { ...prev, status: prev.status === 'ativo' ? 'pausado' : 'ativo' } : null) }}
+                    className={`py-2.5 rounded-xl border text-sm font-bold transition-all ${selectedAutomacao.status === 'ativo' ? 'border-[#F5A623]/30 bg-[#F5A623]/10 text-[#F5A623] hover:bg-[#F5A623]/20' : 'border-[#1B8A5A]/30 bg-[#1B8A5A]/10 text-[#1B8A5A] hover:bg-[#1B8A5A]/20'}`}>
+                    {selectedAutomacao.status === 'ativo' ? '⏸ Pausar automação' : '▶ Ativar automação'}
+                  </button>
+                  <button onClick={() => { setAutomacoes(p => p.map(x => x.id === selectedAutomacao.id ? { ...x, enviados: 0, abertos: 0, cliques: 0, conversoes: 0 } : x)); setSelectedAutomacao(prev => prev ? { ...prev, enviados: 0, abertos: 0, cliques: 0, conversoes: 0 } : null) }}
+                    className="py-2.5 rounded-xl border border-white/10 text-white/50 text-sm font-bold hover:bg-white/5 transition-colors">
+                    🔄 Resetar métricas
+                  </button>
+                  <button
+                    onClick={() => { if (confirm(`Excluir "${selectedAutomacao.nome}"?`)) { setAutomacoes(p => p.filter(x => x.id !== selectedAutomacao.id)); setSelectedAutomacao(null) } }}
+                    className="col-span-2 py-2.5 rounded-xl border border-red-500/20 bg-red-500/5 text-red-400 text-sm font-bold hover:bg-red-500/10 transition-colors">
+                    🗑️ Excluir automação
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-white/10 flex gap-3">
+              <button onClick={() => setSelectedAutomacao(null)}
+                className="flex-1 border border-white/10 text-white/60 text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5">
+                Cancelar
+              </button>
+              <button onClick={() => {
+                setAutomacoes(p => p.map(x => x.id === selectedAutomacao.id ? { ...x, nome: editAutomacao.nome, descricao: editAutomacao.descricao } : x))
+                setSelectedAutomacao(null)
+              }} className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90">
+                ✓ Salvar alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL DETALHE DO LEAD ── */}
       {selectedLead && (
