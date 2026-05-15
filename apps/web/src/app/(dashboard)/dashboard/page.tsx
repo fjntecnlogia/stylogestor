@@ -1,20 +1,38 @@
 import { StatsGrid } from '@/components/dashboard/stats-grid'
 import { AppointmentsToday } from '@/components/dashboard/appointments-today'
 import { CashflowCard } from '@/components/dashboard/cashflow-card'
+import { AlertsPanel } from '@/components/dashboard/alerts-panel'
+import { QuickActions } from '@/components/dashboard/quick-actions'
 
 export const metadata = { title: 'Dashboard — STYLOGESTOR' }
 
+const hour = new Date().getHours()
+const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+
 export default function DashboardPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[#1C1C2E] font-sora">Bom dia! ✂️</h1>
-        <p className="text-[#4A4A5A] text-sm mt-1">Aqui está o resumo do seu negócio hoje.</p>
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-[#1C1C2E] font-sora">
+            {greeting}, João! ✂️
+          </h1>
+          <p className="text-[#4A4A5A] text-sm mt-1">
+            {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })} · Aqui está o resumo do seu negócio.
+          </p>
+        </div>
+        <QuickActions />
       </div>
 
+      {/* KPIs */}
       <StatsGrid />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Alertas inteligentes */}
+      <AlertsPanel />
+
+      {/* Agenda + Caixa */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <AppointmentsToday />
         <CashflowCard />
       </div>
