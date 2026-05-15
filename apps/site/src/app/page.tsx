@@ -381,9 +381,10 @@ export default function Home() {
             <div>
               <p className="font-semibold text-white/60 text-sm mb-3">Empresa</p>
               <div className="space-y-2 text-xs">
+                <a href="/sobre" className="block hover:text-white/70 transition-colors">Sobre nós</a>
                 <a href="/termos" className="block hover:text-white/70 transition-colors">Termos de uso</a>
                 <a href="/privacidade" className="block hover:text-white/70 transition-colors">Privacidade</a>
-                <a href="mailto:suporte@stylogestor.com.br" className="block hover:text-white/70 transition-colors">Suporte</a>
+                <a href="/suporte" className="block hover:text-white/70 transition-colors">Suporte</a>
               </div>
             </div>
             <div>
