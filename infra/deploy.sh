@@ -32,13 +32,13 @@ echo "🗄️  DATABASE_URL: ${DATABASE_URL:0:40}..."
 
 # 3. Instalar dependências
 echo "📦 Instalando dependências..."
-pnpm install --no-frozen-lockfile
+PNPM_YES=true pnpm install --no-frozen-lockfile
 
 # 4. Rodar migrações do banco
 echo "🗄️ Rodando migrações Prisma..."
 cd "$APP_DIR/packages/database"
 # Instalar sem NODE_ENV=production para incluir prisma
-NODE_ENV=development pnpm install --no-frozen-lockfile
+PNPM_YES=true NODE_ENV=development pnpm install --no-frozen-lockfile
 # Usar o prisma do workspace (v6), não o npx (que pega v7)
 DATABASE_URL="$DATABASE_URL" ./node_modules/.bin/prisma db push --accept-data-loss || \
 DATABASE_URL="$DATABASE_URL" pnpm exec prisma db push --accept-data-loss
