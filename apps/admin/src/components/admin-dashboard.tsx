@@ -987,53 +987,52 @@ export function AdminDashboard() {
                       )}
 
                       {selectedTicket?.status !== 'resolvido' && (
-                      <div>
-                        <label className="text-xs text-white/40 block mb-1.5">Responder ao cliente</label>
-                        <textarea value={resposta} onChange={(e) => setResposta(e.target.value)}
-                          placeholder="Digite sua resposta..."
-                          rows={4}
-                          className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-3 py-2.5 placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-[#F5A623]/50 resize-none"
-                        />
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            if (!resposta.trim()) {
-                              setTicketResolvido('erro')
-                              setTimeout(() => setTicketResolvido(null), 3000)
-                              return
-                            }
-                            // Salva resposta e muda status para resolvido
-                            setTickets(prev => prev.map(tk =>
-                              tk.id === selectedTicket!.id
-                                ? { ...tk, status: 'resolvido', resposta: resposta.trim() }
-                                : tk
-                            ))
-                            setTicketResolvido(selectedTicket!.id)
-                            setTimeout(() => {
-                              setSelectedTicket(null)
-                              setResposta('')
-                              setTicketResolvido(null)
-                            }, 2000)
-                          }}
-                          className="flex-1 bg-[#1B8A5A] text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#156b47] transition-colors">
-                          {ticketResolvido === selectedTicket?.id ? '✅ Resolvido!' : '✓ Responder e Resolver'}
-                        </button>
-                        {ticketResolvido === 'erro' && (
-                          <p className="text-xs text-red-400 mt-1 text-center w-full">⚠️ Digite uma resposta antes de resolver.</p>
-                        )}
-                        <button
-                          onClick={() => {
-                            setTickets(prev => prev.map(tk =>
-                              tk.id === selectedTicket!.id ? { ...tk, status: 'andamento' } : tk
-                            ))
-                          }}
-                          className="flex-1 border border-white/10 text-white/60 text-xs font-semibold py-2.5 rounded-xl hover:bg-white/5">
-                          📋 Assumir
-                        </button>
-                      </div>
-                      </div>
+                        <>
+                          <div>
+                            <label className="text-xs text-white/40 block mb-1.5">Responder ao cliente</label>
+                            <textarea value={resposta} onChange={(e) => setResposta(e.target.value)}
+                              placeholder="Digite sua resposta..."
+                              rows={4}
+                              className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-3 py-2.5 placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-[#F5A623]/50 resize-none"
+                            />
+                          </div>
+                          {ticketResolvido === 'erro' && (
+                            <p className="text-xs text-red-400 text-center">⚠️ Digite uma resposta antes de resolver.</p>
+                          )}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                if (!resposta.trim()) {
+                                  setTicketResolvido('erro')
+                                  setTimeout(() => setTicketResolvido(null), 3000)
+                                  return
+                                }
+                                setTickets(prev => prev.map(tk =>
+                                  tk.id === selectedTicket!.id
+                                    ? { ...tk, status: 'resolvido', resposta: resposta.trim() }
+                                    : tk
+                                ))
+                                setTicketResolvido(selectedTicket!.id)
+                                setTimeout(() => {
+                                  setSelectedTicket(null)
+                                  setResposta('')
+                                  setTicketResolvido(null)
+                                }, 2000)
+                              }}
+                              className="flex-1 bg-[#1B8A5A] text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#156b47] transition-colors">
+                              {ticketResolvido === selectedTicket?.id ? '✅ Resolvido!' : '✓ Responder e Resolver'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setTickets(prev => prev.map(tk =>
+                                  tk.id === selectedTicket!.id ? { ...tk, status: 'andamento' } : tk
+                                ))
+                              }}
+                              className="flex-1 border border-white/10 text-white/60 text-xs font-semibold py-2.5 rounded-xl hover:bg-white/5">
+                              📋 Assumir
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
                   ) : (
