@@ -299,10 +299,8 @@ export function ClientesView() {
         onSave={handleNovoCliente}
       />
       <AppointmentModal
-        isOpen={agendaOpen}
-        onClose={() => setAgendaOpen(false)}
-        onSave={() => { success('Agendamento criado!'); setAgendaOpen(false) }}
-        initialClient={selected?.name}
+        open={agendaOpen}
+        onClose={() => { success('Agendamento criado! 📅'); setAgendaOpen(false) }}
       />
     </div>
   )
