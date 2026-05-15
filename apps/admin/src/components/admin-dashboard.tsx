@@ -11,12 +11,12 @@ const TENANTS = [
   { id: '6', name: 'Espaço Capilar',       slug: 'espaco-cap',    plan: 'STARTER', status: 'canceled', mrr: 0,   since: '01/01/2026', city: 'Fortaleza',    clients: 45,  appts: 98,  lastLogin: '01/04/2026', email: 'espaco@capilar.com',    phone: '5585999990006' },
 ]
 
-const TICKETS = [
-  { id: '1', tenant: 'Barbearia do João',    tipo: 'suporte',    titulo: 'Agendamento duplicado',             status: 'aberto',      data: '11/05/2026', prioridade: 'alta' },
-  { id: '2', tenant: 'Studio Beleza & Cia',  tipo: 'elogio',     titulo: 'Suporte incrível!',                 status: 'resolvido',   data: '10/05/2026', prioridade: 'baixa' },
-  { id: '3', tenant: 'Barber King',          tipo: 'reclamacao', titulo: 'WhatsApp não enviando lembretes',   status: 'andamento',   data: '09/05/2026', prioridade: 'alta' },
-  { id: '4', tenant: 'Salão da Maria',       tipo: 'sugestao',   titulo: 'Adicionar relatório semanal',       status: 'aberto',      data: '08/05/2026', prioridade: 'media' },
-  { id: '5', tenant: 'Classic Barber Shop',  tipo: 'suporte',    titulo: 'Erro ao fechar caixa',              status: 'andamento',   data: '07/05/2026', prioridade: 'alta' },
+const TICKETS_INICIAL = [
+  { id: '1', tenant: 'Barbearia do João',    tipo: 'suporte',    titulo: 'Agendamento duplicado',             status: 'aberto',      data: '11/05/2026', prioridade: 'alta',  resposta: '' },
+  { id: '2', tenant: 'Studio Beleza & Cia',  tipo: 'elogio',     titulo: 'Suporte incrível!',                 status: 'resolvido',   data: '10/05/2026', prioridade: 'baixa', resposta: 'Obrigado pelo elogio! Fico feliz que pôde nos ajudar.' },
+  { id: '3', tenant: 'Barber King',          tipo: 'reclamacao', titulo: 'WhatsApp não enviando lembretes',   status: 'andamento',   data: '09/05/2026', prioridade: 'alta',  resposta: '' },
+  { id: '4', tenant: 'Salão da Maria',       tipo: 'sugestao',   titulo: 'Adicionar relatório semanal',       status: 'aberto',      data: '08/05/2026', prioridade: 'media', resposta: '' },
+  { id: '5', tenant: 'Classic Barber Shop',  tipo: 'suporte',    titulo: 'Erro ao fechar caixa',              status: 'andamento',   data: '07/05/2026', prioridade: 'alta',  resposta: '' },
 ]
 
 const ANALYTICS = {
@@ -121,6 +121,7 @@ export function AdminDashboard() {
   const [selectedTenant, setSelectedTenant] = useState<typeof TENANTS[0] | null>(null)
   const [resposta, setResposta] = useState('')
   const [ticketResolvido, setTicketResolvido] = useState<string | null>(null)
+  const [tickets, setTickets] = useState(TICKETS_INICIAL)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [cobrancaEnviada, setCobrancaEnviada] = useState<string | null>(null)
   const [suspenderConfirm, setSuspenderConfirm] = useState(false)
@@ -137,11 +138,11 @@ export function AdminDashboard() {
     t.name.toLowerCase().includes(search.toLowerCase()) || t.city.toLowerCase().includes(search.toLowerCase())
   )
 
-  const filteredTickets = TICKETS.filter((t) =>
+  const filteredTickets = tickets.filter((t) =>
     ticketFiltro === 'todos' || t.status === ticketFiltro
   )
 
-  const ticketsAbertos = TICKETS.filter((t) => t.status === 'aberto').length
+  const ticketsAbertos = tickets.filter((t) => t.status === 'aberto').length
 
   const maxPageView = Math.max(...ANALYTICS.pageViews)
 
@@ -507,7 +508,7 @@ export function AdminDashboard() {
                     <button onClick={() => setPage('tickets')} className="text-xs text-[#F5A623] hover:underline">Ver todos →</button>
                   </div>
                   <div className="space-y-3">
-                    {TICKETS.filter(t => t.status !== 'resolvido').slice(0,4).map((t) => {
+                    {tickets.filter(t => t.status !== 'resolvido').slice(0,4).map((t) => {
                       const tipo = TIPO_TICKET[t.tipo as keyof typeof TIPO_TICKET]
                       const st = STATUS_TICKET[t.status as keyof typeof STATUS_TICKET]
                       return (
@@ -734,7 +735,7 @@ export function AdminDashboard() {
           {page === 'tenant-detail' && selectedTenant && (() => {
             const t = selectedTenant
             const st = STATUS_TENANT[t.status as keyof typeof STATUS_TENANT]
-            const tenantTickets = TICKETS.filter((tk) => tk.tenant === t.name)
+            const tenantTickets = tickets.filter((tk) => tk.tenant === t.name)
             return (
               <>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -977,6 +978,15 @@ export function AdminDashboard() {
                         ))}
                       </div>
 
+                      {/* Resposta já registrada */}
+                      {selectedTicket?.resposta && (
+                        <div className="bg-[#1B8A5A]/15 border border-[#1B8A5A]/30 rounded-xl p-3">
+                          <p className="text-xs text-[#1B8A5A] font-semibold mb-1">✅ Resposta enviada:</p>
+                          <p className="text-sm text-white/80">{selectedTicket.resposta}</p>
+                        </div>
+                      )}
+
+                      {selectedTicket?.status !== 'resolvido' && (
                       <div>
                         <label className="text-xs text-white/40 block mb-1.5">Responder ao cliente</label>
                         <textarea value={resposta} onChange={(e) => setResposta(e.target.value)}
@@ -994,6 +1004,12 @@ export function AdminDashboard() {
                               setTimeout(() => setTicketResolvido(null), 3000)
                               return
                             }
+                            // Salva resposta e muda status para resolvido
+                            setTickets(prev => prev.map(tk =>
+                              tk.id === selectedTicket!.id
+                                ? { ...tk, status: 'resolvido', resposta: resposta.trim() }
+                                : tk
+                            ))
                             setTicketResolvido(selectedTicket!.id)
                             setTimeout(() => {
                               setSelectedTicket(null)
@@ -1001,18 +1017,24 @@ export function AdminDashboard() {
                               setTicketResolvido(null)
                             }, 2000)
                           }}
-                          className="flex-1 bg-[#1B8A5A] text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#156b47]">
+                          className="flex-1 bg-[#1B8A5A] text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#156b47] transition-colors">
                           {ticketResolvido === selectedTicket?.id ? '✅ Resolvido!' : '✓ Responder e Resolver'}
                         </button>
                         {ticketResolvido === 'erro' && (
                           <p className="text-xs text-red-400 mt-1 text-center w-full">⚠️ Digite uma resposta antes de resolver.</p>
                         )}
                         <button
-                          onClick={() => setTicketResolvido('assumido')}
+                          onClick={() => {
+                            setTickets(prev => prev.map(tk =>
+                              tk.id === selectedTicket!.id ? { ...tk, status: 'andamento' } : tk
+                            ))
+                          }}
                           className="flex-1 border border-white/10 text-white/60 text-xs font-semibold py-2.5 rounded-xl hover:bg-white/5">
                           📋 Assumir
                         </button>
                       </div>
+                      </div>
+                      )}
                     </div>
                   ) : (
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center text-white/30">
