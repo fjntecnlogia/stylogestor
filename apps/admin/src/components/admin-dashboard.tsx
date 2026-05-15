@@ -2,6 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
+// ── Tipo do tenant vindo da API ──────────────────────────────────
+type TenantDB = {
+  id: string; name: string; slug: string; plan: string; status: string
+  mrr: number; since: string; city: string; clients: number; appts: number
+  lastLogin: string; email: string; phone: string; trialEndsAt: string | null
+}
+
 // ── Helper localStorage com fallback seguro ──────────────────────
 function loadLS<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback
@@ -152,12 +159,38 @@ export function AdminDashboard() {
   const [tenantsSuspended, setTenantsSuspended] = useState<string[]>(() => loadLS('sg_suspended', []))
 
   // Sincronizar com localStorage sempre que mudam
-  useEffect(() => { saveLS('sg_tenants', tenants) }, [tenants])
   useEffect(() => { saveLS('sg_tickets', tickets) }, [tickets])
   useEffect(() => { saveLS('sg_campanhas', campanhas) }, [campanhas])
   useEffect(() => { saveLS('sg_automacoes', automacoes) }, [automacoes])
   useEffect(() => { saveLS('sg_afiliados', afiliados) }, [afiliados])
   useEffect(() => { saveLS('sg_suspended', tenantsSuspended) }, [tenantsSuspended])
+
+  // ── Buscar tenants REAIS do banco ────────────────────────────────
+  const [dbStats, setDbStats] = useState({ totalMRR: 0, active: 0, trials: 0, totalClients: 0, totalAppts: 0 })
+  const [loadingDB, setLoadingDB] = useState(true)
+
+  useEffect(() => {
+    // Buscar tenants reais
+    fetch('/api/tenants')
+      .then(r => r.json())
+      .then((dbTenants: TenantDB[]) => {
+        if (Array.isArray(dbTenants) && dbTenants.length > 0) {
+          // Mesclar DB com mock: DB primeiro, depois mocks que não estão no DB
+          const dbIds = new Set(dbTenants.map(t => t.slug))
+          const mockOnly = TENANTS.filter(t => !dbIds.has(t.slug))
+          setTenants([...dbTenants, ...mockOnly])
+          saveLS('sg_tenants', [...dbTenants, ...mockOnly])
+        }
+        setLoadingDB(false)
+      })
+      .catch(() => setLoadingDB(false))
+
+    // Buscar stats reais
+    fetch('/api/stats')
+      .then(r => r.json())
+      .then(s => { if (!s.error) setDbStats(s) })
+      .catch(() => {})
+  }, [])
 
   // ── Estados de UI (não precisam persistir) ───────────────────────
   const [novaCampanhaOpen, setNovaCampanhaOpen] = useState(false)
@@ -179,13 +212,13 @@ export function AdminDashboard() {
   const [novoTenantOpen, setNovoTenantOpen] = useState(false)
   const [formTenant, setFormTenant] = useState({ name: '', email: '', phone: '', city: '', plan: 'PRO', slug: '' })
 
-  // ── Derivados ────────────────────────────────────────────────────
+  // ── Derivados — usa DB quando disponível, fallback para local ────
   const active   = tenants.filter((t) => t.status === 'active')
   const trials   = tenants.filter((t) => t.status === 'trial')
   const pastDue  = tenants.filter((t) => t.status === 'past_due')
-  const totalMRR = [...active, ...pastDue].reduce((s, t) => s + t.mrr, 0)
-  const totalClients = tenants.reduce((s, t) => s + t.clients, 0)
-  const totalAppts = tenants.reduce((s, t) => s + t.appts, 0)
+  const totalMRR = dbStats.totalMRR || [...active, ...pastDue].reduce((s, t) => s + t.mrr, 0)
+  const totalClients = dbStats.totalClients || tenants.reduce((s, t) => s + t.clients, 0)
+  const totalAppts = dbStats.totalAppts || tenants.reduce((s, t) => s + t.appts, 0)
 
   const filteredTenants = tenants.filter((t) =>
     t.name.toLowerCase().includes(search.toLowerCase()) || t.city.toLowerCase().includes(search.toLowerCase())
@@ -266,7 +299,14 @@ export function AdminDashboard() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-white/5">
+        <div className="p-3 border-t border-white/5 space-y-2">
+          {/* Badge banco de dados */}
+          <div className={`rounded-xl px-3 py-2 text-center ${loadingDB ? 'bg-yellow-500/10' : 'bg-green-500/10'}`}>
+            <p className="text-[10px] font-bold" style={{ color: loadingDB ? '#F5A623' : '#10B981' }}>
+              {loadingDB ? '⏳ Carregando BD...' : '🗄️ PostgreSQL conectado'}
+            </p>
+            <p className="text-[10px] text-white/30 mt-0.5">{tenants.length} barbearias</p>
+          </div>
           <div className="bg-white/5 rounded-xl px-3 py-2.5">
             <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Logado como</p>
             <p className="text-xs font-semibold text-white">fjntecnologia2022</p>
