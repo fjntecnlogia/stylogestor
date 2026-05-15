@@ -37,8 +37,9 @@ pnpm install --no-frozen-lockfile
 # 4. Rodar migrações do banco
 echo "🗄️ Rodando migrações Prisma..."
 cd "$APP_DIR/packages/database"
-pnpm exec prisma db push --accept-data-loss
-pnpm exec prisma generate
+pnpm install --no-frozen-lockfile
+DATABASE_URL="$DATABASE_URL" npx prisma db push --accept-data-loss
+DATABASE_URL="$DATABASE_URL" npx prisma generate
 cd "$APP_DIR"
 
 # 5. Build dos apps
