@@ -17,8 +17,12 @@
       "distribution": "internal",
       "node": "22.13.0",
       "pnpm": "9.15.9",
+      "env": {
+        "EXPO_NO_TELEMETRY": "1"
+      },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       }
     },
     "production": {
