@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/components/ui/toast'
 
 const WEEK_DATA = [
@@ -42,7 +42,33 @@ export function FinanceiroView() {
   const [newType, setNewType]   = useState<'INCOME' | 'EXPENSE'>('INCOME')
   const [newMethod, setNewMethod] = useState('PIX')
   const [transactions, setTransactions] = useState(MOCK_TRANSACTIONS)
+  const [chartData, setChartData]       = useState(WEEK_DATA)
+  const [paymentMethods, setPaymentMethods] = useState(PAYMENT_METHODS)
+  const [loading, setLoading]           = useState(false)
+  const [isRealData, setIsRealData]     = useState(false)
   const { success } = useToast()
+
+  // Buscar dados reais da API
+  const fetchData = useCallback(async (p: string) => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/reports/financeiro?periodo=${p}`)
+      if (!res.ok) throw new Error('API error')
+      const data = await res.json()
+      if (data.transactions?.length >= 0) {
+        setTransactions(data.transactions.length > 0 ? data.transactions : MOCK_TRANSACTIONS)
+        if (data.chartData?.length > 0) setChartData(data.chartData)
+        if (data.paymentMethods?.length > 0) setPaymentMethods(data.paymentMethods)
+        setIsRealData(data.transactions.length > 0)
+      }
+    } catch {
+      // Fallback para mock se API falhar
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchData(periodo) }, [periodo, fetchData])
 
   const filtered = transactions.filter(
     (t) => tab === 'all' || (tab === 'income' ? t.type === 'INCOME' : t.type === 'EXPENSE')
@@ -72,18 +98,68 @@ export function FinanceiroView() {
   return (
     <div className="space-y-5">
 
-      {/* Filtro de período */}
+      {/* Filtro de período + Exportar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="font-sora font-bold text-xl text-[#111827]">Financeiro</h1>
-        <div className="flex bg-white border border-[#E5E7EB] rounded-xl p-1 w-fit">
-          {(['hoje', 'semana', 'mes'] as const).map((p) => (
-            <button key={p} onClick={() => setPeriodo(p)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize ${
-                periodo === p ? 'bg-[#1A3A6B] text-white shadow-sm' : 'text-[#6B7280] hover:text-[#111827]'
-              }`}>
-              {p === 'hoje' ? 'Hoje' : p === 'semana' ? 'Semana' : 'Mês'}
-            </button>
-          ))}
+        <h1 className="font-sora font-bold text-xl text-[#111827]">
+          Financeiro {loading && <span className="text-sm font-normal text-[#6B7280]">⏳</span>}
+        </h1>
+        <div className="flex gap-2 flex-wrap">
+          <div className="flex bg-white border border-[#E5E7EB] rounded-xl p-1">
+            {(['hoje', 'semana', 'mes'] as const).map((p) => (
+              <button key={p} onClick={() => setPeriodo(p)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize ${
+                  periodo === p ? 'bg-[#1A3A6B] text-white shadow-sm' : 'text-[#6B7280] hover:text-[#111827]'
+                }`}>
+                {p === 'hoje' ? 'Hoje' : p === 'semana' ? 'Semana' : 'Mês'}
+              </button>
+            ))}
+          </div>
+          {/* Exportar CSV */}
+          <button
+            onClick={() => {
+              const BOM = '﻿'
+              const now = new Date().toLocaleDateString('pt-BR')
+              const rows = [
+                `RELATORIO FINANCEIRO - STYLOGESTOR`,
+                `Periodo;${periodo === 'hoje' ? 'Hoje' : periodo === 'semana' ? 'Esta semana' : 'Este mes'}`,
+                `Gerado em;${now}`,
+                ``,
+                `Entradas;R$ ${currentIncome}`,
+                `Saidas;R$ ${currentExpense}`,
+                `Saldo;R$ ${currentIncome - currentExpense}`,
+                ``,
+                `Data;Descricao;Categoria;Tipo;Metodo;Valor`,
+                ...transactions.map(t => `${t.date};${t.desc};${t.cat};${t.type === 'INCOME' ? 'Entrada' : 'Saida'};${t.method};${t.amount}`),
+              ]
+              const csv = BOM + rows.join('\r\n')
+              const b = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+              const u = URL.createObjectURL(b)
+              const a = document.createElement('a')
+              a.href = u; a.download = `financeiro-${periodo}-${now.replace(/\//g,'-')}.csv`; a.click()
+              success('CSV exportado!')
+            }}
+            className="text-xs font-semibold px-3 py-2 rounded-xl bg-[#1B8A5A]/10 text-[#1B8A5A] hover:bg-[#1B8A5A]/20 border border-[#1B8A5A]/20"
+          >
+            📥 CSV
+          </button>
+          {/* Exportar PDF */}
+          <button
+            onClick={() => {
+              const now = new Date().toLocaleDateString('pt-BR')
+              const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Financeiro</title>
+              <style>body{font-family:Arial;padding:32px;color:#1C1C2E}h1{color:#1A3A6B}.logo{font-weight:900;font-size:20px;letter-spacing:-1px}.logo span{color:#F5A623}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#1A3A6B;color:white;padding:10px;text-align:left;font-size:12px}td{padding:8px 10px;border-bottom:1px solid #E5E7EB;font-size:12px}.income{color:#1B8A5A;font-weight:bold}.expense{color:#EF4444;font-weight:bold}.summary{display:flex;gap:16px;margin:20px 0}.kpi{background:#F0F4FF;padding:12px 16px;border-radius:8px;flex:1;text-align:center}.kpi-val{font-size:20px;font-weight:900;color:#1A3A6B}.kpi-label{font-size:11px;color:#6B7280}.header{display:flex;justify-content:space-between;border-bottom:3px solid #1A3A6B;padding-bottom:12px;margin-bottom:20px}.footer{margin-top:40px;padding-top:12px;border-top:1px solid #E5E7EB;font-size:11px;color:#9CA3AF;display:flex;justify-content:space-between}</style></head><body>
+              <div class="header"><div><div class="logo">STYLO<span>GESTOR</span></div><div style="font-size:12px;color:#6B7280">Sistema de Gestão para Barbearias</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:bold">Relatório Financeiro</div><div style="font-size:12px;color:#6B7280">${periodo === 'hoje' ? 'Hoje' : periodo === 'semana' ? 'Esta semana' : 'Este mês'} · ${now}</div></div></div>
+              <div class="summary"><div class="kpi"><div class="kpi-label">Entradas</div><div class="kpi-val" style="color:#1B8A5A">R$ ${currentIncome}</div></div><div class="kpi"><div class="kpi-label">Saídas</div><div class="kpi-val" style="color:#EF4444">R$ ${currentExpense}</div></div><div class="kpi"><div class="kpi-label">Saldo</div><div class="kpi-val">R$ ${currentIncome - currentExpense}</div></div><div class="kpi"><div class="kpi-label">Transações</div><div class="kpi-val" style="color:#F5A623">${transactions.length}</div></div></div>
+              <table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Método</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>${transactions.map(t=>`<tr><td>${t.date}</td><td>${t.desc}</td><td>${t.cat}</td><td>${t.method}</td><td class="${t.type==='INCOME'?'income':'expense'}">${t.type==='INCOME'?'Entrada':'Saída'}</td><td class="${t.type==='INCOME'?'income':'expense'}">R$ ${t.amount}</td></tr>`).join('')}</tbody></table>
+              <div class="footer"><div>© ${new Date().getFullYear()} STYLOGESTOR</div><div>Gerado em ${now} · Documento confidencial</div></div>
+              <script>window.onload=()=>window.print()</script></body></html>`
+              const w = window.open('', '_blank', 'width=900,height=700')
+              if (w) { w.document.write(html); w.document.close() }
+            }}
+            className="text-xs font-semibold px-3 py-2 rounded-xl bg-[#60A5FA]/10 text-[#1D4ED8] hover:bg-[#60A5FA]/20 border border-[#60A5FA]/30"
+          >
+            🖨️ PDF
+          </button>
         </div>
       </div>
 
@@ -102,42 +178,44 @@ export function FinanceiroView() {
         ))}
       </div>
 
-      {/* Gráfico de barras da semana */}
+      {/* Gráfico de barras */}
       <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="font-sora font-bold text-[#111827]">Receita — últimos 7 dias</p>
+          <div>
+            <p className="font-sora font-bold text-[#111827]">
+              Receita — {isRealData ? '📊 dados reais' : '📋 dados demonstração'}
+            </p>
+            {loading && <p className="text-xs text-[#6B7280]">Carregando...</p>}
+          </div>
           <div className="flex gap-3 text-xs text-[#6B7280]">
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-[#1A3A6B] inline-block" /> Entrada</span>
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-300 inline-block" /> Saída</span>
           </div>
         </div>
         <div className="flex items-end gap-2 h-36">
-          {WEEK_DATA.map((d) => (
-            <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
-              <div className="w-full flex flex-col items-center gap-0.5" style={{ height: '120px', justifyContent: 'flex-end' }}>
-                {d.expense > 0 && (
-                  <div
-                    className="w-full bg-red-200 rounded-t"
-                    style={{ height: `${(d.expense / maxBar) * 100}%`, minHeight: 4 }}
-                  />
-                )}
-                <div
-                  className="w-full bg-[#1A3A6B] rounded-t"
-                  style={{ height: `${(d.income / maxBar) * 100}%`, minHeight: 4 }}
-                />
+          {chartData.slice(-7).map((d) => {
+            const maxB = Math.max(...chartData.map(x => x.income), 1)
+            return (
+              <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
+                <div className="w-full flex flex-col items-center gap-0.5" style={{ height: '120px', justifyContent: 'flex-end' }}>
+                  {d.expense > 0 && (
+                    <div className="w-full bg-red-200 rounded-t" style={{ height: `${(d.expense / maxB) * 100}%`, minHeight: 4 }} />
+                  )}
+                  <div className="w-full bg-[#1A3A6B] rounded-t" style={{ height: `${(d.income / maxB) * 100}%`, minHeight: 4 }} />
+                </div>
+                <p className="text-[10px] text-[#6B7280] font-medium">{d.day}</p>
+                <p className="text-[10px] font-bold text-[#1A3A6B]">R${d.income}</p>
               </div>
-              <p className="text-[10px] text-[#6B7280] font-medium">{d.day}</p>
-              <p className="text-[10px] font-bold text-[#1A3A6B]">R${d.income}</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
       {/* Forma de pagamento */}
       <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-        <p className="font-sora font-bold text-[#111827] mb-4">Formas de pagamento hoje</p>
+        <p className="font-sora font-bold text-[#111827] mb-4">Formas de pagamento</p>
         <div className="space-y-3">
-          {PAYMENT_METHODS.map((pm) => (
+          {paymentMethods.map((pm) => (
             <div key={pm.method}>
               <div className="flex justify-between text-sm mb-1">
                 <span className="font-medium text-[#374151]">{pm.method}</span>
