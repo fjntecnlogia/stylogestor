@@ -2,7 +2,7 @@
   "expo": {
     "name": "STYLOGESTOR",
     "slug": "stylogestor-gestor",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -23,7 +23,12 @@
         "backgroundColor": "#1A3A6B"
       },
       "package": "br.com.stylogestor.gestor",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.USE_EXACT_ALARM"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -31,7 +36,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
+          "icon": "./assets/icon.png",
           "color": "#1A3A6B",
           "defaultChannel": "default",
           "sounds": []
@@ -43,6 +48,7 @@
     },
     "extra": {
       "router": {},
+      "apiUrl": "https://app.stylogestor.com.br",
       "eas": {
         "projectId": "596ea82b-f4e3-4784-9c34-379b90e25f13"
       }

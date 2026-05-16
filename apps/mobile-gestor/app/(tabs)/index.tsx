@@ -1,5 +1,6 @@
 import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, RefreshControl } from 'react-native'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { dashboardApi } from '@/lib/api'
 
 const STATS = [
   { label: 'Caixa hoje',        value: 'R$ 1.240', sub: '▲ 18% vs ontem',  color: '#1B8A5A', bg: '#F0FDF4' },
@@ -23,10 +24,37 @@ const STATUS_CONFIG = {
 
 export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false)
+  const [kpis, setKpis] = useState<{
+    agendamentosHoje: number; receitaMes: number; totalClientes: number; lucroMes: number
+  } | null>(null)
+  const [appointments, setAppointments] = useState(APPOINTMENTS)
+
+  const fetchData = useCallback(async () => {
+    try {
+      const data = await dashboardApi.get()
+      if (data.kpis) {
+        setKpis(data.kpis)
+      }
+      if (data.agendamentosHoje?.length > 0) {
+        setAppointments(data.agendamentosHoje.map(a => ({
+          id: a.id,
+          client: a.clientName,
+          service: a.services,
+          time: a.time,
+          prof: a.professionalName,
+          status: a.status === 'COMPLETED' ? 'done' : a.status === 'IN_PROGRESS' ? 'next' : 'pending',
+        })))
+      }
+    } catch {
+      // Fallback para mock
+    }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   const onRefresh = () => {
     setRefreshing(true)
-    setTimeout(() => setRefreshing(false), 1000)
+    fetchData().finally(() => setRefreshing(false))
   }
 
   const now = new Date()
@@ -53,7 +81,12 @@ export default function DashboardScreen() {
       >
         {/* KPI Cards */}
         <View style={s.kpiGrid}>
-          {STATS.map((stat) => (
+          {(kpis ? [
+            { label: 'Caixa do mês',    value: `R$ ${kpis.receitaMes.toLocaleString('pt-BR')}`, sub: `Lucro: R$ ${kpis.lucroMes.toLocaleString('pt-BR')}`, color: '#1B8A5A', bg: '#F0FDF4' },
+            { label: 'Agendamentos',    value: String(kpis.agendamentosHoje), sub: 'hoje',         color: '#1A3A6B', bg: '#EFF6FF' },
+            { label: 'Total clientes',  value: String(kpis.totalClientes),    sub: `+${kpis.novosClientesMes} este mês`, color: '#7C3AED', bg: '#F5F3FF' },
+            { label: 'Novos clientes',  value: String(kpis.novosClientesMes), sub: 'este mês',     color: '#F5A623', bg: '#FFFBEB' },
+          ] : STATS).map((stat) => (
             <View key={stat.label} style={[s.kpiCard, { backgroundColor: stat.bg }]}>
               <Text style={s.kpiLabel}>{stat.label}</Text>
               <Text style={[s.kpiValue, { color: stat.color }]}>{stat.value}</Text>
@@ -70,7 +103,7 @@ export default function DashboardScreen() {
         {/* Agendamentos de hoje */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>Agendamentos de hoje</Text>
-          {APPOINTMENTS.map((apt) => {
+          {appointments.map((apt) => {
             const st = STATUS_CONFIG[apt.status as keyof typeof STATUS_CONFIG]
             return (
               <TouchableOpacity key={apt.id} style={s.aptCard}>
