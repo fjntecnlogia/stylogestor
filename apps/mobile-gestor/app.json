@@ -33,15 +33,7 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#1A3A6B",
-          "defaultChannel": "default",
-          "sounds": []
-        }
-      ]
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true
