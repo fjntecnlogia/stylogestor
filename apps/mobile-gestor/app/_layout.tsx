@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as Notifications from 'expo-notifications'
-import { registerForPushNotifications, savePushToken } from '@/lib/notifications'
+import { registerForPushNotifications, savePushToken } from '../lib/notifications'
 
 export default function RootLayout() {
   const notificationListener = useRef<Notifications.EventSubscription>()

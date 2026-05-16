@@ -1,6 +1,6 @@
 import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, RefreshControl } from 'react-native'
 import { useState, useEffect, useCallback } from 'react'
-import { dashboardApi } from '@/lib/api'
+import { dashboardApi } from '../../lib/api'
 
 const STATS = [
   { label: 'Caixa hoje',        value: 'R$ 1.240', sub: '▲ 18% vs ontem',  color: '#1B8A5A', bg: '#F0FDF4' },
