@@ -5,7 +5,7 @@ function TabIcon({ emoji, label, focused }: { emoji: string; label: string; focu
   return (
     <View style={[s.tab, focused && s.tabActive]}>
       <Text style={s.emoji}>{emoji}</Text>
-      <Text style={[s.tabLabel, focused && s.tabLabelActive]}>{label}</Text>
+      <Text style={[s.tabLabel, focused && s.tabLabelActive]} numberOfLines={1}>{label}</Text>
     </View>
   )
 }
@@ -22,7 +22,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📊" label="Dashboard" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon emoji="📊" label="Início" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -65,9 +65,9 @@ const s = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 10,
   },
-  tab: { alignItems: 'center', gap: 2, paddingHorizontal: 8, opacity: 0.5 },
+  tab: { alignItems: 'center', gap: 2, paddingHorizontal: 4, opacity: 0.5, minWidth: 55, maxWidth: 70 },
   tabActive: { opacity: 1 },
   emoji: { fontSize: 20 },
-  tabLabel: { fontSize: 10, color: '#fff', fontWeight: '500' },
+  tabLabel: { fontSize: 10, color: '#fff', fontWeight: '500', textAlign: 'center' },
   tabLabelActive: { color: '#F5A623', fontWeight: '700' },
 })

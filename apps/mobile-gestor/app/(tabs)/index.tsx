@@ -1,5 +1,6 @@
 import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, RefreshControl } from 'react-native'
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'expo-router'
 import { dashboardApi } from '../../lib/api'
 
 const STATS = [
@@ -23,6 +24,7 @@ const STATUS_CONFIG = {
 }
 
 export default function DashboardScreen() {
+  const router = useRouter()
   const [refreshing, setRefreshing] = useState(false)
   const [kpis, setKpis] = useState<{
     agendamentosHoje: number; receitaMes: number; totalClientes: number; lucroMes: number
@@ -96,7 +98,7 @@ export default function DashboardScreen() {
         </View>
 
         {/* Ação rápida */}
-        <TouchableOpacity style={s.ctaBtn}>
+        <TouchableOpacity style={s.ctaBtn} onPress={() => router.push('/(tabs)/agenda')}>
           <Text style={s.ctaText}>+ Novo agendamento</Text>
         </TouchableOpacity>
 

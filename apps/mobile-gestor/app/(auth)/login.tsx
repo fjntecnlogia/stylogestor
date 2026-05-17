@@ -4,6 +4,7 @@ import {
   StyleSheet, SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform
 } from 'react-native'
 import { router } from 'expo-router'
+import * as SecureStore from 'expo-secure-store'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
@@ -16,7 +17,11 @@ export default function LoginScreen() {
       return
     }
     setLoading(true)
-    // TODO: Clerk signIn
+    // TODO: Clerk signIn — por ora aceita qualquer credencial e persiste sessão
+    try {
+      await SecureStore.setItemAsync('user_logged_in', 'true')
+      await SecureStore.setItemAsync('user_email', email)
+    } catch (_) {}
     setTimeout(() => {
       setLoading(false)
       router.replace('/(tabs)')

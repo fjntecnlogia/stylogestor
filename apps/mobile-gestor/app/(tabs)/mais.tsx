@@ -1,5 +1,6 @@
-import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native'
+import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from 'react-native'
 import { router } from 'expo-router'
+import * as SecureStore from 'expo-secure-store'
 
 const MENU = [
   {
@@ -63,7 +64,22 @@ export default function MaisScreen() {
         ))}
 
         {/* Logout */}
-        <TouchableOpacity style={s.logoutBtn} onPress={() => router.replace('/(auth)/login')}>
+        <TouchableOpacity
+          style={s.logoutBtn}
+          onPress={() => {
+            Alert.alert('Sair da conta', 'Deseja realmente sair?', [
+              { text: 'Cancelar', style: 'cancel' },
+              {
+                text: 'Sair',
+                style: 'destructive',
+                onPress: async () => {
+                  try { await SecureStore.deleteItemAsync('user_logged_in') } catch (_) {}
+                  router.replace('/(auth)/login')
+                },
+              },
+            ])
+          }}
+        >
           <Text style={s.logoutText}>Sair da conta</Text>
         </TouchableOpacity>
 
