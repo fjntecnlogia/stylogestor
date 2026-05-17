@@ -30,9 +30,10 @@ export class StripeService {
   private stripe: Stripe
 
   constructor() {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-      apiVersion: '2025-04-30.basil',
-    })
+    // Não pinamos apiVersion (`undefined`) — usa a default da conta no Stripe.
+    // O cliente da v22 espera `'2026-04-22.dahlia'`, mas a conta pode estar em
+    // versão anterior. Deixar indefinido evita o lock-in.
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '')
   }
 
   // ── Criar sessão de checkout ──────────────────────────────────

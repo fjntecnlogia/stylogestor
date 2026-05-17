@@ -418,3 +418,23 @@ model Subscription {
 
   @@map("subscriptions")
 }
+
+// ============================================================
+// WEBHOOK EVENTS — Idempotência de webhooks externos
+// ============================================================
+// Cada webhook (Clerk/Stripe/Pagar.me) tem um eventId único.
+// Antes de processar, checamos se já existe; após processar, registramos.
+// Garante "exactly-once" mesmo com retries do provider.
+
+model WebhookEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider    String   // "clerk" | "stripe" | "pagarme"
+  eventId     String   // svix-id (Clerk) ou event.id (Stripe)
+  eventType   String?  // ex.: "user.created", "checkout.session.completed"
+  processedAt DateTime @default(now())
+  payload     Json?    // opcional, útil para debug
+
+  @@unique([provider, eventId])
+  @@index([provider, processedAt])
+  @@map("webhook_events")
+}

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
+import { Prisma, AppointmentStatus } from '@prisma/client'
 import { PrismaService } from '../../common/prisma/prisma.service'
 import { CreateAppointmentDto } from './dto/create-appointment.dto'
 import { UpdateAppointmentDto } from './dto/update-appointment.dto'
@@ -11,7 +16,7 @@ export class AppointmentsService {
     tenantId: string,
     filters: { date?: string; professionalId?: string; status?: string },
   ) {
-    const where: Record<string, unknown> = { tenantId }
+    const where: Prisma.AppointmentWhereInput = { tenantId }
     if (filters.date) {
       const d = new Date(filters.date)
       const next = new Date(d)
@@ -19,12 +24,14 @@ export class AppointmentsService {
       where.date = { gte: d, lt: next }
     }
     if (filters.professionalId) where.professionalId = filters.professionalId
-    if (filters.status) where.status = filters.status
+    if (filters.status && filters.status in AppointmentStatus) {
+      where.status = filters.status as AppointmentStatus
+    }
 
     return this.prisma.appointment.findMany({
       where,
       include: {
-        client: { select: { id: true, name: true, phone: true } },
+        client: { select: { id: true, name: true } }, // phone removido: PII desnecessária na listagem
         professional: { select: { id: true, name: true, avatar: true } },
         services: { include: { service: true } },
       },
@@ -47,60 +54,96 @@ export class AppointmentsService {
   }
 
   async create(dto: CreateAppointmentDto, tenantId: string) {
-    // Verificar conflito de horário
-    const conflict = await this.prisma.appointment.findFirst({
-      where: {
-        tenantId,
-        professionalId: dto.professionalId,
-        status: { notIn: ['CANCELED', 'NO_SHOW'] },
-        OR: [
-          { startTime: { gte: new Date(dto.startTime), lt: new Date(dto.endTime) } },
-          { endTime: { gt: new Date(dto.startTime), lte: new Date(dto.endTime) } },
-        ],
-      },
-    })
-    if (conflict) throw new ConflictException('Horário já ocupado para este profissional')
+    const start = new Date(dto.startTime)
+    const end = new Date(dto.endTime)
 
-    return this.prisma.appointment.create({
-      data: {
-        tenantId,
-        clientId: dto.clientId,
-        professionalId: dto.professionalId,
-        date: new Date(dto.startTime),
-        startTime: new Date(dto.startTime),
-        endTime: new Date(dto.endTime),
-        totalPrice: dto.totalPrice,
-        totalDuration: dto.totalDuration,
-        notes: dto.notes,
-        source: dto.source ?? 'manual',
-        services: {
-          create: dto.serviceIds.map((sid) => ({
-            serviceId: sid,
-            price: 0, // atualizado após buscar serviços
-            duration: 0,
-          })),
-        },
+    if (!(start < end)) {
+      throw new ConflictException('startTime deve ser anterior a endTime')
+    }
+
+    // Checagem + criação em UMA transação Serializable para evitar race:
+    // dois POSTs simultâneos não podem mais criar overlap.
+    return this.prisma.$transaction(
+      async (tx) => {
+        // Lógica correta de overlap: existing.start < new.end AND existing.end > new.start.
+        // Cobre todos os 4 casos (engloba, é englobado, sobrepõe início, sobrepõe fim).
+        const conflict = await tx.appointment.findFirst({
+          where: {
+            tenantId,
+            professionalId: dto.professionalId,
+            status: { notIn: [AppointmentStatus.CANCELED, AppointmentStatus.NO_SHOW] },
+            startTime: { lt: end },
+            endTime: { gt: start },
+          },
+          select: { id: true },
+        })
+        if (conflict) {
+          throw new ConflictException('Horário já ocupado para este profissional')
+        }
+
+        return tx.appointment.create({
+          data: {
+            tenantId,
+            clientId: dto.clientId,
+            professionalId: dto.professionalId,
+            date: start,
+            startTime: start,
+            endTime: end,
+            totalPrice: dto.totalPrice,
+            totalDuration: dto.totalDuration,
+            notes: dto.notes,
+            source: dto.source ?? 'manual',
+            services: {
+              create: dto.serviceIds.map((sid) => ({
+                serviceId: sid,
+                price: 0, // atualizado após buscar serviços
+                duration: 0,
+              })),
+            },
+          },
+          include: { services: true },
+        })
       },
-      include: { services: true },
-    })
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    )
   }
 
   async update(id: string, dto: UpdateAppointmentDto, tenantId: string) {
-    await this.findOne(id, tenantId)
-    return this.prisma.appointment.update({ where: { id }, data: dto })
+    // updateMany com filtro composto: garante multi-tenant no nível da query.
+    // Se 0 linhas afetadas, lança NotFound em vez de update silencioso.
+    const updated = await this.prisma.appointment.updateMany({
+      where: { id, tenantId },
+      data: dto,
+    })
+    if (updated.count === 0) {
+      throw new NotFoundException('Agendamento não encontrado')
+    }
+    return this.findOne(id, tenantId)
   }
 
-  async updateStatus(id: string, status: string, tenantId: string, cancelReason?: string) {
-    await this.findOne(id, tenantId)
-    return this.prisma.appointment.update({
-      where: { id },
-      data: { status: status as never, cancelReason },
+  async updateStatus(
+    id: string,
+    status: AppointmentStatus,
+    tenantId: string,
+    cancelReason?: string,
+  ) {
+    const updated = await this.prisma.appointment.updateMany({
+      where: { id, tenantId },
+      data: { status, cancelReason },
     })
+    if (updated.count === 0) {
+      throw new NotFoundException('Agendamento não encontrado')
+    }
+    return this.findOne(id, tenantId)
   }
 
   async remove(id: string, tenantId: string) {
-    await this.findOne(id, tenantId)
-    return this.prisma.appointment.delete({ where: { id } })
+    const deleted = await this.prisma.appointment.deleteMany({
+      where: { id, tenantId },
+    })
+    if (deleted.count === 0) {
+      throw new NotFoundException('Agendamento não encontrado')
+    }
   }
 
   async getAvailableSlots(tenantId: string, date: string, professionalId: string) {
@@ -114,12 +157,14 @@ export class AppointmentsService {
         tenantId,
         professionalId,
         date: new Date(date),
-        status: { notIn: ['CANCELED', 'NO_SHOW'] },
+        status: { notIn: [AppointmentStatus.CANCELED, AppointmentStatus.NO_SHOW] },
       },
       select: { startTime: true, endTime: true },
     })
 
     // Gera slots de 30 em 30 minutos no horário do profissional
+    // NOTA: a duração do serviço pretendido NÃO é considerada aqui — bug funcional
+    // documentado na auditoria, fora do escopo desta passagem.
     const slots: string[] = []
     const [startH, startM] = schedule.startTime.split(':').map(Number)
     const [endH, endM] = schedule.endTime.split(':').map(Number)

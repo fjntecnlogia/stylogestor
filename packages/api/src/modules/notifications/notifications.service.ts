@@ -1,5 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common'
 
+export interface SendResult {
+  ok: boolean
+  error?: string
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name)
@@ -7,14 +12,27 @@ export class NotificationsService {
   private readonly evolutionKey = process.env.EVOLUTION_API_KEY
   private readonly instance = process.env.EVOLUTION_INSTANCE_NAME ?? 'stylogestor'
 
-  async sendWhatsApp(phone: string, message: string): Promise<void> {
+  /**
+   * Mascara telefone para logs/respostas: mantém só DDD + últimos 2 dígitos.
+   * "11987654321" → "11****21"
+   */
+  private static maskPhone(phone: string): string {
+    const cleaned = phone.replace(/\D/g, '')
+    if (cleaned.length < 4) return '****'
+    const ddd = cleaned.slice(0, 2)
+    const tail = cleaned.slice(-2)
+    return `${ddd}****${tail}`
+  }
+
+  async sendWhatsApp(phone: string, message: string): Promise<SendResult> {
     if (!this.evolutionUrl || !this.evolutionKey) {
       this.logger.warn('Evolution API não configurada — mensagem não enviada')
-      return
+      return { ok: false, error: 'evolution_not_configured' }
     }
 
     const cleaned = phone.replace(/\D/g, '')
     const number = cleaned.startsWith('55') ? cleaned : `55${cleaned}`
+    const masked = NotificationsService.maskPhone(phone)
 
     try {
       const res = await fetch(
@@ -25,17 +43,18 @@ export class NotificationsService {
             'Content-Type': 'application/json',
             apikey: this.evolutionKey,
           },
-          body: JSON.stringify({
-            number,
-            text: message,
-          }),
+          body: JSON.stringify({ number, text: message }),
         },
       )
       if (!res.ok) {
-        this.logger.error(`WhatsApp falhou: ${res.status} — ${phone}`)
+        this.logger.error(`WhatsApp falhou: status=${res.status} phone=${masked}`)
+        return { ok: false, error: `http_${res.status}` }
       }
+      return { ok: true }
     } catch (err) {
-      this.logger.error(`Erro ao enviar WhatsApp: ${err}`)
+      const msg = err instanceof Error ? err.message : 'erro desconhecido'
+      this.logger.error(`Erro ao enviar WhatsApp (phone=${masked}): ${msg}`)
+      return { ok: false, error: msg }
     }
   }
 

@@ -1,11 +1,15 @@
 import { NestFactory } from '@nestjs/core'
-import { ValidationPipe } from '@nestjs/common'
+import { Logger, ValidationPipe } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import helmet from 'helmet'
 import { AppModule } from './app.module'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule)
+  const logger = new Logger('Bootstrap')
+
+  // rawBody: true → preserva o corpo bruto para validação HMAC de webhooks
+  // (svix do Clerk e Stripe.webhooks.constructEvent precisam disso)
+  const app = await NestFactory.create(AppModule, { rawBody: true })
 
   // Segurança
   app.use(helmet())
@@ -47,8 +51,8 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3001
   await app.listen(port)
-  console.log(`🚀 STYLOGESTOR API rodando em: http://localhost:${port}`)
-  console.log(`📚 Documentação: http://localhost:${port}/docs`)
+  logger.log(`🚀 STYLOGESTOR API rodando em: http://localhost:${port}`)
+  logger.log(`📚 Documentação: http://localhost:${port}/docs`)
 }
 
 bootstrap()

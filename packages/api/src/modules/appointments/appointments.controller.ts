@@ -1,11 +1,12 @@
 import {
   Controller, Get, Post, Patch, Delete,
-  Body, Param, Query, UseGuards, UseInterceptors, HttpCode, HttpStatus
+  Body, Param, Query, UseGuards, UseInterceptors, HttpCode, HttpStatus,
 } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { AppointmentsService } from './appointments.service'
 import { CreateAppointmentDto } from './dto/create-appointment.dto'
 import { UpdateAppointmentDto } from './dto/update-appointment.dto'
+import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto'
 import { TenantGuard } from '../../common/guards/tenant.guard'
 import { TenantContextInterceptor } from '../../common/interceptors/tenant-context.interceptor'
 import { CurrentTenant, TenantPayload } from '../../common/decorators/current-tenant.decorator'
@@ -64,7 +65,7 @@ export class AppointmentsController {
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
-    @Body() body: { status: string; cancelReason?: string },
+    @Body() body: UpdateAppointmentStatusDto,
     @CurrentTenant() tenant: TenantPayload,
   ) {
     return this.service.updateStatus(id, body.status, tenant.id, body.cancelReason)

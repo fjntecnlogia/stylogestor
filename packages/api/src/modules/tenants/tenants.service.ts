@@ -15,15 +15,30 @@ export class TenantsService {
     return tenant
   }
 
-  async findBySlug(slug: string) {
+  /**
+   * Busca pública (chamada pelo middleware Next.js) — retorna apenas
+   * campos seguros para resolver o subdomínio. NUNCA expor settings/email/phone aqui.
+   */
+  findBySlugPublic(slug: string) {
     return this.prisma.tenant.findUnique({
       where: { slug, active: true },
-      select: { id: true, name: true, plan: true, slug: true, logo: true, settings: true },
+      select: { id: true, name: true, plan: true, slug: true, logo: true },
     })
   }
 
+  /**
+   * Update por ID — usa updateMany com filtro composto (id) para garantir que
+   * a contagem de linhas afetadas seja explícita (NotFound se 0).
+   */
   async update(id: string, dto: UpdateTenantDto) {
-    return this.prisma.tenant.update({ where: { id }, data: dto })
+    const updated = await this.prisma.tenant.updateMany({
+      where: { id, active: true },
+      data: dto,
+    })
+    if (updated.count === 0) {
+      throw new NotFoundException('Tenant não encontrado')
+    }
+    return this.findById(id)
   }
 
   async getDashboardStats(tenantId: string) {

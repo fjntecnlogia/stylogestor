@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../../common/prisma/prisma.service'
+import { CreateProfessionalDto } from './dto/create-professional.dto'
+import { UpdateProfessionalDto } from './dto/update-professional.dto'
 
 @Injectable()
 export class ProfessionalsService {
@@ -22,12 +24,20 @@ export class ProfessionalsService {
     return p
   }
 
-  create(dto: Record<string, unknown>, tenantId: string) {
-    return this.prisma.professional.create({ data: { ...(dto as never), tenantId } })
+  create(dto: CreateProfessionalDto, tenantId: string) {
+    return this.prisma.professional.create({
+      data: { ...dto, tenantId },
+    })
   }
 
-  async update(id: string, dto: Record<string, unknown>, tenantId: string) {
-    await this.findOne(id, tenantId)
-    return this.prisma.professional.update({ where: { id }, data: dto as never })
+  async update(id: string, dto: UpdateProfessionalDto, tenantId: string) {
+    const updated = await this.prisma.professional.updateMany({
+      where: { id, tenantId },
+      data: dto,
+    })
+    if (updated.count === 0) {
+      throw new NotFoundException('Profissional não encontrado')
+    }
+    return this.findOne(id, tenantId)
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../../common/prisma/prisma.service'
 import { CreateClientDto } from './dto/create-client.dto'
+import { UpdateClientDto } from './dto/update-client.dto'
 
 @Injectable()
 export class ClientsService {
@@ -41,8 +42,14 @@ export class ClientsService {
     return this.prisma.client.create({ data: { ...dto, tenantId } })
   }
 
-  async update(id: string, dto: Partial<CreateClientDto>, tenantId: string) {
-    await this.findOne(id, tenantId)
-    return this.prisma.client.update({ where: { id }, data: dto })
+  async update(id: string, dto: UpdateClientDto, tenantId: string) {
+    const updated = await this.prisma.client.updateMany({
+      where: { id, tenantId },
+      data: dto,
+    })
+    if (updated.count === 0) {
+      throw new NotFoundException('Cliente não encontrado')
+    }
+    return this.findOne(id, tenantId)
   }
 }
