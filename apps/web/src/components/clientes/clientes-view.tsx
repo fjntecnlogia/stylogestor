@@ -5,17 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { NovoClienteModal } from './novo-cliente-modal'
 import { AppointmentModal } from '../agenda/appointment-modal'
 import { useToast } from '@/components/ui/toast'
-
-const MOCK_CLIENTS = [
-  { id: '1', name: 'Carlos Oliveira', phone: '(11) 99999-0001', email: 'carlos@email.com', visits: 12, spent: 720,  lastVisit: '08/05/2026', tags: ['vip'],           segment: 'vip'    },
-  { id: '2', name: 'Rafael Santos',   phone: '(11) 99999-0002', email: '',                 visits: 5,  spent: 200,  lastVisit: '05/05/2026', tags: [],                segment: 'risco'  },
-  { id: '3', name: 'Pedro Alves',     phone: '(11) 99999-0003', email: 'pedro@email.com',  visits: 23, spent: 1380, lastVisit: '09/05/2026', tags: ['vip', 'mensal'], segment: 'vip'    },
-  { id: '4', name: 'Lucas Ferreira',  phone: '(11) 99999-0004', email: '',                 visits: 3,  spent: 120,  lastVisit: '01/05/2026', tags: [],                segment: 'inativo'},
-  { id: '5', name: 'André Lima',      phone: '(11) 99999-0005', email: 'andre@email.com',  visits: 8,  spent: 480,  lastVisit: '07/05/2026', tags: ['mensal'],        segment: 'regular'},
-  { id: '6', name: 'Bruno Carvalho',  phone: '(11) 99999-0006', email: '',                 visits: 1,  spent: 40,   lastVisit: '02/05/2026', tags: [],                segment: 'novo'   },
-  { id: '7', name: 'Diego Mendes',    phone: '(11) 99999-0007', email: 'diego@email.com',  visits: 2,  spent: 80,   lastVisit: '10/05/2026', tags: [],                segment: 'novo'   },
-  { id: '8', name: 'Fábio Rocha',     phone: '(11) 99999-0008', email: '',                 visits: 15, spent: 900,  lastVisit: '03/04/2026', tags: ['vip'],           segment: 'inativo'},
-]
+import { getInitialClients, type ClientFixture } from './__fixtures__/clients'
 
 const SEGMENTS = [
   { id: 'todos',   label: 'Todos',      icon: '👥', color: '#6B7280' },
@@ -31,18 +21,18 @@ const TAG_COLORS: Record<string, string> = {
   mensal: 'bg-[#DBEAFE] text-[#1E40AF]',
 }
 
-function getScore(c: typeof MOCK_CLIENTS[0]) {
+function getScore(c: ClientFixture) {
   return Math.min(100, Math.round((c.visits * 3) + (c.spent / 20)))
 }
 
 export function ClientesView() {
   const [search, setSearch]   = useState('')
   const [segment, setSegment] = useState('todos')
-  const [selected, setSelected]     = useState<typeof MOCK_CLIENTS[0] | null>(null)
+  const [selected, setSelected]     = useState<ClientFixture | null>(null)
   const [novoOpen, setNovoOpen]     = useState(false)
   const [agendaOpen, setAgendaOpen] = useState(false)
   const [historicoOpen, setHistoricoOpen] = useState(false)
-  const [clients, setClients]       = useState(MOCK_CLIENTS)
+  const [clients, setClients]       = useState<ClientFixture[]>(() => getInitialClients())
   const [sortBy, setSortBy]         = useState<'name' | 'visits' | 'spent'>('visits')
   const { success } = useToast()
 

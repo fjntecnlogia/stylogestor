@@ -2,20 +2,12 @@
 
 import { useState } from 'react'
 import { useToast } from '@/components/ui/toast'
+import { getInitialServices, type ServiceFixture } from './__fixtures__/services'
 
 const CATEGORIAS = ['Todos', 'Corte', 'Barba', 'Coloração', 'Tratamento', 'Outros']
 
-const INITIAL_SERVICES = [
-  { id: '1', name: 'Corte masculino',   price: 40, duration: 30, category: 'Corte',     active: true,  count: 124 },
-  { id: '2', name: 'Barba',             price: 30, duration: 30, category: 'Barba',     active: true,  count: 98  },
-  { id: '3', name: 'Corte + Barba',     price: 60, duration: 45, category: 'Corte',     active: true,  count: 87  },
-  { id: '4', name: 'Pigmentação',       price: 80, duration: 60, category: 'Coloração', active: true,  count: 23  },
-  { id: '5', name: 'Hidratação',        price: 70, duration: 45, category: 'Tratamento',active: true,  count: 31  },
-  { id: '6', name: 'Sobrancelha',       price: 20, duration: 15, category: 'Outros',    active: false, count: 12  },
-]
-
 export function ServicosView() {
-  const [services, setServices] = useState(INITIAL_SERVICES)
+  const [services, setServices] = useState<ServiceFixture[]>(() => getInitialServices())
   const [cat, setCat] = useState('Todos')
   const [editing, setEditing] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Record<string, { price: number; duration: number }>>({})

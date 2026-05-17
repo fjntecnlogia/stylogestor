@@ -2,14 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-
-const ENTRIES = [
-  { label: 'Cortes (8x)',     value: 440,  type: 'in',  method: 'PIX'      },
-  { label: 'Barba (5x)',      value: 200,  type: 'in',  method: 'Dinheiro' },
-  { label: 'Combo (4x)',      value: 480,  type: 'in',  method: 'Cartão'   },
-  { label: 'Produtos',        value: 120,  type: 'in',  method: 'Dinheiro' },
-  { label: 'Material compra', value: 85,   type: 'out', method: 'Dinheiro' },
-]
+import { getInitialEntries, getInitialWeek } from './__fixtures__/cashflow'
 
 const METHOD_COLORS: Record<string, string> = {
   PIX:      '#1B8A5A',
@@ -17,23 +10,16 @@ const METHOD_COLORS: Record<string, string> = {
   Cartão:   '#1A3A6B',
 }
 
-const WEEK = [
-  { day: 'Seg', v: 320 },
-  { day: 'Ter', v: 450 },
-  { day: 'Qua', v: 280 },
-  { day: 'Qui', v: 520 },
-  { day: 'Sex', v: 680 },
-  { day: 'Sab', v: 890 },
-  { day: 'Dom', v: 205 },
-]
-
 export function CashflowCard() {
   const [view, setView] = useState<'hoje' | 'semana'>('hoje')
+  // Carregado uma vez no mount; quando a API existir trocar por fetch.
+  const [entries] = useState(() => getInitialEntries())
+  const [week] = useState(() => getInitialWeek())
 
-  const totalIn  = ENTRIES.filter(e => e.type === 'in').reduce((s, e) => s + e.value, 0)
-  const totalOut = ENTRIES.filter(e => e.type === 'out').reduce((s, e) => s + e.value, 0)
+  const totalIn  = entries.filter(e => e.type === 'in').reduce((s, e) => s + e.value, 0)
+  const totalOut = entries.filter(e => e.type === 'out').reduce((s, e) => s + e.value, 0)
   const net      = totalIn - totalOut
-  const maxWeek  = Math.max(...WEEK.map(d => d.v))
+  const maxWeek  = week.length > 0 ? Math.max(...week.map(d => d.v)) : 1
 
   return (
     <div className="bg-white rounded-2xl border border-[#E8E6E2] shadow-sm overflow-hidden">
@@ -73,7 +59,7 @@ export function CashflowCard() {
 
           {/* Lançamentos */}
           <div className="divide-y divide-[#F3F4F6]">
-            {ENTRIES.map((e, i) => (
+            {entries.map((e, i) => (
               <div key={i} className="flex items-center justify-between px-5 py-2.5 hover:bg-[#F8F6F2] transition-colors">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ background: METHOD_COLORS[e.method] ?? '#9CA3AF' }} />
@@ -107,7 +93,7 @@ export function CashflowCard() {
           <div className="px-5 py-5">
             <p className="text-xs text-[#9CA3AF] mb-4">Faturamento — últimos 7 dias</p>
             <div className="flex items-end gap-2 h-32">
-              {WEEK.map((d) => (
+              {week.map((d) => (
                 <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-[9px] text-[#9CA3AF] font-semibold">
                     R${d.v >= 1000 ? (d.v/1000).toFixed(1)+'k' : d.v}
@@ -125,7 +111,7 @@ export function CashflowCard() {
             <div className="mt-4 pt-4 border-t border-[#E8E6E2] flex justify-between items-center">
               <span className="text-sm text-[#4A4A5A]">Total da semana</span>
               <span className="font-sora font-bold text-[#1A3A6B]">
-                R$ {WEEK.reduce((s, d) => s + d.v, 0).toLocaleString()}
+                R$ {week.reduce((s, d) => s + d.v, 0).toLocaleString()}
               </span>
             </div>
           </div>

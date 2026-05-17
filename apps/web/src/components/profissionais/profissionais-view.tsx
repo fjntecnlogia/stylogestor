@@ -2,23 +2,15 @@
 
 import { useState } from 'react'
 import { useToast } from '@/components/ui/toast'
+import { getInitialProfessionals, type ProfessionalFixture } from './__fixtures__/professionals'
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
-
-const MOCK = [
-  { id: '1', name: 'João Silva', role: 'Barbeiro', phone: '(11) 99999-0001', commission: 40, active: true,
-    schedules: [{ day: 1, start: '09:00', end: '18:00' }, { day: 2, start: '09:00', end: '18:00' }, { day: 3, start: '09:00', end: '18:00' }, { day: 4, start: '09:00', end: '18:00' }, { day: 5, start: '09:00', end: '18:00' }, { day: 6, start: '09:00', end: '14:00' }],
-    stats: { month: 28, revenue: 2240, commission: 896 } },
-  { id: '2', name: 'Pedro Costa', role: 'Cabeleireiro', phone: '(11) 99999-0002', commission: 35, active: true,
-    schedules: [{ day: 1, start: '10:00', end: '19:00' }, { day: 2, start: '10:00', end: '19:00' }, { day: 3, start: '10:00', end: '19:00' }, { day: 4, start: '10:00', end: '19:00' }, { day: 5, start: '10:00', end: '19:00' }],
-    stats: { month: 19, revenue: 1520, commission: 532 } },
-]
 
 interface NovoProfForm { name: string; role: string; phone: string; commission: number }
 
 export function ProfissionaisView() {
-  const [professionals, setProfessionals] = useState(MOCK)
-  const [selected, setSelected] = useState(MOCK[0])
+  const [professionals, setProfessionals] = useState<ProfessionalFixture[]>(() => getInitialProfessionals())
+  const [selected, setSelected] = useState<ProfessionalFixture | null>(professionals[0] ?? null)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<NovoProfForm>({ name: '', role: 'Barbeiro', phone: '', commission: 40 })
@@ -46,13 +38,30 @@ export function ProfissionaisView() {
   }
 
   const handleEdit = () => {
+    if (!selected) return
     setProfessionals(p => p.map(x => x.id === selected.id
       ? { ...x, name: editForm.name || x.name, role: editForm.role || x.role, phone: editForm.phone || x.phone, commission: editForm.commission || x.commission }
       : x
     ))
-    setSelected(prev => ({ ...prev, name: editForm.name || prev.name, role: editForm.role || prev.role, phone: editForm.phone || prev.phone, commission: editForm.commission || prev.commission }))
+    setSelected(prev => prev && { ...prev, name: editForm.name || prev.name, role: editForm.role || prev.role, phone: editForm.phone || prev.phone, commission: editForm.commission || prev.commission })
     setEditing(false)
     success('Profissional atualizado!')
+  }
+
+  // Empty state quando NEXT_PUBLIC_USE_MOCKS=false e o módulo de profissionais
+  // ainda não está plugado na API.
+  if (!selected) {
+    return (
+      <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-12 text-center">
+        <p className="text-5xl mb-3">✂️</p>
+        <p className="font-sora font-bold text-[#111827] text-lg">Nenhum profissional cadastrado</p>
+        <p className="text-sm text-[#6B7280] mt-1 mb-4">Cadastre o primeiro profissional pra começar a usar a agenda.</p>
+        <button onClick={() => setAdding(true)}
+          className="bg-[#1A3A6B] text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-[#142d55] text-sm">
+          + Novo profissional
+        </button>
+      </div>
+    )
   }
 
   return (

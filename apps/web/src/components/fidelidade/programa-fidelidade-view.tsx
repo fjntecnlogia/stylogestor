@@ -3,6 +3,10 @@
 import { useState } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { useToast } from '@/components/ui/toast'
+import {
+  getInitialClientesFidelidade,
+  type ClienteFidelidadeFixture,
+} from './__fixtures__/clientes-fidelidade'
 
 interface FidelidadeConfig {
   tipo: 'carimbo' | 'pontos'
@@ -38,15 +42,6 @@ function loadConfig(tenantSlug: string | undefined): FidelidadeConfig {
   }
 }
 
-// Dados mock — conectar à API depois
-const MOCK_CLIENTES_FIDELIDADE = [
-  { id: '1', name: 'Pedro Alves',     phone: '(11) 99999-0003', stamps: 8,  points: 1380, tier: 'ouro',   totalVisits: 23, nextReward: 2 },
-  { id: '2', name: 'Carlos Oliveira', phone: '(11) 99999-0001', stamps: 5,  points: 720,  tier: 'prata',  totalVisits: 12, nextReward: 5 },
-  { id: '3', name: 'André Lima',      phone: '(11) 99999-0005', stamps: 3,  points: 480,  tier: 'bronze', totalVisits: 8,  nextReward: 7 },
-  { id: '4', name: 'Rafael Santos',   phone: '(11) 99999-0002', stamps: 2,  points: 200,  tier: 'bronze', totalVisits: 5,  nextReward: 8 },
-  { id: '5', name: 'Lucas Ferreira',  phone: '(11) 99999-0004', stamps: 1,  points: 120,  tier: 'bronze', totalVisits: 3,  nextReward: 9 },
-  { id: '6', name: 'Bruno Carvalho',  phone: '(11) 99999-0006', stamps: 0,  points: 40,   tier: 'bronze', totalVisits: 1,  nextReward: 10 },
-]
 
 const TIER_CONFIG = {
   bronze: { label: 'Bronze', color: '#92400E', bg: '#FEF3C7', icon: '🥉' },
@@ -65,8 +60,8 @@ export function ProgramaFidelidadeView() {
   const [tipo, setTipo] = useState<'carimbo' | 'pontos'>(initial.tipo)
   const [stampsGoal, setStampsGoal] = useState(initial.stampsGoal)
   const [reward, setReward] = useState(initial.reward)
-  const [selected, setSelected] = useState<typeof MOCK_CLIENTES_FIDELIDADE[0] | null>(null)
-  const [clients, setClients] = useState(MOCK_CLIENTES_FIDELIDADE)
+  const [selected, setSelected] = useState<ClienteFidelidadeFixture | null>(null)
+  const [clients, setClients] = useState<ClienteFidelidadeFixture[]>(() => getInitialClientesFidelidade())
   const { success } = useToast()
 
   const handleDarCarimbo = (id: string) => {
