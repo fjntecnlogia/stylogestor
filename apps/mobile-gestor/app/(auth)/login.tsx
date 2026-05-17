@@ -5,13 +5,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSignIn } from '@clerk/clerk-expo'
-
-// Extrai a mensagem mais util de um erro do Clerk (que vem em err.errors[]).
-function clerkErrorMessage(err: unknown, fallback: string): string {
-  const e = err as { errors?: Array<{ longMessage?: string; message?: string; code?: string }> }
-  const first = e?.errors?.[0]
-  return first?.longMessage || first?.message || fallback
-}
+import { clerkErrorMessage } from '../../lib/clerkErrors'
 
 export default function LoginScreen() {
   const router = useRouter()

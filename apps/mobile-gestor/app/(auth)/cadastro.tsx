@@ -5,12 +5,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSignUp } from '@clerk/clerk-expo'
-
-function clerkErrorMessage(err: unknown, fallback: string): string {
-  const e = err as { errors?: Array<{ longMessage?: string; message?: string }> }
-  const first = e?.errors?.[0]
-  return first?.longMessage || first?.message || fallback
-}
+import { clerkErrorMessage } from '../../lib/clerkErrors'
 
 export default function CadastroScreen() {
   const router = useRouter()
