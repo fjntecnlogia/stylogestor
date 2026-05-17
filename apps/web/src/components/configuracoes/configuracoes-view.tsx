@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useUser } from '@clerk/nextjs'
 import { useToast } from '@/components/ui/toast'
 import { PortalButton } from '@/components/ui/portal-button'
 
@@ -146,11 +147,21 @@ export function ConfiguracoesView() {
   const [whatsappModal, setWhatsappModal] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const { success, error } = useToast()
+  const { user, isLoaded } = useUser()
 
-  const slug = 'joao-barber' // TODO: pegar do contexto real
-  const linkAgendamento = `https://${slug}.stylogestor.com.br`
+  // Slug do tenant vem do Clerk publicMetadata (setado pelo webhook do Stripe no signup).
+  // Se ainda não estiver disponível, mostra placeholder bem-comunicado.
+  const tenantSlug = (user?.publicMetadata as { tenantSlug?: string } | undefined)?.tenantSlug
+  const slug = tenantSlug || (isLoaded ? 'sua-barbearia' : '...')
+  const linkAgendamento = tenantSlug
+    ? `https://${tenantSlug}.stylogestor.com.br`
+    : 'https://sua-barbearia.stylogestor.com.br'
 
   const handleCopyLink = () => {
+    if (!tenantSlug) {
+      error('Sua barbearia ainda não tem um endereço configurado. Conclua o cadastro primeiro.')
+      return
+    }
     navigator.clipboard.writeText(linkAgendamento)
     setLinkCopied(true)
     setTimeout(() => setLinkCopied(false), 2000)

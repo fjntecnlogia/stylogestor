@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 
 const ALERTS = [
   {
@@ -10,6 +11,7 @@ const ALERTS = [
     title: '3 clientes sem visitar há +30 dias',
     desc: 'Carlos, Rafael e Pedro não aparecem desde abril. Hora de um WhatsApp!',
     action: 'Enviar mensagem',
+    href: '/clientes?segment=inativo',
     color: '#F5A623',
     bg: '#FFF7ED',
     border: '#FED7AA',
@@ -21,6 +23,7 @@ const ALERTS = [
     title: '2 aniversariantes esta semana',
     desc: 'Lucas Ferreira (amanhã) e André Lima (sex). Que tal um desconto especial?',
     action: 'Ver clientes',
+    href: '/clientes',
     color: '#1A3A6B',
     bg: '#EFF6FF',
     border: '#BFDBFE',
@@ -32,6 +35,7 @@ const ALERTS = [
     title: 'Estoque: Pomada Capilar baixo',
     desc: 'Restam apenas 2 unidades. Peça mais antes de acabar.',
     action: 'Ver estoque',
+    href: '/estoque',
     color: '#1B8A5A',
     bg: '#ECFDF5',
     border: '#A7F3D0',
@@ -58,14 +62,16 @@ export function AlertsPanel() {
             <p className="text-[#4A4A5A] text-xs mt-0.5">{a.desc}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
+            <Link
+              href={a.href}
               className="text-xs font-bold px-3 py-1.5 rounded-lg text-white transition-opacity hover:opacity-80"
               style={{ background: a.color }}
             >
               {a.action}
-            </button>
+            </Link>
             <button
               onClick={() => setDismissed(p => [...p, a.id])}
+              aria-label="Dispensar alerta"
               className="text-[#9CA3AF] hover:text-[#4A4A5A] text-lg leading-none transition-colors"
             >
               ×

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import * as Dialog from '@radix-ui/react-dialog'
 import { NovoClienteModal } from './novo-cliente-modal'
 import { AppointmentModal } from '../agenda/appointment-modal'
 import { useToast } from '@/components/ui/toast'
@@ -40,9 +41,30 @@ export function ClientesView() {
   const [selected, setSelected]     = useState<typeof MOCK_CLIENTS[0] | null>(null)
   const [novoOpen, setNovoOpen]     = useState(false)
   const [agendaOpen, setAgendaOpen] = useState(false)
+  const [historicoOpen, setHistoricoOpen] = useState(false)
   const [clients, setClients]       = useState(MOCK_CLIENTS)
   const [sortBy, setSortBy]         = useState<'name' | 'visits' | 'spent'>('visits')
-  const { success, info } = useToast()
+  const { success } = useToast()
+
+  // Histórico mockado por cliente — substituir por API quando disponível
+  const getHistorico = (clientId: string) => {
+    const seed = parseInt(clientId)
+    const base = [
+      { date: '08/05/2026', service: 'Corte + Barba', professional: 'João Silva', price: 60 },
+      { date: '24/04/2026', service: 'Corte',         professional: 'Pedro Costa', price: 40 },
+      { date: '10/04/2026', service: 'Combo + Pigmentação', professional: 'João Silva', price: 100 },
+      { date: '27/03/2026', service: 'Corte',         professional: 'João Silva', price: 40 },
+    ]
+    return base.slice(0, Math.min(seed + 1, 4))
+  }
+
+  const handleEnviarOferta = (phone: string, name: string) => {
+    const msg = encodeURIComponent(
+      `Oi ${name.split(' ')[0]}! 🎁 Tenho um presente pra você: 10% de desconto no seu próximo corte! Válido pelos próximos 7 dias. Bora agendar?`
+    )
+    window.open(`https://wa.me/55${phone.replace(/\D/g, '')}?text=${msg}`, '_blank', 'noopener,noreferrer')
+    success('Oferta enviada via WhatsApp!')
+  }
 
   const filtered = clients
     .filter(c => segment === 'todos' || c.segment === segment)
@@ -67,7 +89,7 @@ export function ClientesView() {
 
   const handleWhatsApp = (phone: string, name: string) => {
     const msg = encodeURIComponent(`Oi ${name.split(' ')[0]}! 😊 Tudo bem? Faz tempo que não te vemos aqui na barbearia. Que tal agendar um horário? 📅`)
-    window.open(`https://wa.me/55${phone.replace(/\D/g, '')}?text=${msg}`, '_blank')
+    window.open(`https://wa.me/55${phone.replace(/\D/g, '')}?text=${msg}`, '_blank', 'noopener,noreferrer')
   }
 
   // Contadores por segmento
@@ -252,13 +274,13 @@ export function ClientesView() {
                     💬 WhatsApp
                   </button>
                   <button
-                    onClick={() => { info('Histórico em breve!') }}
+                    onClick={() => setHistoricoOpen(true)}
                     className="bg-[#F8F6F2] text-[#374151] text-xs font-bold py-2.5 rounded-xl hover:bg-[#E8E6E2] transition-colors"
                   >
                     📋 Histórico
                   </button>
                   <button
-                    onClick={() => { success('Desconto de 10% enviado!') }}
+                    onClick={() => handleEnviarOferta(selected.phone, selected.name)}
                     className="bg-[#FFF7ED] text-[#92400E] text-xs font-bold py-2.5 rounded-xl hover:bg-[#FED7AA] transition-colors"
                   >
                     🎁 Enviar oferta
@@ -294,14 +316,56 @@ export function ClientesView() {
       </div>
 
       <NovoClienteModal
-        isOpen={novoOpen}
+        open={novoOpen}
         onClose={() => setNovoOpen(false)}
         onSave={handleNovoCliente}
       />
       <AppointmentModal
         open={agendaOpen}
-        onClose={() => { success('Agendamento criado! 📅'); setAgendaOpen(false) }}
+        onClose={() => setAgendaOpen(false)}
+        onSave={(payload) => success(`Agendamento de ${payload.clientName} criado! 📅 Veja em Agenda.`)}
       />
+
+      {/* Modal Histórico do cliente */}
+      <Dialog.Root open={historicoOpen} onOpenChange={(v) => !v && setHistoricoOpen(false)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-[#1A3A6B] px-6 py-4 flex items-center justify-between">
+              <div>
+                <Dialog.Title className="text-white font-sora font-bold text-lg">
+                  📋 Histórico de {selected?.name ?? ''}
+                </Dialog.Title>
+                <p className="text-white/60 text-sm mt-0.5">Últimos atendimentos</p>
+              </div>
+              <button onClick={() => setHistoricoOpen(false)} className="text-white/60 hover:text-white text-xl" aria-label="Fechar">✕</button>
+            </div>
+            <div className="px-6 pt-4">
+              <div className="bg-[#FEF9C3] border border-[#FCD34D] text-[#92400E] text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-2">
+                <span>📌</span>
+                <span>Dados de exemplo — o histórico real aparece aqui assim que o módulo de atendimentos for ativado.</span>
+              </div>
+            </div>
+            <div className="p-6 max-h-[60vh] overflow-y-auto">
+              {selected && getHistorico(selected.id).length > 0 ? (
+                <ul className="divide-y divide-[#E5E7EB]">
+                  {getHistorico(selected.id).map((h, i) => (
+                    <li key={i} className="py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-[#111827]">{h.service}</p>
+                        <p className="text-xs text-[#6B7280] mt-0.5">{h.date} · {h.professional}</p>
+                      </div>
+                      <span className="text-sm font-bold text-[#1B8A5A]">R$ {h.price}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-[#6B7280] text-center py-8">Nenhum atendimento registrado ainda.</p>
+              )}
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   )
 }

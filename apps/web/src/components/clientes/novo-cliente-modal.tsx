@@ -14,19 +14,14 @@ export function NovoClienteModal({ open, onClose, onSave }: Props) {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [notes, setNotes] = useState('')
-  const [loading, setLoading] = useState(false)
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!name || !phone) return
-    setLoading(true)
-    // TODO: chamar API real
-    await new Promise((r) => setTimeout(r, 500))
     onSave?.({ name, phone, email, notes })
     setName('')
     setPhone('')
     setEmail('')
     setNotes('')
-    setLoading(false)
     onClose()
   }
 
@@ -103,10 +98,10 @@ export function NovoClienteModal({ open, onClose, onSave }: Props) {
             </button>
             <button
               onClick={handleSave}
-              disabled={!name || !phone || loading}
+              disabled={!name || !phone}
               className="flex-1 bg-[#1A3A6B] disabled:opacity-40 text-white font-bold py-2.5 rounded-xl hover:bg-[#142d55] transition-colors"
             >
-              {loading ? 'Salvando...' : '✓ Cadastrar cliente'}
+              ✓ Cadastrar cliente
             </button>
           </div>
         </Dialog.Content>

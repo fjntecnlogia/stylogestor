@@ -1,6 +1,7 @@
 'use client'
 
 import * as Dialog from '@radix-ui/react-dialog'
+import { useToast } from '@/components/ui/toast'
 
 interface Appt {
   id: string; client: string; service: string; price: number
@@ -19,6 +20,7 @@ const PROFISSIONAIS: Record<string, string> = { '1': 'João Silva', '2': 'Pedro 
 const COMISSAO: Record<string, number> = { '1': 40, '2': 35 }
 
 export function FechamentoDiaModal({ open, onClose, appointments, totalDia }: Props) {
+  const { success } = useToast()
   const concluidos = appointments.filter((a) => a.status === 'COMPLETED')
   const cancelados = appointments.filter((a) => a.status === 'CANCELED')
   const noShow     = appointments.filter((a) => a.status === 'NO_SHOW')
@@ -40,6 +42,51 @@ export function FechamentoDiaModal({ open, onClose, appointments, totalDia }: Pr
     const comissao = Math.round(faturado * (COMISSAO[id] / 100))
     return { id, name, atendimentos: appts.length, faturado, comissao, pct: COMISSAO[id] }
   })
+
+  const totalComissoes = porProfissional.reduce((s, p) => s + p.comissao, 0)
+
+  const handleConfirmar = () => {
+    success(`Fechamento do dia confirmado! 💰 Total: R$ ${totalDia}`)
+    onClose()
+  }
+
+  const handleExportar = () => {
+    const dataStr = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
+    const linhas: string[] = []
+    linhas.push('STYLOGESTOR — Fechamento do Dia')
+    linhas.push(`Data;${new Date().toLocaleDateString('pt-BR')}`)
+    linhas.push('')
+    linhas.push('Resumo')
+    linhas.push(`Atendimentos concluídos;${concluidos.length}`)
+    linhas.push(`Total atendimentos;${appointments.length}`)
+    linhas.push(`Faturamento bruto;R$ ${totalBruto}`)
+    linhas.push(`Descontos;-R$ ${totalDescontos}`)
+    linhas.push(`Total recebido;R$ ${totalDia}`)
+    linhas.push('')
+    linhas.push('Formas de pagamento')
+    Object.entries(porForma).forEach(([forma, valor]) => {
+      linhas.push(`${forma};R$ ${valor}`)
+    })
+    linhas.push('')
+    linhas.push('Comissões')
+    linhas.push('Profissional;Atendimentos;Faturado;%;A pagar')
+    porProfissional.forEach((p) => {
+      linhas.push(`${p.name};${p.atendimentos};R$ ${p.faturado};${p.pct}%;R$ ${p.comissao}`)
+    })
+    linhas.push(`Total comissões;;;;R$ ${totalComissoes}`)
+
+    const csv = '﻿' + linhas.join('\n') // BOM p/ Excel abrir com acento certo
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `fechamento-${dataStr}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    success('Fechamento exportado! 📥')
+  }
 
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
@@ -136,7 +183,7 @@ export function FechamentoDiaModal({ open, onClose, appointments, totalDia }: Pr
                     <td className="px-3 py-2.5 text-right text-[#111827]">R$ {totalDia}</td>
                     <td className="px-3 py-2.5 text-right text-[#111827]">—</td>
                     <td className="px-4 py-2.5 text-right text-[#F5A623]">
-                      R$ {porProfissional.reduce((s, p) => s + p.comissao, 0)}
+                      R$ {totalComissoes}
                     </td>
                   </tr>
                 </tbody>
@@ -163,11 +210,17 @@ export function FechamentoDiaModal({ open, onClose, appointments, totalDia }: Pr
 
             {/* Ações */}
             <div className="flex gap-3">
-              <button className="flex-1 bg-[#1A3A6B] text-white font-bold py-3 rounded-xl hover:bg-[#142d55] transition-colors">
+              <button
+                onClick={handleConfirmar}
+                className="flex-1 bg-[#1A3A6B] text-white font-bold py-3 rounded-xl hover:bg-[#142d55] transition-colors"
+              >
                 ✅ Confirmar fechamento
               </button>
-              <button className="flex-1 border-2 border-[#E5E7EB] text-[#374151] font-semibold py-3 rounded-xl hover:bg-[#F9FAFB] transition-colors">
-                📥 Exportar PDF
+              <button
+                onClick={handleExportar}
+                className="flex-1 border-2 border-[#E5E7EB] text-[#374151] font-semibold py-3 rounded-xl hover:bg-[#F9FAFB] transition-colors"
+              >
+                📥 Exportar CSV
               </button>
             </div>
           </div>

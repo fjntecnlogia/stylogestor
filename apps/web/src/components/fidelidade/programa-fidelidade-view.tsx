@@ -1,7 +1,42 @@
 'use client'
 
 import { useState } from 'react'
+import { useUser } from '@clerk/nextjs'
 import { useToast } from '@/components/ui/toast'
+
+interface FidelidadeConfig {
+  tipo: 'carimbo' | 'pontos'
+  stampsGoal: number
+  reward: string
+}
+
+const DEFAULT_CONFIG: FidelidadeConfig = {
+  tipo: 'carimbo',
+  stampsGoal: 10,
+  reward: '1 serviço grátis',
+}
+
+/** Chave do localStorage isolada por tenant para evitar vazamento entre barbearias. */
+function storageKey(tenantSlug: string | undefined): string {
+  return `stylogestor:${tenantSlug ?? 'unknown'}:fidelidade:config`
+}
+
+function loadConfig(tenantSlug: string | undefined): FidelidadeConfig {
+  if (typeof window === 'undefined' || !tenantSlug) return DEFAULT_CONFIG
+  try {
+    const raw = window.localStorage.getItem(storageKey(tenantSlug))
+    if (!raw) return DEFAULT_CONFIG
+    const cfg = JSON.parse(raw) as Partial<FidelidadeConfig>
+    return {
+      tipo: cfg.tipo === 'pontos' || cfg.tipo === 'carimbo' ? cfg.tipo : DEFAULT_CONFIG.tipo,
+      stampsGoal: typeof cfg.stampsGoal === 'number' && cfg.stampsGoal >= 5 && cfg.stampsGoal <= 20
+        ? cfg.stampsGoal : DEFAULT_CONFIG.stampsGoal,
+      reward: typeof cfg.reward === 'string' && cfg.reward.trim() ? cfg.reward : DEFAULT_CONFIG.reward,
+    }
+  } catch {
+    return DEFAULT_CONFIG
+  }
+}
 
 // Dados mock — conectar à API depois
 const MOCK_CLIENTES_FIDELIDADE = [
@@ -21,9 +56,15 @@ const TIER_CONFIG = {
 }
 
 export function ProgramaFidelidadeView() {
-  const [tipo, setTipo] = useState<'carimbo' | 'pontos'>('carimbo')
-  const [stampsGoal, setStampsGoal] = useState(10)
-  const [reward, setReward] = useState('1 serviço grátis')
+  const { user } = useUser()
+  const tenantSlug = (user?.publicMetadata as { tenantSlug?: string } | undefined)?.tenantSlug
+
+  // Lazy init lê do localStorage uma única vez no mount (sem useEffect → sem cascading render)
+  // Scoped por tenant para impedir vazamento de config entre barbearias no mesmo browser.
+  const initial = loadConfig(tenantSlug)
+  const [tipo, setTipo] = useState<'carimbo' | 'pontos'>(initial.tipo)
+  const [stampsGoal, setStampsGoal] = useState(initial.stampsGoal)
+  const [reward, setReward] = useState(initial.reward)
   const [selected, setSelected] = useState<typeof MOCK_CLIENTES_FIDELIDADE[0] | null>(null)
   const [clients, setClients] = useState(MOCK_CLIENTES_FIDELIDADE)
   const { success } = useToast()
@@ -40,11 +81,21 @@ export function ProgramaFidelidadeView() {
 
   const handleWhatsApp = (phone: string, name: string) => {
     const msg = encodeURIComponent(`Oi ${name.split(' ')[0]}! 🎂 Feliz aniversário! Temos um presente especial esperando por você na barbearia. Venha nos visitar! ✂️`)
-    window.open(`https://wa.me/55${phone.replace(/\D/g,'')}?text=${msg}`, '_blank')
+    window.open(`https://wa.me/55${phone.replace(/\D/g,'')}?text=${msg}`, '_blank', 'noopener,noreferrer')
   }
 
   const handleSalvarConfig = () => {
-    success(`Programa salvo: ${tipo === 'carimbo' ? `${stampsGoal} visitas` : 'pontos'} → ${reward}`)
+    try {
+      const cfg: FidelidadeConfig = { tipo, stampsGoal, reward }
+      if (tenantSlug) {
+        localStorage.setItem(storageKey(tenantSlug), JSON.stringify(cfg))
+        success(`Programa salvo: ${tipo === 'carimbo' ? `${stampsGoal} visitas` : 'pontos'} → ${reward}`)
+      } else {
+        success('Configuração aplicada (cadastro da barbearia ainda não concluído)')
+      }
+    } catch {
+      success('Configuração aplicada (sem persistência neste navegador)')
+    }
   }
 
   const aniversariantes = [

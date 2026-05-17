@@ -22,6 +22,9 @@ const STATUS_CONFIG = {
   resolvido: { label: 'Resolvido',     cls: 'bg-[#D1FAE5] text-[#065F46]',  dot: 'bg-[#10B981]' },
 }
 
+// Canal oficial de suporte — configurável via env. Fallback para o número conhecido.
+const SUPPORT_WHATSAPP = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || '5565996952828'
+
 export function SuporteView() {
   const [tab, setTab] = useState<'novo' | 'historico'>('historico')
   const [tipo, setTipo] = useState('')
@@ -33,11 +36,25 @@ export function SuporteView() {
   const [tickets, setTickets] = useState(MOCK_TICKETS)
   const { success } = useToast()
 
-  const handleEnviar = async () => {
+  const handleEnviar = () => {
     if (!tipo || !titulo || !descricao) return
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 800))
 
+    const tipoLabel = TIPOS.find((t) => t.id === tipo)?.label ?? tipo
+    const prioridadeLabel = prioridade === 'alta' ? '🔴 Alta' : prioridade === 'media' ? '🟡 Média' : '🟢 Baixa'
+
+    // Envia via WhatsApp do suporte (canal de fato em uso até o backend de tickets existir)
+    const msg = encodeURIComponent(
+      `*Novo chamado STYLOGESTOR*\n\n` +
+      `*Tipo:* ${tipoLabel}\n` +
+      `*Prioridade:* ${prioridadeLabel}\n` +
+      `*Assunto:* ${titulo}\n\n` +
+      `*Descrição:*\n${descricao}\n\n` +
+      `_Enviado em ${new Date().toLocaleString('pt-BR')}_`
+    )
+    window.open(`https://wa.me/${SUPPORT_WHATSAPP}?text=${msg}`, '_blank', 'noopener,noreferrer')
+
+    // Registra localmente para o histórico imediato (visível até o reload)
     const novoTicket = {
       id: String(tickets.length + 1),
       tipo,
@@ -49,7 +66,7 @@ export function SuporteView() {
     setTickets((prev) => [novoTicket, ...prev])
     setEnviado(true)
     setLoading(false)
-    success('Chamado enviado! Nossa equipe responderá em breve.')
+    success('Chamado aberto no WhatsApp! Responderemos em até 2h úteis.')
     setTimeout(() => {
       setEnviado(false)
       setTab('historico')
@@ -222,7 +239,7 @@ export function SuporteView() {
       <div className="bg-[#F0F4FF] border border-[#BFDBFE] rounded-2xl p-5">
         <h3 className="font-semibold text-[#1E40AF] mb-2">Outros canais de atendimento</h3>
         <div className="flex gap-4 flex-wrap">
-          <a href="https://wa.me/5565996952828" target="_blank"
+          <a href={`https://wa.me/${SUPPORT_WHATSAPP}`} target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-2 text-sm text-[#1E40AF] font-semibold hover:underline">
             💬 WhatsApp: (65) 99696-52828
           </a>

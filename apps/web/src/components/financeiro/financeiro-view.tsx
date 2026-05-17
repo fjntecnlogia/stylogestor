@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { useToast } from '@/components/ui/toast'
 
 const WEEK_DATA = [
@@ -247,11 +248,11 @@ export function FinanceiroView() {
               className="bg-[#1A3A6B] text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[#142d55] transition-colors">
               + Lançamento
             </button>
-            <button
-              onClick={() => success('Caixa fechado! Resumo salvo.')}
+            <Link
+              href="/agenda"
               className="border border-[#1B8A5A] text-[#1B8A5A] text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[#1B8A5A]/5 transition-colors">
-              Fechar caixa
-            </button>
+              Fechar caixa →
+            </Link>
           </div>
         </div>
 

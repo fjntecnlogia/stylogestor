@@ -3,9 +3,11 @@
 import { useState, useCallback } from 'react'
 import { format, addDays, subDays, startOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { AppointmentModal } from './appointment-modal'
+import { AppointmentModal, type NewAppointmentPayload } from './appointment-modal'
+import { useToast } from '@/components/ui/toast'
 import { AppointmentDetailModal } from './appointment-detail-modal'
 import { FechamentoDiaModal } from './fechamento-dia-modal'
+import { getInitialAppointments, type AppointmentFixture } from './__fixtures__/appointments'
 
 const PROFISSIONAIS = [
   { id: '1', name: 'João Silva',  color: '#1A3A6B', initials: 'JS' },
@@ -25,15 +27,6 @@ const STATUS_CONFIG = {
   NO_SHOW:    { label: 'Faltou',     bg: '#FEF2F2', text: '#991B1B', border: '#FECACA' },
 }
 
-// Agendamentos mock
-const MOCK_APPOINTMENTS = [
-  { id: '1', professionalId: '1', client: 'Carlos Oliveira', phone: '(11)99999-0001', service: 'Corte + Barba', price: 60, discount: 0, payMethod: 'PIX', start: '09:00', end: '09:45', status: 'COMPLETED', duration: 45, note: '' },
-  { id: '2', professionalId: '1', client: 'Rafael Santos',   phone: '(11)99999-0002', service: 'Corte',        price: 40, discount: 0, payMethod: 'Dinheiro', start: '10:00', end: '10:30', status: 'COMPLETED', duration: 30, note: '' },
-  { id: '3', professionalId: '2', client: 'Pedro Alves',     phone: '(11)99999-0003', service: 'Barba',        price: 30, discount: 5, payMethod: 'Cartão',  start: '09:30', end: '10:00', status: 'CONFIRMED', duration: 30, note: 'Cliente VIP' },
-  { id: '4', professionalId: '1', client: 'Lucas Ferreira',  phone: '(11)99999-0004', service: 'Corte',        price: 40, discount: 0, payMethod: '',        start: '14:00', end: '14:30', status: 'SCHEDULED', duration: 30, note: '' },
-  { id: '5', professionalId: '2', client: 'André Lima',      phone: '(11)99999-0005', service: 'Corte + Barba', price: 60, discount: 0, payMethod: 'PIX',    start: '14:30', end: '15:15', status: 'SCHEDULED', duration: 45, note: '' },
-  { id: '6', professionalId: '1', client: 'Bruno Carvalho',  phone: '(11)99999-0006', service: 'Corte',        price: 40, discount: 0, payMethod: '',        start: '15:00', end: '15:30', status: 'IN_PROGRESS', duration: 30, note: '' },
-]
 
 export function AgendaView() {
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'professional'>('professional')
@@ -41,18 +34,53 @@ export function AgendaView() {
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [fechamentoOpen, setFechamentoOpen] = useState(false)
-  const [selectedAppt, setSelectedAppt] = useState<typeof MOCK_APPOINTMENTS[0] | null>(null)
-  const [appointments, setAppointments] = useState(MOCK_APPOINTMENTS)
+  const [selectedAppt, setSelectedAppt] = useState<AppointmentFixture | null>(null)
+  const [appointments, setAppointments] = useState<AppointmentFixture[]>(() => getInitialAppointments())
+
+  const { success } = useToast()
+
+  const concluirAppt = (id: string) => {
+    setAppointments(p => p.map(a => a.id === id ? { ...a, status: 'COMPLETED' } : a))
+    success('Agendamento concluído ✅')
+  }
+
+  const cancelarAppt = (id: string) => {
+    setAppointments(p => p.map(a => a.id === id ? { ...a, status: 'CANCELED' } : a))
+    success('Agendamento cancelado')
+  }
+
+  const addAppt = (payload: NewAppointmentPayload) => {
+    const startMin = parseInt(payload.time.slice(0, 2)) * 60 + parseInt(payload.time.slice(3, 5))
+    const endMin = startMin + payload.duration
+    const endH = String(Math.floor(endMin / 60)).padStart(2, '0')
+    const endM = String(endMin % 60).padStart(2, '0')
+    setAppointments(p => [...p, {
+      id: `new-${Date.now()}`,
+      professionalId: payload.professionalId,
+      client: payload.clientName,
+      phone: payload.clientPhone,
+      service: payload.serviceLabel,
+      price: payload.price,
+      discount: 0,
+      payMethod: '',
+      start: payload.time,
+      end: `${endH}:${endM}`,
+      status: 'SCHEDULED',
+      duration: payload.duration,
+      note: '',
+    }])
+    success(`Agendamento de ${payload.clientName} criado! ✅`)
+  }
 
   const handleConcluir = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    setAppointments(p => p.map(a => a.id === id ? { ...a, status: 'COMPLETED' } : a))
+    concluirAppt(id)
   }
 
   const handleCancelar = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (confirm('Cancelar este agendamento?')) {
-      setAppointments(p => p.map(a => a.id === id ? { ...a, status: 'CANCELED' } : a))
+      cancelarAppt(id)
     }
   }
   const [selectedTime, setSelectedTime] = useState('')
@@ -61,9 +89,9 @@ export function AgendaView() {
   const dateStr = format(selectedDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })
 
   // Stats do dia
-  const concluidos = MOCK_APPOINTMENTS.filter((a) => a.status === 'COMPLETED')
+  const concluidos = appointments.filter((a) => a.status === 'COMPLETED')
   const totalDia = concluidos.reduce((s, a) => s + a.price - a.discount, 0)
-  const agendados = MOCK_APPOINTMENTS.filter((a) => ['SCHEDULED','CONFIRMED','IN_PROGRESS'].includes(a.status)).length
+  const agendados = appointments.filter((a) => ['SCHEDULED','CONFIRMED','IN_PROGRESS'].includes(a.status)).length
   const ticketMedio = concluidos.length ? Math.round(totalDia / concluidos.length) : 0
 
   const handleSlotClick = useCallback((time: string, profId: string) => {
@@ -72,7 +100,7 @@ export function AgendaView() {
     setNewModalOpen(true)
   }, [])
 
-  const handleApptClick = useCallback((appt: typeof MOCK_APPOINTMENTS[0]) => {
+  const handleApptClick = useCallback((appt: AppointmentFixture) => {
     setSelectedAppt(appt)
     setDetailOpen(true)
   }, [])
@@ -171,7 +199,7 @@ export function AgendaView() {
 
             {/* Colunas dos profissionais */}
             {PROFISSIONAIS.map((prof) => {
-              const appts = MOCK_APPOINTMENTS.filter((a) => a.professionalId === prof.id)
+              const appts = appointments.filter((a) => a.professionalId === prof.id)
               return (
                 <div key={prof.id} className="flex-1 min-w-[220px] border-r border-[#E5E7EB] last:border-r-0">
                   {/* Header do profissional */}
@@ -276,7 +304,7 @@ export function AgendaView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E7EB]">
-              {MOCK_APPOINTMENTS.sort((a, b) => a.start.localeCompare(b.start)).map((appt) => {
+              {[...appointments].sort((a, b) => a.start.localeCompare(b.start)).map((appt) => {
                 const prof = PROFISSIONAIS.find((p) => p.id === appt.professionalId)
                 const cfg = STATUS_CONFIG[appt.status as keyof typeof STATUS_CONFIG]
                 return (
@@ -340,14 +368,14 @@ export function AgendaView() {
             <tfoot>
               <tr className="bg-[#F0F4FF] border-t-2 border-[#1A3A6B]/20">
                 <td colSpan={4} className="px-4 py-3 font-sora font-bold text-[#111827]">
-                  Resumo do dia — {MOCK_APPOINTMENTS.length} atendimentos
+                  Resumo do dia — {appointments.length} atendimentos
                 </td>
                 <td className="px-3 py-3 text-red-500 font-bold">
-                  -R$ {MOCK_APPOINTMENTS.reduce((s, a) => s + a.discount, 0)}
+                  -R$ {appointments.reduce((s, a) => s + a.discount, 0)}
                 </td>
                 <td className="px-3 py-3 text-xs text-[#374151]">
-                  PIX: R$ {MOCK_APPOINTMENTS.filter(a=>a.payMethod==='PIX').reduce((s,a)=>s+a.price-a.discount,0)} ·{' '}
-                  Din: R$ {MOCK_APPOINTMENTS.filter(a=>a.payMethod==='Dinheiro').reduce((s,a)=>s+a.price-a.discount,0)}
+                  PIX: R$ {appointments.filter(a=>a.payMethod==='PIX').reduce((s,a)=>s+a.price-a.discount,0)} ·{' '}
+                  Din: R$ {appointments.filter(a=>a.payMethod==='Dinheiro').reduce((s,a)=>s+a.price-a.discount,0)}
                 </td>
                 <td className="px-3 py-3 font-sora font-bold text-xl text-[#1B8A5A]">
                   R$ {totalDia}
@@ -395,12 +423,31 @@ export function AgendaView() {
         </div>
       )}
 
-      {/* Modais */}
-      <AppointmentModal open={newModalOpen} onClose={() => setNewModalOpen(false)} defaultDate="" />
-      {selectedAppt && (
-        <AppointmentDetailModal open={detailOpen} onClose={() => setDetailOpen(false)} event={selectedAppt} />
+      {/* Modal de novo agendamento: monta só quando aberto + key garante
+          que os defaults (slot/horário/profissional clicado) sejam reaplicados
+          ao reabrir em outra célula sem precisar de useEffect. */}
+      {newModalOpen && (
+        <AppointmentModal
+          key={`new-${selectedTime}-${selectedProfId}-${format(selectedDate, 'yyyy-MM-dd')}`}
+          open
+          onClose={() => setNewModalOpen(false)}
+          defaultDate={format(selectedDate, 'yyyy-MM-dd')}
+          defaultTime={selectedTime || undefined}
+          defaultProfessionalId={selectedProfId || undefined}
+          onSave={addAppt}
+        />
       )}
-      <FechamentoDiaModal open={fechamentoOpen} onClose={() => setFechamentoOpen(false)} appointments={MOCK_APPOINTMENTS} totalDia={totalDia} />
+      {selectedAppt && (
+        <AppointmentDetailModal
+          open={detailOpen}
+          onClose={() => setDetailOpen(false)}
+          appointment={selectedAppt}
+          professionalName={PROFISSIONAIS.find(p => p.id === selectedAppt.professionalId)?.name}
+          onConcluir={concluirAppt}
+          onCancelar={cancelarAppt}
+        />
+      )}
+      <FechamentoDiaModal open={fechamentoOpen} onClose={() => setFechamentoOpen(false)} appointments={appointments} totalDia={totalDia} />
     </div>
   )
 }

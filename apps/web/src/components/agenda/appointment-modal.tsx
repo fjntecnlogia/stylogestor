@@ -23,19 +23,39 @@ const MOCK_PROFESSIONALS = [
   { id: '2', name: 'Pedro Costa' },
 ]
 
+export interface NewAppointmentPayload {
+  clientId: string
+  clientName: string
+  clientPhone: string
+  serviceIds: string[]
+  serviceLabel: string
+  professionalId: string
+  professionalName: string
+  date: string
+  time: string
+  price: number
+  duration: number
+}
+
 interface Props {
   open: boolean
   onClose: () => void
   defaultDate?: string
+  defaultTime?: string
+  defaultProfessionalId?: string
+  onSave?: (appt: NewAppointmentPayload) => void
 }
 
-export function AppointmentModal({ open, onClose, defaultDate }: Props) {
+export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defaultProfessionalId, onSave }: Props) {
+  // Estes useState pegam os defaults só no mount. O pai deve usar
+  // `key` que muda quando o slot clicado muda (ou montar condicionalmente
+  // com `open && <AppointmentModal />`) para que esses defaults sejam respeitados.
   const [clientSearch, setClientSearch] = useState('')
   const [selectedClient, setSelectedClient] = useState<typeof MOCK_CLIENTS[0] | null>(null)
   const [selectedServices, setSelectedServices] = useState<string[]>([])
-  const [professional, setProfessional] = useState('')
+  const [professional, setProfessional] = useState(defaultProfessionalId || '')
   const [date, setDate] = useState(defaultDate || new Date().toISOString().slice(0, 10))
-  const [time, setTime] = useState('09:00')
+  const [time, setTime] = useState(defaultTime || '09:00')
   const [step, setStep] = useState<'client' | 'services' | 'schedule'>('client')
 
   const filteredClients = MOCK_CLIENTS.filter(
@@ -212,9 +232,24 @@ export function AppointmentModal({ open, onClose, defaultDate }: Props) {
               </button>
             ) : (
               <button
-                disabled={!professional}
+                disabled={!professional || !selectedClient || selectedServices.length === 0}
                 onClick={() => {
-                  alert('Agendamento criado! ✅\n(Integração com API em breve)')
+                  if (!selectedClient || selectedServices.length === 0 || !professional) return
+                  const services = MOCK_SERVICES.filter((s) => selectedServices.includes(s.id))
+                  const prof = MOCK_PROFESSIONALS.find((p) => p.id === professional)
+                  onSave?.({
+                    clientId: selectedClient.id,
+                    clientName: selectedClient.name,
+                    clientPhone: selectedClient.phone,
+                    serviceIds: selectedServices,
+                    serviceLabel: services.map((s) => s.name).join(' + '),
+                    professionalId: professional,
+                    professionalName: prof?.name ?? '',
+                    date,
+                    time,
+                    price: totalPrice,
+                    duration: totalDuration,
+                  })
                   handleClose()
                 }}
                 className="bg-[#1B8A5A] disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-[#156b47] transition-colors"

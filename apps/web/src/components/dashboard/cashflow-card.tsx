@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useToast } from '@/components/ui/toast'
+import Link from 'next/link'
 
 const ENTRIES = [
   { label: 'Cortes (8x)',     value: 440,  type: 'in',  method: 'PIX'      },
@@ -29,21 +29,11 @@ const WEEK = [
 
 export function CashflowCard() {
   const [view, setView] = useState<'hoje' | 'semana'>('hoje')
-  const [closing, setClosing] = useState(false)
-  const { success } = useToast()
 
   const totalIn  = ENTRIES.filter(e => e.type === 'in').reduce((s, e) => s + e.value, 0)
   const totalOut = ENTRIES.filter(e => e.type === 'out').reduce((s, e) => s + e.value, 0)
   const net      = totalIn - totalOut
   const maxWeek  = Math.max(...WEEK.map(d => d.v))
-
-  const handleClose = () => {
-    setClosing(true)
-    setTimeout(() => {
-      success('Caixa fechado com sucesso! Relatório gerado. 📊')
-      setClosing(false)
-    }, 1000)
-  }
 
   return (
     <div className="bg-white rounded-2xl border border-[#E8E6E2] shadow-sm overflow-hidden">
@@ -103,17 +93,12 @@ export function CashflowCard() {
               <span className="font-semibold text-[#1C1C2E]">Total do dia</span>
               <span className="font-sora font-bold text-xl text-[#1B8A5A]">R$ {net}</span>
             </div>
-            <button
-              onClick={handleClose}
-              disabled={closing}
-              className="w-full bg-[#1A3A6B] text-white text-sm font-bold py-3 rounded-xl hover:bg-[#142d55] transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+            <Link
+              href="/agenda"
+              className="w-full bg-[#1A3A6B] text-white text-sm font-bold py-3 rounded-xl hover:bg-[#142d55] transition-colors flex items-center justify-center gap-2"
             >
-              {closing ? (
-                <><span className="animate-spin">⟳</span> Fechando caixa...</>
-              ) : (
-                '🔒 Fechar caixa do dia'
-              )}
-            </button>
+              🔒 Fechar caixa do dia →
+            </Link>
           </div>
         </>
       ) : (
