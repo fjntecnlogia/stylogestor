@@ -50,7 +50,7 @@ export class TenantsController {
    * Resolução de slug → tenant (usado pelo middleware Next.js).
    *
    * - @Public: sem JWT (executa antes da auth do usuário).
-   * - Protegida por `x-internal-secret` compartilhado com o middleware.
+   * - Protegida por `x-internal-key` compartilhado com o middleware (env INTERNAL_API_KEY).
    * - Retorna apenas campos seguros (sem email/phone/settings).
    * - Bug anterior: usava @Body em GET — agora @Param.
    */
@@ -58,10 +58,10 @@ export class TenantsController {
   @Get('by-slug/:slug')
   findBySlug(
     @Param('slug') slug: string,
-    @Headers('x-internal-secret') internalSecret?: string,
+    @Headers('x-internal-key') internalKey?: string,
   ) {
-    const expected = process.env.INTERNAL_SECRET
-    if (!expected || internalSecret !== expected) {
+    const expected = process.env.INTERNAL_API_KEY
+    if (!expected || internalKey !== expected) {
       throw new ForbiddenException('Acesso interno apenas')
     }
     return this.tenantsService.findBySlugPublic(slug)
