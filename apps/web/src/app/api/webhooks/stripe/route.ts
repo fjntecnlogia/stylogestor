@@ -4,6 +4,45 @@ import { clerkClient } from '@clerk/nextjs/server'
 import { sendWelcomeEmail, sendPaymentFailedEmail } from '@/lib/resend'
 import Stripe from 'stripe'
 
+// ── Compat helpers: Stripe moveu campos entre versões da API ─────
+// API antiga: sub.current_period_start/end e invoice.subscription
+// API nova (basil/2025+): sub.items.data[0].current_period_start/end e invoice.parent.subscription_details.subscription
+// O cliente Stripe nao pina apiVersion (getStripe), entao aceitamos os dois.
+type SubWithLegacyPeriod = Stripe.Subscription & {
+  current_period_start?: number
+  current_period_end?: number
+}
+type InvoiceWithLegacySub = Stripe.Invoice & {
+  subscription?: string | Stripe.Subscription | null
+}
+
+function getPeriodStart(sub: Stripe.Subscription): number {
+  const fromItem = sub.items?.data?.[0]?.current_period_start
+  if (typeof fromItem === 'number') return fromItem
+  return (sub as SubWithLegacyPeriod).current_period_start ?? 0
+}
+
+function getPeriodEnd(sub: Stripe.Subscription): number {
+  const fromItem = sub.items?.data?.[0]?.current_period_end
+  if (typeof fromItem === 'number') return fromItem
+  return (sub as SubWithLegacyPeriod).current_period_end ?? 0
+}
+
+function getSubIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
+  // Nova API: invoice.parent.subscription_details.subscription
+  const parent = invoice.parent
+  if (parent && 'subscription_details' in parent) {
+    const fromNew = parent.subscription_details?.subscription
+    if (typeof fromNew === 'string') return fromNew
+    if (fromNew && typeof fromNew === 'object' && 'id' in fromNew) return fromNew.id
+  }
+  // API antiga: invoice.subscription
+  const legacy = (invoice as InvoiceWithLegacySub).subscription
+  if (typeof legacy === 'string') return legacy
+  if (legacy && typeof legacy === 'object' && 'id' in legacy) return legacy.id
+  return undefined
+}
+
 // ── Atualiza metadata no Clerk ───────────────────────────────────
 async function updateUserSubscription(
   userId: string,
@@ -95,16 +134,17 @@ export async function POST(req: NextRequest) {
         const PLAN_PRICES: Record<string, number> = {
           STARTER: 7900, PRO: 14900, PREMIUM: 24900,
         }
+        // price_data com product_data inline e suportado em runtime pelo Stripe
+        // (cria produto on-the-fly), mas o tipo PriceData nao declara product_data.
+        const priceData = {
+          currency: 'brl',
+          product_data: { name: `STYLOGESTOR ${planId}` },
+          unit_amount: PLAN_PRICES[planId] ?? 14900,
+          recurring: { interval: 'month' as const },
+        } as unknown as Stripe.SubscriptionCreateParams.Item.PriceData
         const sub = await stripe.subscriptions.create({
           customer: customer.id,
-          items: [{
-            price_data: {
-              currency: 'brl',
-              product_data: { name: `STYLOGESTOR ${planId}` },
-              unit_amount: PLAN_PRICES[planId] ?? 14900,
-              recurring: { interval: 'month' },
-            },
-          }],
+          items: [{ price_data: priceData }],
           trial_period_days: 29,
           metadata: { userId, planId, tenantSlug: tenantSlug ?? '' },
         })
@@ -115,8 +155,8 @@ export async function POST(req: NextRequest) {
           stripeCustomerId: customer.id,
           plan: planId,
           status: 'trial',
-          currentPeriodStart: new Date(sub.current_period_start * 1000),
-          currentPeriodEnd: new Date(sub.current_period_end * 1000),
+          currentPeriodStart: new Date(getPeriodStart(sub) * 1000),
+          currentPeriodEnd: new Date(getPeriodEnd(sub) * 1000),
         })
       } else {
         await updateUserSubscription(userId, 'trial', planId)
@@ -146,8 +186,8 @@ export async function POST(req: NextRequest) {
         stripeCustomerId: customerId,
         plan: planId ?? 'PRO',
         status,
-        currentPeriodStart: new Date(sub.current_period_start * 1000),
-        currentPeriodEnd: new Date(sub.current_period_end * 1000),
+        currentPeriodStart: new Date(getPeriodStart(sub) * 1000),
+        currentPeriodEnd: new Date(getPeriodEnd(sub) * 1000),
       })
       break
     }
@@ -171,8 +211,8 @@ export async function POST(req: NextRequest) {
         stripeCustomerId: customerId,
         plan: planId ?? 'PRO',
         status: newStatus,
-        currentPeriodStart: new Date(sub.current_period_start * 1000),
-        currentPeriodEnd: new Date(sub.current_period_end * 1000),
+        currentPeriodStart: new Date(getPeriodStart(sub) * 1000),
+        currentPeriodEnd: new Date(getPeriodEnd(sub) * 1000),
       })
       break
     }
@@ -198,7 +238,7 @@ export async function POST(req: NextRequest) {
     // ── Pagamento falhou ────────────────────────────────────────
     case 'invoice.payment_failed': {
       const invoice = event.data.object as Stripe.Invoice
-      const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+      const subId = getSubIdFromInvoice(invoice)
       if (!subId) break
       const sub = await stripe.subscriptions.retrieve(subId)
       const { userId } = sub.metadata || {}
@@ -221,7 +261,7 @@ export async function POST(req: NextRequest) {
     case 'invoice.payment_succeeded': {
       const invoice = event.data.object as Stripe.Invoice
       if (invoice.billing_reason === 'subscription_create') break // já tratado em created
-      const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+      const subId = getSubIdFromInvoice(invoice)
       if (!subId) break
       const sub = await stripe.subscriptions.retrieve(subId)
       const { userId, planId } = sub.metadata || {}
@@ -234,8 +274,8 @@ export async function POST(req: NextRequest) {
         stripeCustomerId: customerId,
         plan: planId ?? 'PRO',
         status: 'active',
-        currentPeriodStart: new Date(sub.current_period_start * 1000),
-        currentPeriodEnd: new Date(sub.current_period_end * 1000),
+        currentPeriodStart: new Date(getPeriodStart(sub) * 1000),
+        currentPeriodEnd: new Date(getPeriodEnd(sub) * 1000),
       })
       break
     }
