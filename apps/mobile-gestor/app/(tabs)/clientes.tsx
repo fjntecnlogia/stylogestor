@@ -1,5 +1,6 @@
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TextInput, TouchableOpacity } from 'react-native'
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TextInput, TouchableOpacity, Alert, Linking } from 'react-native'
 import { useState } from 'react'
+import { useRouter } from 'expo-router'
 
 const CLIENTS = [
   { id: '1', name: 'Carlos Oliveira', phone: '(11) 99999-0001', visits: 12, spent: 720,  lastVisit: '08/05', tags: ['vip'] },
@@ -11,8 +12,22 @@ const CLIENTS = [
 ]
 
 export default function ClientesScreen() {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
+
+  const handleWhatsApp = async (phone: string, clientName: string) => {
+    const digits = phone.replace(/\D/g, '')
+    const msg = encodeURIComponent(`Oi ${clientName.split(' ')[0]}! Tudo bem? ✂️`)
+    const appUrl = `whatsapp://send?phone=55${digits}&text=${msg}`
+    const webUrl = `https://wa.me/55${digits}?text=${msg}`
+    try {
+      const supported = await Linking.canOpenURL(appUrl)
+      await Linking.openURL(supported ? appUrl : webUrl)
+    } catch {
+      Alert.alert('WhatsApp', 'Não foi possível abrir o WhatsApp.')
+    }
+  }
 
   const filtered = CLIENTS.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -23,7 +38,10 @@ export default function ClientesScreen() {
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
         <Text style={s.title}>Clientes</Text>
-        <TouchableOpacity style={s.addBtn}>
+        <TouchableOpacity
+          style={s.addBtn}
+          onPress={() => Alert.alert('Novo cliente', 'Cadastro de cliente em desenvolvimento. Use o painel web por ora.')}
+        >
           <Text style={s.addBtnText}>+ Novo</Text>
         </TouchableOpacity>
       </View>
@@ -82,10 +100,16 @@ export default function ClientesScreen() {
                 )}
                 {isSelected && (
                   <View style={s.actions}>
-                    <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#1A3A6B' }]}>
+                    <TouchableOpacity
+                      style={[s.actionBtn, { backgroundColor: '#1A3A6B' }]}
+                      onPress={() => router.push('/(tabs)/agenda')}
+                    >
                       <Text style={s.actionBtnText}>📅 Agendar</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' }]}>
+                    <TouchableOpacity
+                      style={[s.actionBtn, { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' }]}
+                      onPress={() => handleWhatsApp(c.phone, c.name)}
+                    >
                       <Text style={[s.actionBtnText, { color: '#374151' }]}>💬 WhatsApp</Text>
                     </TouchableOpacity>
                   </View>

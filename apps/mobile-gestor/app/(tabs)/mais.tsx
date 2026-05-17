@@ -34,7 +34,10 @@ export default function MaisScreen() {
           <Text style={s.name}>João Silva</Text>
           <Text style={s.plan}>✓ Plano Pro</Text>
         </View>
-        <TouchableOpacity style={s.editBtn}>
+        <TouchableOpacity
+          style={s.editBtn}
+          onPress={() => Alert.alert('Editar perfil', 'Em desenvolvimento. Use o painel web por ora.')}
+        >
           <Text style={s.editBtnText}>Editar</Text>
         </TouchableOpacity>
       </View>
@@ -48,6 +51,12 @@ export default function MaisScreen() {
                 <TouchableOpacity
                   key={item.label}
                   style={[s.menuItem, idx < section.items.length - 1 && s.menuItemBorder]}
+                  onPress={() =>
+                    Alert.alert(
+                      item.label,
+                      `A tela "${item.label}" ainda não está disponível no app. Acesse pelo painel web (app.stylogestor.com.br).`,
+                    )
+                  }
                 >
                   <View style={s.menuIcon}>
                     <Text style={s.menuIconText}>{item.icon}</Text>
