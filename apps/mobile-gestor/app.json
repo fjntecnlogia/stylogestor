@@ -50,6 +50,8 @@
     "extra": {
       "router": {},
       "apiUrl": "https://app.stylogestor.com.br",
+      "privacyPolicyUrl": "https://stylogestor.com.br/privacidade",
+      "termsOfServiceUrl": "https://stylogestor.com.br/termos",
       "eas": {
         "projectId": "596ea82b-f4e3-4784-9c34-379b90e25f13"
       }

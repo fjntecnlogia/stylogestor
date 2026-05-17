@@ -13,6 +13,11 @@ build
 .env.local
 .env.production
 
+# Credenciais — NUNCA commitar
+google-services-key.json
+**/google-services-key.json
+*-service-account*.json
+
 # prisma
 prisma/dev.db
 prisma/dev.db-journal
@@ -21,3 +26,7 @@ prisma/dev.db-journal
 .DS_Store
 *.log
 .vscode
+
+# Claude Code — config local por dev (CLAUDE.md por pasta CONTINUA versionado)
+.claude/
+.expo/

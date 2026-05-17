@@ -1,8 +1,22 @@
-import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from 'react-native'
+import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, Linking } from 'react-native'
 import { router } from 'expo-router'
 import * as SecureStore from 'expo-secure-store'
+import Constants from 'expo-constants'
 
-const MENU = [
+type MenuItem = {
+  icon: string
+  label: string
+  desc: string
+  route?: string
+  url?: string
+}
+
+const extra = (Constants.expoConfig?.extra ?? {}) as {
+  privacyPolicyUrl?: string
+  termsOfServiceUrl?: string
+}
+
+const MENU: { title: string; items: MenuItem[] }[] = [
   {
     title: 'Gestão',
     items: [
@@ -19,6 +33,13 @@ const MENU = [
       { icon: '💳', label: 'Plano atual',      desc: 'Pro · Renova em 10/06',         route: '/planos' },
       { icon: '❓', label: 'Ajuda',            desc: 'Central de suporte',            route: '/ajuda' },
       { icon: '🎧', label: 'Abrir chamado',   desc: 'Falar com o suporte',           route: '/suporte' },
+    ],
+  },
+  {
+    title: 'Legal',
+    items: [
+      { icon: '🔒', label: 'Política de privacidade', desc: 'Como tratamos seus dados', url: extra.privacyPolicyUrl },
+      { icon: '📄', label: 'Termos de uso',            desc: 'Condições do serviço',     url: extra.termsOfServiceUrl },
     ],
   },
 ]
@@ -51,12 +72,18 @@ export default function MaisScreen() {
                 <TouchableOpacity
                   key={item.label}
                   style={[s.menuItem, idx < section.items.length - 1 && s.menuItemBorder]}
-                  onPress={() =>
+                  onPress={() => {
+                    if (item.url) {
+                      Linking.openURL(item.url).catch(() =>
+                        Alert.alert(item.label, 'Não foi possível abrir o link.'),
+                      )
+                      return
+                    }
                     Alert.alert(
                       item.label,
                       `A tela "${item.label}" ainda não está disponível no app. Acesse pelo painel web (app.stylogestor.com.br).`,
                     )
-                  }
+                  }}
                 >
                   <View style={s.menuIcon}>
                     <Text style={s.menuIconText}>{item.icon}</Text>
