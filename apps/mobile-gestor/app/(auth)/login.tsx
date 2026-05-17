@@ -1,12 +1,21 @@
 import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform
+  StyleSheet, SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native'
-import { router } from 'expo-router'
-import * as SecureStore from 'expo-secure-store'
+import { useRouter } from 'expo-router'
+import { useSignIn } from '@clerk/clerk-expo'
+
+// Extrai a mensagem mais util de um erro do Clerk (que vem em err.errors[]).
+function clerkErrorMessage(err: unknown, fallback: string): string {
+  const e = err as { errors?: Array<{ longMessage?: string; message?: string; code?: string }> }
+  const first = e?.errors?.[0]
+  return first?.longMessage || first?.message || fallback
+}
 
 export default function LoginScreen() {
+  const router = useRouter()
+  const { signIn, setActive, isLoaded } = useSignIn()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -16,16 +25,25 @@ export default function LoginScreen() {
       Alert.alert('Atenção', 'Preencha e-mail e senha')
       return
     }
+    if (!isLoaded) {
+      Alert.alert('Aguarde', 'Autenticador carregando, tente novamente em 1s.')
+      return
+    }
     setLoading(true)
-    // TODO: Clerk signIn — por ora aceita qualquer credencial e persiste sessão
     try {
-      await SecureStore.setItemAsync('user_logged_in', 'true')
-      await SecureStore.setItemAsync('user_email', email)
-    } catch (_) {}
-    setTimeout(() => {
+      const attempt = await signIn.create({ identifier: email, password })
+      if (attempt.status === 'complete') {
+        await setActive({ session: attempt.createdSessionId })
+        // Auth gate em app/index.tsx redireciona automatico p/ /(tabs)
+      } else {
+        // Status comuns nao-complete: needs_second_factor (2FA), needs_identifier, etc.
+        Alert.alert('Login incompleto', `Etapa adicional necessaria (status: ${attempt.status}). Conclua pelo painel web.`)
+      }
+    } catch (err) {
+      Alert.alert('Erro ao entrar', clerkErrorMessage(err, 'Verifique suas credenciais.'))
+    } finally {
       setLoading(false)
-      router.replace('/(tabs)')
-    }, 1000)
+    }
   }
 
   return (
@@ -51,6 +69,8 @@ export default function LoginScreen() {
             placeholderTextColor="#9CA3AF"
             keyboardType="email-address"
             autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
           />
 
           <Text style={s.label}>Senha</Text>
@@ -61,6 +81,8 @@ export default function LoginScreen() {
             placeholder="••••••••"
             placeholderTextColor="#9CA3AF"
             secureTextEntry
+            autoComplete="password"
+            textContentType="password"
           />
 
           <TouchableOpacity style={[s.btn, loading && s.btnDisabled]} onPress={handleLogin} disabled={loading}>
@@ -70,8 +92,20 @@ export default function LoginScreen() {
             }
           </TouchableOpacity>
 
-          <TouchableOpacity style={s.linkBtn}>
+          <TouchableOpacity
+            style={s.linkBtn}
+            onPress={() =>
+              Alert.alert(
+                'Esqueci minha senha',
+                'Por ora, redefina pelo painel web em app.stylogestor.com.br (fluxo de recuperacao por email).',
+              )
+            }
+          >
             <Text style={s.linkText}>Esqueci minha senha</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.linkBtn} onPress={() => router.push('/(auth)/cadastro')}>
+            <Text style={s.linkText}>Não tem conta? <Text style={{ fontWeight: '700' }}>Cadastre-se</Text></Text>
           </TouchableOpacity>
         </View>
 

@@ -1,22 +1,11 @@
-import { useEffect, useState } from 'react'
 import { View, ActivityIndicator } from 'react-native'
 import { Redirect } from 'expo-router'
-import * as SecureStore from 'expo-secure-store'
+import { useAuth } from '@clerk/clerk-expo'
 
 export default function Index() {
-  const [loading, setLoading] = useState(true)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const { isLoaded, isSignedIn } = useAuth()
 
-  useEffect(() => {
-    SecureStore.getItemAsync('user_logged_in')
-      .then((val) => {
-        setIsLoggedIn(val === 'true')
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
-
-  if (loading) {
+  if (!isLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1A3A6B' }}>
         <ActivityIndicator color="#F5A623" size="large" />
@@ -24,5 +13,5 @@ export default function Index() {
     )
   }
 
-  return <Redirect href={isLoggedIn ? '/(tabs)' : '/(auth)/login'} />
+  return <Redirect href={isSignedIn ? '/(tabs)' : '/(auth)/login'} />
 }

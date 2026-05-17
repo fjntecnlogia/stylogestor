@@ -1,6 +1,6 @@
 import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, Linking } from 'react-native'
-import { router } from 'expo-router'
-import * as SecureStore from 'expo-secure-store'
+import { useRouter } from 'expo-router'
+import { useAuth } from '@clerk/clerk-expo'
 import Constants from 'expo-constants'
 
 type MenuItem = {
@@ -45,6 +45,8 @@ const MENU: { title: string; items: MenuItem[] }[] = [
 ]
 
 export default function MaisScreen() {
+  const router = useRouter()
+  const { signOut } = useAuth()
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
@@ -109,8 +111,14 @@ export default function MaisScreen() {
                 text: 'Sair',
                 style: 'destructive',
                 onPress: async () => {
-                  try { await SecureStore.deleteItemAsync('user_logged_in') } catch (_) {}
-                  router.replace('/(auth)/login')
+                  try {
+                    await signOut()
+                    // Auth gate em app/index.tsx detecta !isSignedIn e redireciona
+                    // automaticamente para /(auth)/login.
+                  } catch {
+                    // Fallback se signOut falhar por algum motivo
+                    router.replace('/(auth)/login')
+                  }
                 },
               },
             ])
