@@ -42,6 +42,34 @@ pnpm --filter web lint
 - **Auth**: `import { auth } from '@clerk/nextjs/server'` em RSC; `useUser()` em client.
 - **Tipos do banco**: `import type { ... } from '@stylogestor/database'`.
 - **Não fazer fetch direto ao Postgres** no front — sempre via API NestJS (`NEXT_PUBLIC_API_URL`).
+- **Mocks vão em `__fixtures__/` próximo ao componente, atrás de flag** — ver seção abaixo.
+
+## Padrão de mocks (`__fixtures__/`)
+Enquanto módulos do `packages/api` não estão plugados, cada componente carrega
+seus dados de uma pasta `__fixtures__/` irmã, **nunca inline**. Isso evita que
+dados fake vazem pro build de produção.
+
+**Como criar um novo fixture:**
+1. Crie `src/components/<dominio>/__fixtures__/<nome>.ts`.
+2. Exporte um `interface XFixture` (o tipo será o contrato com a API real depois).
+3. Exporte a array `MOCK_X: XFixture[]`.
+4. Exporte `getInitialX(): XFixture[]` que retorna `[]` se `process.env.NEXT_PUBLIC_USE_MOCKS === 'false'`.
+
+**Como consumir no componente:**
+```tsx
+import { getInitialX, type XFixture } from './__fixtures__/x'
+
+const [items, setItems] = useState<XFixture[]>(() => getInitialX())
+```
+
+**Quando o endpoint real chegar:**
+- Trocar `getInitialX()` por `fetch(NEXT_PUBLIC_API_URL + '/...')` dentro de `useEffect`.
+- Manter o tipo `XFixture` como contrato (renomear se quiser).
+- Apagar a pasta `__fixtures__/` correspondente.
+
+**Default do flag:** `NEXT_PUBLIC_USE_MOCKS` é `true` por omissão (dev). Em build
+de produção, setar `NEXT_PUBLIC_USE_MOCKS=false` deixa o dashboard vazio até a
+API estar plugada — comportamento desejado.
 
 ## Onde está o quê
 ```
@@ -69,6 +97,9 @@ CLERK_SECRET_KEY=
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 BASE_DOMAIN=stylogestor.com.br
+# Opcionais
+NEXT_PUBLIC_USE_MOCKS=true                # default true; setar false em prod
+NEXT_PUBLIC_SUPPORT_WHATSAPP=5565996952828 # canal oficial de suporte
 ```
 
 ## Referências

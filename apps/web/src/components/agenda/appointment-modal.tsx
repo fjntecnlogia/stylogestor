@@ -4,24 +4,12 @@ import { useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-
-const MOCK_CLIENTS = [
-  { id: '1', name: 'Carlos Oliveira', phone: '(11) 99999-0001' },
-  { id: '2', name: 'Rafael Santos',   phone: '(11) 99999-0002' },
-  { id: '3', name: 'Pedro Alves',     phone: '(11) 99999-0003' },
-]
-
-const MOCK_SERVICES = [
-  { id: '1', name: 'Corte masculino', price: 40, duration: 30 },
-  { id: '2', name: 'Barba',           price: 30, duration: 30 },
-  { id: '3', name: 'Corte + Barba',   price: 60, duration: 45 },
-  { id: '4', name: 'Pigmentação',     price: 80, duration: 60 },
-]
-
-const MOCK_PROFESSIONALS = [
-  { id: '1', name: 'João Silva' },
-  { id: '2', name: 'Pedro Costa' },
-]
+// Reusa as mesmas fixtures das views irmãs. Quando a API real estiver
+// plugada, basta trocar essas chamadas por fetches específicos (ex:
+// listar só clientes ativos via /api/clients?active=1).
+import { getInitialClients, type ClientFixture } from '../clientes/__fixtures__/clients'
+import { getInitialServices, type ServiceFixture } from '../servicos/__fixtures__/services'
+import { getInitialProfessionals } from '../profissionais/__fixtures__/professionals'
 
 export interface NewAppointmentPayload {
   clientId: string
@@ -51,25 +39,27 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
   // `key` que muda quando o slot clicado muda (ou montar condicionalmente
   // com `open && <AppointmentModal />`) para que esses defaults sejam respeitados.
   const [clientSearch, setClientSearch] = useState('')
-  const [selectedClient, setSelectedClient] = useState<typeof MOCK_CLIENTS[0] | null>(null)
+  const [selectedClient, setSelectedClient] = useState<ClientFixture | null>(null)
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [professional, setProfessional] = useState(defaultProfessionalId || '')
   const [date, setDate] = useState(defaultDate || new Date().toISOString().slice(0, 10))
   const [time, setTime] = useState(defaultTime || '09:00')
   const [step, setStep] = useState<'client' | 'services' | 'schedule'>('client')
 
-  const filteredClients = MOCK_CLIENTS.filter(
+  // Sources das listas (mocks até a API plugar). Filtra inativos no momento da seleção.
+  const [allClients] = useState(() => getInitialClients())
+  const [allServices] = useState(() => getInitialServices().filter((s) => s.active))
+  const [allProfessionals] = useState(() => getInitialProfessionals().filter((p) => p.active))
+
+  const filteredClients = allClients.filter(
     (c) =>
       c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
       c.phone.includes(clientSearch)
   )
 
-  const totalPrice = MOCK_SERVICES.filter((s) => selectedServices.includes(s.id)).reduce(
-    (sum, s) => sum + s.price, 0
-  )
-  const totalDuration = MOCK_SERVICES.filter((s) => selectedServices.includes(s.id)).reduce(
-    (sum, s) => sum + s.duration, 0
-  )
+  const selectedServiceObjs: ServiceFixture[] = allServices.filter((s) => selectedServices.includes(s.id))
+  const totalPrice = selectedServiceObjs.reduce((sum, s) => sum + s.price, 0)
+  const totalDuration = selectedServiceObjs.reduce((sum, s) => sum + s.duration, 0)
 
   const handleClose = () => {
     setStep('client')
@@ -135,7 +125,7 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
             {/* STEP 2 — Serviços */}
             {step === 'services' && (
               <div className="space-y-2">
-                {MOCK_SERVICES.map((s) => {
+                {allServices.map((s) => {
                   const selected = selectedServices.includes(s.id)
                   return (
                     <button
@@ -204,7 +194,7 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
                     className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]"
                   >
                     <option value="">Selecionar profissional</option>
-                    {MOCK_PROFESSIONALS.map((p) => (
+                    {allProfessionals.map((p) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </select>
@@ -235,8 +225,8 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
                 disabled={!professional || !selectedClient || selectedServices.length === 0}
                 onClick={() => {
                   if (!selectedClient || selectedServices.length === 0 || !professional) return
-                  const services = MOCK_SERVICES.filter((s) => selectedServices.includes(s.id))
-                  const prof = MOCK_PROFESSIONALS.find((p) => p.id === professional)
+                  const services = selectedServiceObjs
+                  const prof = allProfessionals.find((p) => p.id === professional)
                   onSave?.({
                     clientId: selectedClient.id,
                     clientName: selectedClient.name,
