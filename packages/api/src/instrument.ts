@@ -6,8 +6,14 @@
  *   Express, Prisma) ser carregado. Se não, traces e contexto perdem dados.
  *   Ler `import './instrument'` ANTES de qualquer outro import no main.ts.
  *
+ * Por que `dotenv/config` antes:
+ *   Sentry.init roda em tempo de IMPORT (antes do bootstrap do Nest).
+ *   ConfigModule.forRoot() do Nest só carrega .env depois de NestFactory.create.
+ *   Então precisamos carregar manualmente o .env aqui.
+ *
  * Sem SENTRY_DSN no .env → Sentry desativa silenciosamente (não quebra dev).
  */
+import 'dotenv/config'
 import * as Sentry from '@sentry/nestjs'
 import { nodeProfilingIntegration } from '@sentry/profiling-node'
 
