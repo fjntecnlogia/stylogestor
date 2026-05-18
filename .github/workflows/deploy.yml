@@ -1,5 +1,13 @@
 name: 🚀 Deploy STYLOGESTOR
 
+# A VPS de produção (Hostinger) usa PM2 direto (não Docker) pros 5 apps.
+# Esse workflow faz quality check no CI e depois SSH na VPS pra rodar
+# deploy-pm2.sh — que faz git pull, build dos 5 apps e pm2 reload.
+#
+# Secrets necessários (ver .github/SECRETS_DEPLOY.md):
+#   - VPS_HOST, VPS_USER, VPS_SSH_KEY (obrigatórios)
+#   - VPS_PORT (opcional, default 22)
+
 on:
   push:
     branches: [master, main]
@@ -7,14 +15,18 @@ on:
       - 'apps/**'
       - 'packages/**'
       - 'infra/**'
-      - 'Dockerfile.api'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - 'turbo.json'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  # ─── 1. Lint e Typecheck ─────────────────────────────────
+  # ─── 1. Quality check (typecheck + build local pra detectar erro ANTES de SSH) ───
   quality:
     name: ✅ Quality Check
     runs-on: ubuntu-latest
@@ -23,7 +35,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -36,66 +48,24 @@ jobs:
       - name: Gerar Prisma Client (necessário pro typecheck)
         run: pnpm --filter @stylogestor/database run generate
 
-      - name: Typecheck API
-        run: pnpm --filter @stylogestor/api exec tsc --noEmit || true
+      - name: Typecheck API (NestJS)
+        run: pnpm --filter @stylogestor/api exec tsc --noEmit
+        continue-on-error: true # API ainda em estabilização
 
-      - name: Typecheck Web
-        run: pnpm --filter web exec tsc --noEmit || true
+      - name: Typecheck Web (Next.js)
+        run: pnpm --filter web exec tsc --noEmit
 
-  # ─── 2. Build das imagens Docker ─────────────────────────
-  build:
-    name: 🔨 Build Docker Images
+      - name: Build Web (smoke)
+        run: pnpm --filter web build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+  # ─── 2. Deploy via SSH+PM2 na VPS Hostinger ──────────────────────
+  deploy:
+    name: 🚀 Deploy PM2 na VPS
     runs-on: ubuntu-latest
     needs: quality
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Login Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build & Push API
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.api
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/stylogestor-api:latest,${{ secrets.DOCKER_USERNAME }}/stylogestor-api:${{ github.sha }}
-
-      - name: Build & Push Web (Dashboard)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./apps/web/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/stylogestor-web:latest
-
-      - name: Build & Push Site (Vendas)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./apps/site/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/stylogestor-site:latest
-
-      - name: Build & Push Booking
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./apps/booking/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/stylogestor-booking:latest
-
-  # ─── 3. Deploy no VPS Hostinger ──────────────────────────
-  deploy:
-    name: 🚀 Deploy VPS Hostinger
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -103,18 +73,20 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          command_timeout: 30m
           script: |
             cd /opt/stylogestor
-            git fetch --all
-            git checkout master
-            git reset --hard origin/master
-            bash infra/vps/deploy.sh
-            echo "✅ Deploy concluído: $(date)"
+            bash infra/vps/deploy-pm2.sh
 
-      - name: Notificar sucesso
+      - name: Sucesso
         if: success()
-        run: echo "🎉 Deploy realizado com sucesso!"
+        run: echo "✅ Deploy realizado com sucesso em $(date)"
 
-      - name: Notificar falha
+      - name: Falha
         if: failure()
-        run: echo "❌ Deploy falhou! Verifique os logs."
+        run: |
+          echo "❌ Deploy falhou. Veja os logs acima."
+          echo "Pra debugar, SSH na VPS e rode manualmente:"
+          echo "   cd /opt/stylogestor && bash infra/vps/deploy-pm2.sh"
+          exit 1

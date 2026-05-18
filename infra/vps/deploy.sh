@@ -1,13 +1,26 @@
 #!/bin/bash
 # ============================================================
-# STYLOGESTOR — Script de Deploy no VPS Hostinger
-# Execute no servidor: bash deploy.sh
+# STYLOGESTOR — Deploy via Docker Compose (DEPRECATED)
+#
+# ⚠️  ESTE SCRIPT NÃO É O USADO EM PRODUÇÃO HOJE.
+#
+# A VPS atual usa PM2 direto pros 5 apps Node (stylo-api, stylo-web,
+# stylo-admin, stylo-booking, stylo-site). O deploy real é feito pelo
+# `infra/vps/deploy-pm2.sh`, chamado pelo workflow GitHub Actions.
+#
+# Esse arquivo é mantido por enquanto caso o setup volte a usar Docker
+# Compose pros apps no futuro. Se confirmado que não, pode deletar.
 # ============================================================
 set -e
 
 REPO="https://github.com/fjntecnlogia/stylogestor.git"
 APP_DIR="/opt/stylogestor"
 BRANCH="master"
+
+echo "⚠️  Você está rodando o deploy via DOCKER (deploy.sh — DEPRECATED)."
+echo "    A VPS atual usa PM2 direto. Use infra/vps/deploy-pm2.sh."
+echo "    Continue só se sabe o que está fazendo. (Ctrl+C pra abortar nos próximos 5s)"
+sleep 5
 
 echo "🚀 Iniciando deploy do STYLOGESTOR..."
 
