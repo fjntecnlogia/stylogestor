@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useUser } from '@clerk/nextjs'
 import { useToast } from '@/components/ui/toast'
+import { useTenantPersistedState } from '@/lib/tenant-storage'
 import {
   getInitialClientesFidelidade,
   type ClienteFidelidadeFixture,
@@ -20,29 +20,6 @@ const DEFAULT_CONFIG: FidelidadeConfig = {
   reward: '1 serviço grátis',
 }
 
-/** Chave do localStorage isolada por tenant para evitar vazamento entre barbearias. */
-function storageKey(tenantSlug: string | undefined): string {
-  return `stylogestor:${tenantSlug ?? 'unknown'}:fidelidade:config`
-}
-
-function loadConfig(tenantSlug: string | undefined): FidelidadeConfig {
-  if (typeof window === 'undefined' || !tenantSlug) return DEFAULT_CONFIG
-  try {
-    const raw = window.localStorage.getItem(storageKey(tenantSlug))
-    if (!raw) return DEFAULT_CONFIG
-    const cfg = JSON.parse(raw) as Partial<FidelidadeConfig>
-    return {
-      tipo: cfg.tipo === 'pontos' || cfg.tipo === 'carimbo' ? cfg.tipo : DEFAULT_CONFIG.tipo,
-      stampsGoal: typeof cfg.stampsGoal === 'number' && cfg.stampsGoal >= 5 && cfg.stampsGoal <= 20
-        ? cfg.stampsGoal : DEFAULT_CONFIG.stampsGoal,
-      reward: typeof cfg.reward === 'string' && cfg.reward.trim() ? cfg.reward : DEFAULT_CONFIG.reward,
-    }
-  } catch {
-    return DEFAULT_CONFIG
-  }
-}
-
-
 const TIER_CONFIG = {
   bronze: { label: 'Bronze', color: '#92400E', bg: '#FEF3C7', icon: '🥉' },
   prata:  { label: 'Prata',  color: '#374151', bg: '#F3F4F6', icon: '🥈' },
@@ -51,18 +28,23 @@ const TIER_CONFIG = {
 }
 
 export function ProgramaFidelidadeView() {
-  const { user } = useUser()
-  const tenantSlug = (user?.publicMetadata as { tenantSlug?: string } | undefined)?.tenantSlug
-
-  // Lazy init lê do localStorage uma única vez no mount (sem useEffect → sem cascading render)
-  // Scoped por tenant para impedir vazamento de config entre barbearias no mesmo browser.
-  const initial = loadConfig(tenantSlug)
-  const [tipo, setTipo] = useState<'carimbo' | 'pontos'>(initial.tipo)
-  const [stampsGoal, setStampsGoal] = useState(initial.stampsGoal)
-  const [reward, setReward] = useState(initial.reward)
+  // Config do programa persiste em localStorage scoped por tenant.
+  // Lista de clientes idem (futuro CRUD → trocar por fetch).
+  const [config, setConfig] = useTenantPersistedState<FidelidadeConfig>(
+    'fidelidade:config',
+    DEFAULT_CONFIG,
+  )
+  const [clients, setClients] = useTenantPersistedState<ClienteFidelidadeFixture[]>(
+    'fidelidade:clients',
+    getInitialClientesFidelidade(),
+  )
   const [selected, setSelected] = useState<ClienteFidelidadeFixture | null>(null)
-  const [clients, setClients] = useState<ClienteFidelidadeFixture[]>(() => getInitialClientesFidelidade())
   const { success } = useToast()
+
+  const { tipo, stampsGoal, reward } = config
+  const setTipo = (v: 'carimbo' | 'pontos') => setConfig((c) => ({ ...c, tipo: v }))
+  const setStampsGoal = (v: number) => setConfig((c) => ({ ...c, stampsGoal: v }))
+  const setReward = (v: string) => setConfig((c) => ({ ...c, reward: v }))
 
   const handleDarCarimbo = (id: string) => {
     setClients(p => p.map(c => c.id === id ? { ...c, stamps: Math.min(c.stamps + 1, stampsGoal), totalVisits: c.totalVisits + 1, nextReward: Math.max(c.nextReward - 1, 0) } : c))
@@ -79,18 +61,10 @@ export function ProgramaFidelidadeView() {
     window.open(`https://wa.me/55${phone.replace(/\D/g,'')}?text=${msg}`, '_blank', 'noopener,noreferrer')
   }
 
+  // O hook useTenantPersistedState já persiste a cada mudança — esse handler
+  // só dispara o toast de confirmação visual pro usuário.
   const handleSalvarConfig = () => {
-    try {
-      const cfg: FidelidadeConfig = { tipo, stampsGoal, reward }
-      if (tenantSlug) {
-        localStorage.setItem(storageKey(tenantSlug), JSON.stringify(cfg))
-        success(`Programa salvo: ${tipo === 'carimbo' ? `${stampsGoal} visitas` : 'pontos'} → ${reward}`)
-      } else {
-        success('Configuração aplicada (cadastro da barbearia ainda não concluído)')
-      }
-    } catch {
-      success('Configuração aplicada (sem persistência neste navegador)')
-    }
+    success(`Programa salvo: ${tipo === 'carimbo' ? `${stampsGoal} visitas` : 'pontos'} → ${reward}`)
   }
 
   const aniversariantes = [

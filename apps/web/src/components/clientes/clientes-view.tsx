@@ -5,6 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { NovoClienteModal } from './novo-cliente-modal'
 import { AppointmentModal } from '../agenda/appointment-modal'
 import { useToast } from '@/components/ui/toast'
+import { useTenantPersistedState } from '@/lib/tenant-storage'
 import { getInitialClients, type ClientFixture } from './__fixtures__/clients'
 
 const SEGMENTS = [
@@ -32,7 +33,9 @@ export function ClientesView() {
   const [novoOpen, setNovoOpen]     = useState(false)
   const [agendaOpen, setAgendaOpen] = useState(false)
   const [historicoOpen, setHistoricoOpen] = useState(false)
-  const [clients, setClients]       = useState<ClientFixture[]>(() => getInitialClients())
+  // Persiste no localStorage scoped por tenant (chave: `stylogestor:{slug}:clients`).
+  // Quando o módulo packages/api/clients estiver plugado, trocar por fetch.
+  const [clients, setClients]       = useTenantPersistedState<ClientFixture[]>('clients', getInitialClients())
   const [sortBy, setSortBy]         = useState<'name' | 'visits' | 'spent'>('visits')
   const { success } = useToast()
 
