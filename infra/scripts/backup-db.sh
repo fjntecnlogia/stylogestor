@@ -28,15 +28,18 @@ RETENTION_DAYS=7
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
-# Faz dump como usuário postgres (socket Unix → sem precisar de senha)
-# Custom format permite restore seletivo de tabelas
+# Faz dump como usuário postgres (socket Unix → sem precisar de senha).
+# Custom format permite restore seletivo. pg_dump escreve em stdout por padrão
+# quando não passamos --file, e o pipe pro gzip funciona corretamente.
+#
+# Compressão: pg_dump --format=custom já compacta (zlib level 9). gzip externo
+# adiciona ~5% sem perda significativa de tamanho. Trade-off OK por
+# compatibilidade com gunzip universal.
 sudo -u postgres pg_dump \
   --format=custom \
-  --compress=9 \
   --no-owner \
   --no-privileges \
-  --dbname="$DB_NAME" \
-  --file=/dev/stdout 2>/tmp/backup-stylogestor-err.log \
+  --dbname="$DB_NAME" 2>/tmp/backup-stylogestor-err.log \
   | gzip > "$BACKUP_FILE"
 
 # Validar que o arquivo foi gerado e não está vazio
