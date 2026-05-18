@@ -1,3 +1,7 @@
+// ⚠️ Sentry instrument DEVE ser o primeiro import — instrumenta Node antes de
+// qualquer outro pacote ser carregado. Sem isso, traces ficam incompletos.
+import './instrument'
+
 import { NestFactory } from '@nestjs/core'
 import { Logger, ValidationPipe } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
