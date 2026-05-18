@@ -54,8 +54,8 @@ export function BookingFlow({ slug }: Props) {
   const handleConfirm = async () => {
     setSubmitting(true)
     try {
-      const selectedProf = MOCK_PROFESSIONALS.find(p => p.id === professional)
-      const selectedSvcs = MOCK_SERVICES.filter(s => selectedServices.includes(s.id))
+      const selectedProf = PROFESSIONALS.find(p => p.id === professional)
+      const selectedSvcs = SERVICES.filter(s => selectedServices.includes(s.id))
 
       const body = {
         slug,
