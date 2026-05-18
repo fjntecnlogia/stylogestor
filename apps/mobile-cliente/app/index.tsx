@@ -1,5 +1,6 @@
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList } from 'react-native'
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, Alert } from 'react-native'
 import { router } from 'expo-router'
+import { useAuth, useUser } from '@clerk/clerk-expo'
 
 // Simula lista de barbearias próximas
 const BARBEARIAS = [
@@ -9,15 +10,48 @@ const BARBEARIAS = [
 ]
 
 export default function HomeScreen() {
+  const { isSignedIn, signOut } = useAuth()
+  const { user } = useUser()
+  const firstName = user?.firstName || user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'você'
+
+  const handleSignOut = () => {
+    Alert.alert('Sair da conta', 'Deseja realmente sair?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          try { await signOut() } catch (_) {}
+        },
+      },
+    ])
+  }
+
   return (
     <SafeAreaView style={s.safe}>
       {/* Header */}
       <View style={s.header}>
-        <View style={s.logoRow}>
-          <View style={s.logoBox}>
-            <Text style={s.logoLetter}>S</Text>
+        <View style={s.headerTop}>
+          <View style={s.logoRow}>
+            <View style={s.logoBox}>
+              <Text style={s.logoLetter}>S</Text>
+            </View>
+            <Text style={s.logoText}>STYLO<Text style={s.logoAccent}>GESTOR</Text></Text>
           </View>
-          <Text style={s.logoText}>STYLO<Text style={s.logoAccent}>GESTOR</Text></Text>
+
+          {/* Auth corner: Entrar (anonimo) ou avatar (logado) */}
+          {isSignedIn ? (
+            <TouchableOpacity style={s.userChip} onPress={handleSignOut}>
+              <View style={s.userAvatar}>
+                <Text style={s.userAvatarText}>{firstName.charAt(0).toUpperCase()}</Text>
+              </View>
+              <Text style={s.userName} numberOfLines={1}>Oi, {firstName}</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={s.loginBtn} onPress={() => router.push('/(auth)/login')}>
+              <Text style={s.loginBtnText}>Entrar</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <Text style={s.subtitle}>Agende na sua barbearia favorita</Text>
       </View>
@@ -66,7 +100,14 @@ export default function HomeScreen() {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F8F6F2' },
   header: { backgroundColor: '#1A3A6B', padding: 20, paddingBottom: 24 },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  loginBtn: { backgroundColor: 'rgba(245,166,35,0.15)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: '#F5A623' },
+  loginBtnText: { color: '#F5A623', fontWeight: '700', fontSize: 13 },
+  userChip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, maxWidth: 160 },
+  userAvatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F5A623', alignItems: 'center', justifyContent: 'center' },
+  userAvatarText: { color: '#1A3A6B', fontWeight: '900', fontSize: 13 },
+  userName: { color: '#fff', fontSize: 12, fontWeight: '600' },
   logoBox: {
     width: 36, height: 36, borderRadius: 10, backgroundColor: '#F5A623',
     alignItems: 'center', justifyContent: 'center',

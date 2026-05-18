@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "stylogestor-cliente",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -22,18 +22,30 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1A3A6B"
       },
-      "package": "br.com.stylogestor.cliente",
-      "edgeToEdgeEnabled": true
+      "package": "br.com.stylogestor.cliente"
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 24
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "router": {},
+      "apiUrl": "https://app.stylogestor.com.br",
+      "privacyPolicyUrl": "https://stylogestor.com.br/privacidade",
+      "termsOfServiceUrl": "https://stylogestor.com.br/termos",
       "eas": {
         "projectId": "910744fd-65f9-4c92-9e62-95eede31eba3"
       }

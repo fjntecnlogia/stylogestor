@@ -1,8 +1,9 @@
 import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, Alert } from 'react-native'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { router, useLocalSearchParams } from 'expo-router'
 import { addDays, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { useUser } from '@clerk/clerk-expo'
 
 const SERVICES = [
   { id: '1', name: 'Corte masculino', duration: 30, price: 40 },
@@ -24,6 +25,7 @@ type Step = 'services' | 'professional' | 'datetime' | 'info' | 'confirm' | 'suc
 
 export default function AgendarScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>()
+  const { user, isLoaded } = useUser()
   const [step, setStep] = useState<Step>('services')
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [professional, setProfessional] = useState('')
@@ -31,6 +33,21 @@ export default function AgendarScreen() {
   const [selectedSlot, setSelectedSlot] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+
+  // Pre-fill nome e telefone do perfil Clerk quando o usuario esta logado.
+  // Clerk nao captura telefone por padrao - vai ficar vazio se nao foi cadastrado.
+  // Apenas seta uma vez quando isLoaded passa a true e os campos ainda estao vazios.
+  useEffect(() => {
+    if (!isLoaded || !user) return
+    if (!name) {
+      const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim()
+      if (fullName) setName(fullName)
+    }
+    if (!phone) {
+      const phoneFromClerk = user.primaryPhoneNumber?.phoneNumber
+      if (phoneFromClerk) setPhone(phoneFromClerk)
+    }
+  }, [isLoaded, user])
 
   const total    = SERVICES.filter(s => selectedServices.includes(s.id)).reduce((a, s) => a + s.price, 0)
   const duration = SERVICES.filter(s => selectedServices.includes(s.id)).reduce((a, s) => a + s.duration, 0)
