@@ -92,7 +92,12 @@ export class SubscriptionsService {
     const tenantId = session.metadata?.tenantId
     const plan = session.metadata?.plan
     if (!tenantId || !isValidPlan(plan)) {
-      this.logger.warn(`checkout.session.completed sem tenantId/plan válidos (session ${session.id})`)
+      // Eventos sem `tenantId` vêm do checkout do Next.js (apps/web), que usa
+      // o formato { userId, planId } em vez de { tenantId, plan }. Esses são
+      // processados pelo handler do Next em /api/webhooks/stripe.
+      // Aqui só ignoramos silenciosamente — webhook_events já gravou idempotência.
+      // TODO Fase 2: adicionar lookup userId→tenant e processar também aqui.
+      this.logger.debug(`checkout.session.completed ignorado (sem tenantId): ${session.id}`)
       return
     }
 
@@ -137,14 +142,15 @@ export class SubscriptionsService {
   private async handleSubscriptionUpdated(sub: Stripe.Subscription) {
     const tenantId = sub.metadata?.tenantId
     if (!tenantId) {
-      this.logger.warn(`subscription.updated sem tenantId em metadata (sub ${sub.id})`)
+      // Mesma situação do checkout: vem do Next.js sem tenantId.
+      this.logger.debug(`subscription.updated ignorado (sem tenantId): ${sub.id}`)
       return
     }
 
     const plan = sub.metadata?.plan
     if (!isValidPlan(plan)) {
-      // Sem default silencioso. Se vier vazio/quebrado, alerta e aborta — billing
-      // não pode promover/rebaixar tenant por engano.
+      // Sem default silencioso. Se vier vazio/quebrado quando TEM tenantId,
+      // alerta — billing não pode promover/rebaixar tenant por engano.
       this.logger.error(
         `subscription.updated com plan inválido para tenant ${tenantId}: '${plan}'. Abortando.`,
       )
