@@ -72,4 +72,19 @@ export class HealthController {
       timestamp: new Date().toISOString(),
     }
   }
+
+  /**
+   * Endpoint de TESTE do Sentry — lança exception não-tratada propositalmente.
+   * Use apenas pra validar que Sentry está conectado em produção.
+   * Sentry deve capturar e mostrar como issue.
+   *
+   * curl https://api.stylogestor.com.br/api/v1/health/sentry-test
+   *
+   * TODO: remover após primeiros clientes confirmarem que Sentry está OK.
+   */
+  @Public()
+  @Get('sentry-test')
+  sentryTest() {
+    throw new Error('Sentry test — se você vê isso no Sentry, está funcionando!')
+  }
 }
