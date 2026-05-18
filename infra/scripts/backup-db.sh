@@ -25,6 +25,22 @@ TIMESTAMP=$(date +%Y%m%d-%H%M)
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}-${TIMESTAMP}.dump.gz"
 RETENTION_DAYS=7
 
+# pg_dump deve ter versão >= servidor (15 no nosso caso).
+# Distros velhas têm pg_dump 13 no PATH; o oficial fica em /usr/pgsql-XX/bin/.
+PG_DUMP=""
+for candidate in /usr/pgsql-17/bin/pg_dump /usr/pgsql-16/bin/pg_dump /usr/pgsql-15/bin/pg_dump $(which pg_dump 2>/dev/null); do
+  if [ -x "$candidate" ]; then
+    PG_DUMP="$candidate"
+    break
+  fi
+done
+
+if [ -z "$PG_DUMP" ]; then
+  echo "[backup-db] ERRO: pg_dump nao encontrado" >&2
+  exit 1
+fi
+echo "[backup-db] usando $PG_DUMP ($($PG_DUMP --version))"
+
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
@@ -35,7 +51,7 @@ chmod 700 "$BACKUP_DIR"
 # Compressão: pg_dump --format=custom já compacta (zlib level 9). gzip externo
 # adiciona ~5% sem perda significativa de tamanho. Trade-off OK por
 # compatibilidade com gunzip universal.
-sudo -u postgres pg_dump \
+sudo -u postgres "$PG_DUMP" \
   --format=custom \
   --no-owner \
   --no-privileges \

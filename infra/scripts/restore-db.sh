@@ -18,6 +18,19 @@ set -euo pipefail
 BACKUP_FILE="${1:-}"
 DB_NAME="stylogestor"
 
+# pg_restore deve ter versão >= servidor (15+ pra DB Postgres 15)
+PG_DUMP=""
+PG_RESTORE=""
+for ver in 17 16 15; do
+  if [ -x "/usr/pgsql-${ver}/bin/pg_dump" ]; then
+    PG_DUMP="/usr/pgsql-${ver}/bin/pg_dump"
+    PG_RESTORE="/usr/pgsql-${ver}/bin/pg_restore"
+    break
+  fi
+done
+[ -z "$PG_DUMP" ] && PG_DUMP=$(which pg_dump)
+[ -z "$PG_RESTORE" ] && PG_RESTORE=$(which pg_restore)
+
 if [ -z "$BACKUP_FILE" ]; then
   echo "Uso: $0 <arquivo.dump.gz>"
   echo ""
@@ -39,13 +52,13 @@ read -r
 # 1. Backup do estado atual (segurança extra)
 SAFETY_BACKUP="/var/backups/stylogestor/before-restore-$(date +%Y%m%d-%H%M).dump.gz"
 echo "[restore] backup de seguranca em $SAFETY_BACKUP..."
-sudo -u postgres pg_dump --format=custom --compress=9 --dbname="$DB_NAME" 2>/dev/null \
+sudo -u postgres "$PG_DUMP" --format=custom --dbname="$DB_NAME" 2>/dev/null \
   | gzip > "$SAFETY_BACKUP"
 echo "[restore] safety backup OK"
 
 # 2. Restore
 echo "[restore] aplicando $BACKUP_FILE..."
-gunzip -c "$BACKUP_FILE" | sudo -u postgres pg_restore --clean --if-exists --dbname="$DB_NAME" \
+gunzip -c "$BACKUP_FILE" | sudo -u postgres "$PG_RESTORE" --clean --if-exists --dbname="$DB_NAME" \
   || { echo "[restore] FALHOU. Safety backup em $SAFETY_BACKUP" >&2; exit 1; }
 
 # 3. Sanity check
