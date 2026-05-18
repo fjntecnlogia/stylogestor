@@ -6,18 +6,41 @@ import { getInitialProfessionals, type ProfessionalFixture } from './__fixtures_
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
 
-interface NovoProfForm { name: string; role: string; phone: string; commission: number }
+interface NovoProfForm { name: string; role: string; phone: string; commission: number; email: string }
 
 export function ProfissionaisView() {
   const [professionals, setProfessionals] = useState<ProfessionalFixture[]>(() => getInitialProfessionals())
   const [selected, setSelected] = useState<ProfessionalFixture | null>(professionals[0] ?? null)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState<NovoProfForm>({ name: '', role: 'Barbeiro', phone: '', commission: 40 })
+  const [form, setForm] = useState<NovoProfForm>({ name: '', role: 'Barbeiro', phone: '', commission: 40, email: '' })
   const [editForm, setEditForm] = useState({ name: '', role: '', phone: '', commission: 0 })
-  const { success } = useToast()
+  const [invitingId, setInvitingId] = useState<string | null>(null)
+  const { success, error } = useToast()
 
-  const handleAdd = () => {
+  // Chama /api/professionals/invite pra criar usuário Clerk + enviar email convite
+  const sendInvite = async (profId: string, profName: string, email: string, phone: string) => {
+    setInvitingId(profId)
+    try {
+      const res = await fetch('/api/professionals/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: profName, email, phone, professionalId: profId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        error(data.error || 'Erro ao enviar convite')
+        return
+      }
+      success(`Convite enviado para ${email} 📧`)
+    } catch {
+      error('Erro de conexão. Tente novamente.')
+    } finally {
+      setInvitingId(null)
+    }
+  }
+
+  const handleAdd = async () => {
     if (!form.name || !form.phone) return
     const novo = {
       id: String(professionals.length + 1),
@@ -33,8 +56,14 @@ export function ProfissionaisView() {
     setProfessionals(p => [...p, novo])
     setSelected(novo)
     setAdding(false)
-    setForm({ name: '', role: 'Barbeiro', phone: '', commission: 40 })
     success(`Profissional ${form.name} cadastrado!`)
+
+    // Se foi informado email, dispara convite Clerk (cria login pro barbeiro acessar /profissional)
+    const emailToInvite = form.email.trim()
+    setForm({ name: '', role: 'Barbeiro', phone: '', commission: 40, email: '' })
+    if (emailToInvite) {
+      await sendInvite(novo.id, novo.name, emailToInvite, novo.phone)
+    }
   }
 
   const handleEdit = () => {
@@ -89,8 +118,25 @@ export function ProfissionaisView() {
               <label className="text-xs text-[#4A4A5A]">Comissão: {form.commission}%</label>
               <input type="range" min="10" max="70" value={form.commission} onChange={e => setForm(f => ({ ...f, commission: Number(e.target.value) }))} className="w-full" />
             </div>
+
+            {/* Email — opcional. Se preenchido, dispara convite Clerk pro barbeiro acessar /profissional */}
+            <div className="pt-2 border-t border-[#BFDBFE]">
+              <label className="text-xs font-semibold text-[#1A3A6B] block mb-1">
+                Email (opcional — envia acesso ao painel)
+              </label>
+              <input type="email" placeholder="barbeiro@email.com" value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]" />
+              <p className="text-[10px] text-[#6B7280] mt-1">
+                Se preencher, o profissional recebe convite por email pra criar senha e acessar a agenda dele.
+              </p>
+            </div>
+
             <div className="flex gap-2">
-              <button onClick={handleAdd} className="flex-1 bg-[#1A3A6B] text-white text-sm font-bold py-2 rounded-xl hover:bg-[#142d55]">Salvar</button>
+              <button onClick={handleAdd} disabled={invitingId !== null}
+                className="flex-1 bg-[#1A3A6B] disabled:opacity-50 text-white text-sm font-bold py-2 rounded-xl hover:bg-[#142d55]">
+                {invitingId ? 'Enviando convite...' : 'Salvar'}
+              </button>
               <button onClick={() => setAdding(false)} className="flex-1 border border-[#E8E6E2] text-[#4A4A5A] text-sm py-2 rounded-xl hover:bg-[#F8F6F2]">Cancelar</button>
             </div>
           </div>
@@ -151,16 +197,24 @@ export function ProfissionaisView() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><p className="text-xs text-[#4A4A5A]">Função</p><p className="font-medium">{selected.role}</p></div>
-              <div><p className="text-xs text-[#4A4A5A]">Telefone</p><p className="font-medium">{selected.phone}</p></div>
-              <div><p className="text-xs text-[#4A4A5A]">Comissão</p><p className="font-medium text-[#F5A623]">{selected.commission}%</p></div>
-              <div><p className="text-xs text-[#4A4A5A]">Status</p>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${selected.active ? 'bg-[#1B8A5A]/10 text-[#1B8A5A]' : 'bg-[#4A4A5A]/10 text-[#4A4A5A]'}`}>
-                  {selected.active ? 'Ativo' : 'Inativo'}
-                </span>
+            <>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div><p className="text-xs text-[#4A4A5A]">Função</p><p className="font-medium">{selected.role}</p></div>
+                <div><p className="text-xs text-[#4A4A5A]">Telefone</p><p className="font-medium">{selected.phone}</p></div>
+                <div><p className="text-xs text-[#4A4A5A]">Comissão</p><p className="font-medium text-[#F5A623]">{selected.commission}%</p></div>
+                <div><p className="text-xs text-[#4A4A5A]">Status</p>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${selected.active ? 'bg-[#1B8A5A]/10 text-[#1B8A5A]' : 'bg-[#4A4A5A]/10 text-[#4A4A5A]'}`}>
+                    {selected.active ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
               </div>
-            </div>
+
+              {/* Convidar pra ter acesso ao painel /profissional */}
+              <InviteAccessBox
+                onInvite={(email) => sendInvite(selected.id, selected.name, email, selected.phone)}
+                loading={invitingId === selected.id}
+              />
+            </>
           )}
 
           <div>
@@ -179,6 +233,64 @@ export function ProfissionaisView() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Caixa para o gestor enviar (ou re-enviar) o convite de acesso ao painel
+ * /profissional pro barbeiro que já está cadastrado.
+ */
+function InviteAccessBox({ onInvite, loading }: { onInvite: (email: string) => void; loading: boolean }) {
+  const [email, setEmail] = useState('')
+  const [expanded, setExpanded] = useState(false)
+
+  if (!expanded) {
+    return (
+      <div className="pt-3 border-t border-[#E8E6E2]">
+        <button
+          onClick={() => setExpanded(true)}
+          className="text-sm font-semibold text-[#1A3A6B] hover:underline flex items-center gap-2"
+        >
+          🔑 Enviar acesso ao painel do profissional
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="pt-3 border-t border-[#E8E6E2] space-y-2">
+      <p className="text-xs font-semibold text-[#1A3A6B]">Convite ao painel /profissional</p>
+      <input
+        type="email"
+        placeholder="email-do-profissional@exemplo.com"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]"
+      />
+      <p className="text-[10px] text-[#6B7280]">
+        Vai receber um email com link pra criar senha e acessar a agenda dele em app.stylogestor.com.br
+      </p>
+      <div className="flex gap-2">
+        <button
+          onClick={() => {
+            if (!email.includes('@')) return
+            onInvite(email)
+            setEmail('')
+            setExpanded(false)
+          }}
+          disabled={loading || !email.includes('@')}
+          className="flex-1 bg-[#1A3A6B] disabled:opacity-50 text-white text-xs font-bold py-2 rounded-xl hover:bg-[#142d55]"
+        >
+          {loading ? 'Enviando...' : '📧 Enviar convite'}
+        </button>
+        <button
+          onClick={() => { setExpanded(false); setEmail('') }}
+          className="px-3 border border-[#E8E6E2] text-[#4A4A5A] text-xs py-2 rounded-xl hover:bg-[#F8F6F2]"
+        >
+          Cancelar
+        </button>
       </div>
     </div>
   )

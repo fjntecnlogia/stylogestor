@@ -32,6 +32,25 @@ const isPaymentRoute = createRouteMatcher([
   '/suporte(.*)',
 ])
 
+// Rotas exclusivas do painel do profissional (barbeiro)
+const isProfessionalRoute = createRouteMatcher([
+  '/profissional(.*)',
+])
+
+// Rotas exclusivas do gestor (dashboard, clientes, financeiro etc)
+const isGestorRoute = createRouteMatcher([
+  '/dashboard(.*)',
+  '/agenda(.*)',
+  '/clientes(.*)',
+  '/configuracoes(.*)',
+  '/estoque(.*)',
+  '/fidelidade(.*)',
+  '/financeiro(.*)',
+  '/profissionais(.*)',
+  '/servicos(.*)',
+  '/afiliados(.*)',
+])
+
 export default clerkMiddleware(async (auth, request: NextRequest) => {
   const url = request.nextUrl.clone()
   const hostname = request.headers.get('host') || ''
@@ -58,8 +77,35 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   // Exige autenticação
   const { userId, sessionClaims } = await auth.protect()
 
+  const metadata = (sessionClaims?.metadata as Record<string, string> | undefined) ?? {}
+  const role = metadata.role // 'gestor' | 'barbeiro' | undefined (assume gestor por retrocompat)
+
+  // ───────────────────────────────────────────────────────────────
+  // Role-based routing: barbeiro só acessa /profissional/*
+  // Gestor (ou sem role definida) acessa o painel padrão e NÃO entra
+  // em /profissional/*.
+  // ───────────────────────────────────────────────────────────────
+  if (role === 'barbeiro') {
+    // Bloqueia barbeiro em rotas do gestor → redireciona pro painel dele
+    if (isGestorRoute(request)) {
+      url.pathname = '/profissional/agenda'
+      return NextResponse.redirect(url)
+    }
+    // Se acessa raiz `/`, manda direto pro painel dele
+    if (url.pathname === '/') {
+      url.pathname = '/profissional/agenda'
+      return NextResponse.redirect(url)
+    }
+  } else {
+    // Gestor (ou role indefinida) não deve entrar em /profissional/*
+    if (isProfessionalRoute(request)) {
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
+  }
+
   // Verificar status da assinatura (salvo no publicMetadata do Clerk)
-  const subStatus = (sessionClaims?.metadata as Record<string, string> | undefined)?.subscriptionStatus
+  const subStatus = metadata.subscriptionStatus
   const blockedStatuses = ['past_due', 'canceled', 'unpaid']
 
   if (subStatus && blockedStatuses.includes(subStatus) && !isPaymentRoute(request)) {
