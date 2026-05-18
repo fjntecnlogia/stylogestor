@@ -33,14 +33,27 @@ export class AppointmentsController {
   }
 
   @Get('availability')
-  @ApiQuery({ name: 'date', required: true })
+  @ApiQuery({ name: 'date', required: true, description: 'ISO date YYYY-MM-DD' })
   @ApiQuery({ name: 'professionalId', required: true })
+  @ApiQuery({
+    name: 'serviceIds',
+    required: false,
+    description:
+      'CSV de IDs de serviços. Se passado, a duração total deles dimensiona o slot e impede slots que conflitariam.',
+  })
   getAvailability(
     @CurrentTenant() tenant: TenantPayload,
     @Query('date') date: string,
     @Query('professionalId') professionalId: string,
+    @Query('serviceIds') serviceIds?: string,
   ) {
-    return this.service.getAvailableSlots(tenant.id, date, professionalId)
+    const ids = serviceIds
+      ? serviceIds
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined
+    return this.service.getAvailableSlots(tenant.id, date, professionalId, ids)
   }
 
   @Get(':id')

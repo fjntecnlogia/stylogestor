@@ -23,29 +23,19 @@
 ## Comandos
 ```bash
 pnpm --filter @stylogestor/api dev      # nest start --watch (porta padrão 3001)
-pnpm --filter @stylogestor/api build    # ⚠️ ver "Gotcha de build" abaixo
-pnpm --filter @stylogestor/api exec tsc --noEmit
+pnpm --filter @stylogestor/api build    # SWC: ~200ms, gera dist/ pronto pra produção
+pnpm --filter @stylogestor/api exec tsc --noEmit   # type-check completo (separado do build)
 ```
 
-### ⚠️ Gotcha de build (Stripe v22 + commonjs)
+### Build: SWC + tsc
 
-O `tsconfig.json` desta pasta usa `module: esnext, moduleResolution: bundler`
-para que `tsc --noEmit` resolva os tipos do Stripe v22 (`Stripe.Event`,
-`Stripe.Subscription` etc.). Mas Node em CJS runtime precisa de
-`module: commonjs, moduleResolution: node` — caso contrário, `node dist/main.js`
-falha com `ERR_MODULE_NOT_FOUND` em imports sem `.js`.
+- **Build de produção**: `nest build` usa **SWC** (config em `.swcrc` + `nest-cli.json`).
+  SWC só transpila, não faz type-check, gera CommonJS pronto pro Node.
+- **Type-check**: feito via `tsc --noEmit` (usa `tsconfig.json` com `moduleResolution: bundler`
+  para resolver tipos do Stripe v22 corretamente).
 
-**Workaround atual em deploy**: editar manualmente o `tsconfig.json` no servidor
-antes do `nest build`:
-
-```bash
-node -e "const fs=require('fs');const p='packages/api/tsconfig.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.compilerOptions.module='commonjs';c.compilerOptions.moduleResolution='node';fs.writeFileSync(p,JSON.stringify(c,null,2))"
-pnpm --filter @stylogestor/api build
-```
-
-**TODO**: criar `tsconfig.build.json` + shim de tipos do Stripe que funcione
-em ambos os modos, ou migrar para SWC builder no `nest-cli.json`
-(`{ "compilerOptions": { "builder": "swc" } }` + adicionar `@swc/cli @swc/core`).
+Em PRs, ambos rodam: `pnpm exec tsc --noEmit` para garantir tipos + `pnpm build` para
+garantir que o output executa.
 
 ## Princípios não-negociáveis
 1. 🔒 **Multi-tenant isolado**: TODO query Prisma filtra por `tenantId`. Sem exceção. Em updates/deletes por id, use `updateMany`/`deleteMany` com `where: { id, tenantId }` (não apenas `where: { id }`).

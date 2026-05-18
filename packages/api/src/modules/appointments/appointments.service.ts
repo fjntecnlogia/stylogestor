@@ -146,11 +146,42 @@ export class AppointmentsService {
     }
   }
 
-  async getAvailableSlots(tenantId: string, date: string, professionalId: string) {
+  /**
+   * Slots disponíveis para um profissional em uma data.
+   *
+   * @param tenantId       tenant scope
+   * @param date           ISO date (YYYY-MM-DD)
+   * @param professionalId profissional a checar
+   * @param serviceIds     opcional: serviços que o cliente quer agendar.
+   *                       A duração total deles vira o tamanho mínimo do slot,
+   *                       e o slot só é oferecido se [slot, slot+duração]
+   *                       couber sem overlapar com nenhum agendamento existente
+   *                       nem com o horário de almoço do profissional.
+   *
+   * Slots são gerados de 30 em 30 min (granularidade comercial padrão).
+   * Slot final precisa caber inteiramente dentro do horário do profissional.
+   */
+  async getAvailableSlots(
+    tenantId: string,
+    date: string,
+    professionalId: string,
+    serviceIds?: string[],
+  ) {
     const schedule = await this.prisma.professionalSchedule.findFirst({
       where: { professionalId, dayOfWeek: new Date(date).getDay(), active: true },
     })
     if (!schedule) return []
+
+    // Duração total dos serviços (somatório). Default 30 min se nenhum serviço passado.
+    let durationMinutes = 30
+    if (serviceIds && serviceIds.length > 0) {
+      const services = await this.prisma.service.findMany({
+        where: { id: { in: serviceIds }, tenantId, active: true },
+        select: { duration: true },
+      })
+      if (services.length === 0) return [] // serviços inválidos → sem slots
+      durationMinutes = services.reduce((sum, s) => sum + s.duration, 0)
+    }
 
     const booked = await this.prisma.appointment.findMany({
       where: {
@@ -162,22 +193,50 @@ export class AppointmentsService {
       select: { startTime: true, endTime: true },
     })
 
-    // Gera slots de 30 em 30 minutos no horário do profissional
-    // NOTA: a duração do serviço pretendido NÃO é considerada aqui — bug funcional
-    // documentado na auditoria, fora do escopo desta passagem.
-    const slots: string[] = []
     const [startH, startM] = schedule.startTime.split(':').map(Number)
     const [endH, endM] = schedule.endTime.split(':').map(Number)
     const startMin = startH * 60 + startM
     const endMin = endH * 60 + endM
 
-    for (let m = startMin; m < endMin; m += 30) {
-      const slotDate = new Date(date)
-      slotDate.setHours(Math.floor(m / 60), m % 60, 0, 0)
-      const isBooked = booked.some(
-        (b) => slotDate >= new Date(b.startTime) && slotDate < new Date(b.endTime),
+    // Janela de almoço (opcional) — slots que overlapam com ela são bloqueados
+    const lunchStart = schedule.lunchStart
+      ? (() => {
+          const [h, m] = schedule.lunchStart!.split(':').map(Number)
+          return h * 60 + m
+        })()
+      : null
+    const lunchEnd = schedule.lunchEnd
+      ? (() => {
+          const [h, m] = schedule.lunchEnd!.split(':').map(Number)
+          return h * 60 + m
+        })()
+      : null
+
+    const slots: string[] = []
+    const granularity = 30 // minutos
+
+    for (let m = startMin; m + durationMinutes <= endMin; m += granularity) {
+      const slotStart = new Date(date)
+      slotStart.setHours(Math.floor(m / 60), m % 60, 0, 0)
+      const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1000)
+
+      // 1. Overlap com agendamento existente? (mesma fórmula correta do create)
+      const conflictsAppointment = booked.some(
+        (b) =>
+          new Date(b.startTime) < slotEnd && new Date(b.endTime) > slotStart,
       )
-      if (!isBooked) slots.push(slotDate.toISOString())
+      if (conflictsAppointment) continue
+
+      // 2. Overlap com almoço?
+      if (lunchStart !== null && lunchEnd !== null) {
+        const slotStartMin = m
+        const slotEndMin = m + durationMinutes
+        const overlapsLunch =
+          slotStartMin < lunchEnd && slotEndMin > lunchStart
+        if (overlapsLunch) continue
+      }
+
+      slots.push(slotStart.toISOString())
     }
 
     return slots
