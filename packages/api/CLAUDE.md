@@ -23,19 +23,35 @@
 ## Comandos
 ```bash
 pnpm --filter @stylogestor/api dev      # nest start --watch (porta padrão 3001)
-pnpm --filter @stylogestor/api build    # SWC: ~200ms, gera dist/ pronto pra produção
-pnpm --filter @stylogestor/api exec tsc --noEmit   # type-check completo (separado do build)
+pnpm --filter @stylogestor/api exec tsc --noEmit   # type-check
+pnpm --filter @stylogestor/api build    # nest build (precisa swap manual — ver abaixo)
 ```
 
-### Build: SWC + tsc
+### ⚠️ Build: workaround obrigatório
 
-- **Build de produção**: `nest build` usa **SWC** (config em `.swcrc` + `nest-cli.json`).
-  SWC só transpila, não faz type-check, gera CommonJS pronto pro Node.
-- **Type-check**: feito via `tsc --noEmit` (usa `tsconfig.json` com `moduleResolution: bundler`
-  para resolver tipos do Stripe v22 corretamente).
+Stripe v22 mudou seus exports (`export = StripeConstructor`). Resultado:
+- `tsc --noEmit` precisa de `moduleResolution: bundler` para resolver `Stripe.Event`,
+  `Stripe.Customer` etc. (tsconfig.json atual).
+- Mas `node dist/main.js` precisa de `module: commonjs` (caso contrário,
+  `ERR_MODULE_NOT_FOUND` em imports sem `.js`).
 
-Em PRs, ambos rodam: `pnpm exec tsc --noEmit` para garantir tipos + `pnpm build` para
-garantir que o output executa.
+Tentamos SWC builder (produziu código quebrado com `_classExtraInitializers`,
+`continue` fora de loop, `sourceMappingURL` no meio do arquivo — bugs do
+SWC 1.15.x com nossa combinação de decorators + async). Não funcionou.
+
+**Workaround atual em deploy** — antes de `pnpm build`, swapar o tsconfig:
+
+```bash
+node -e "const fs=require('fs');const p='packages/api/tsconfig.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.compilerOptions.module='commonjs';c.compilerOptions.moduleResolution='node';fs.writeFileSync(p,JSON.stringify(c,null,2))"
+pnpm --filter @stylogestor/api build
+# Restaurar (opcional, antes do próximo `tsc --noEmit`):
+node -e "const fs=require('fs');const p='packages/api/tsconfig.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.compilerOptions.module='esnext';c.compilerOptions.moduleResolution='bundler';fs.writeFileSync(p,JSON.stringify(c,null,2))"
+```
+
+**TODO permanente**: aguardar fix do SWC ou migrar pra Stripe v17 (que tinha
+namespace pattern simples) ou reescrever todos os `Stripe.X` para acessar via
+`Stripe.Stripe.X` apenas no contexto de build com tsc, mas isso quebra o
+tsc --noEmit com bundler. Sem solução limpa atualmente.
 
 ## Princípios não-negociáveis
 1. 🔒 **Multi-tenant isolado**: TODO query Prisma filtra por `tenantId`. Sem exceção. Em updates/deletes por id, use `updateMany`/`deleteMany` com `where: { id, tenantId }` (não apenas `where: { id }`).
