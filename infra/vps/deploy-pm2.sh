@@ -38,7 +38,10 @@ echo "   HEAD: $(git log --oneline -1)"
 
 echo ""
 echo "📦 [2/6] Instalando dependências..."
-pnpm install --frozen-lockfile
+# CI=true inline + --config flag pra evitar prompt interativo de purge.
+# Sem essas flags, pnpm 11 aborta com ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY
+# quando precisa limpar node_modules legado.
+CI=true pnpm install --frozen-lockfile --config.confirm-modules-purge=false
 
 echo ""
 echo "🗄️  [3/6] Gerando Prisma Client..."
