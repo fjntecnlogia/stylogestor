@@ -43,10 +43,14 @@ export function AppointmentDetailModal({
   onConcluir,
   onCancelar,
 }: Props) {
-  if (!appointment) return null
+  // Não renderiza nada se não tem appointment OU se fechado — evita Portal
+  // vazio aparecendo como overlay sem conteúdo.
+  if (!appointment || !open) return null
 
   const status = STATUS_MAP[appointment.status] ?? STATUS_MAP.SCHEDULED
-  const total = appointment.price - appointment.discount
+  const price = Number(appointment.price) || 0
+  const discount = Number(appointment.discount) || 0
+  const total = price - discount
 
   const handleConcluir = () => {
     onConcluir?.(appointment.id)
@@ -62,9 +66,11 @@ export function AppointmentDetailModal({
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100vw-2rem)] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden focus:outline-none"
+        >
           <div className="bg-[#1A3A6B] px-6 py-4">
             <Dialog.Title className="text-white font-sora font-bold text-lg">
               Detalhes do Agendamento
@@ -101,8 +107,8 @@ export function AppointmentDetailModal({
               <div>
                 <p className="text-xs text-[#4A4A5A]">Valor</p>
                 <p className="text-sm font-bold text-[#1B8A5A]">R$ {total}</p>
-                {appointment.discount > 0 && (
-                  <p className="text-[10px] text-red-500">-R$ {appointment.discount} desc.</p>
+                {discount > 0 && (
+                  <p className="text-[10px] text-red-500">-R$ {discount} desc.</p>
                 )}
               </div>
             </div>
@@ -141,7 +147,10 @@ export function AppointmentDetailModal({
                 Cancelar
               </button>
             )}
-            <button onClick={onClose} className="px-4 text-sm text-[#4A4A5A] hover:text-[#1C1C2E]">
+            <button
+              onClick={onClose}
+              className="px-4 text-sm text-[#4A4A5A] hover:text-[#1C1C2E]"
+            >
               Fechar
             </button>
           </div>
