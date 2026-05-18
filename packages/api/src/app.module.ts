@@ -12,6 +12,7 @@ import { ProfessionalsModule } from './modules/professionals/professionals.modul
 import { FinancialModule } from './modules/financial/financial.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module'
+import { CacheModule } from './common/cache/cache.module'
 import { ClerkModule } from './common/clerk/clerk.module'
 import { PrismaModule } from './common/prisma/prisma.module'
 import { ClerkAuthGuard } from './common/guards/clerk-auth.guard'
@@ -29,6 +30,9 @@ import { ClerkAuthGuard } from './common/guards/clerk-auth.guard'
 
     // Prisma (banco)
     PrismaModule,
+
+    // Redis (cache + rate limit) — sem REDIS_URL no env, opera em no-op
+    CacheModule,
 
     // Clerk Backend (atualiza publicMetadata pra middleware Next ler)
     ClerkModule,

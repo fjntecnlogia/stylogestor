@@ -1,10 +1,32 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
+import { CacheService } from '../../common/cache/cache.service'
 import { PrismaService } from '../../common/prisma/prisma.service'
 import { UpdateTenantDto } from './dto/update-tenant.dto'
 
+// Cache de 5 min pra resolução slug→tenant.
+// Trade-off: se tenant for desativado ou renomeado, mudança demora até 5min
+// pra refletir em produção. Aceitável — desativações são raras e podemos
+// invalidar manualmente após updates.
+const SLUG_CACHE_TTL_SECONDS = 300
+
+export interface CachedTenantPublic {
+  id: string
+  name: string
+  plan: string
+  slug: string
+  logo: string | null
+}
+
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+  ) {}
+
+  private slugCacheKey(slug: string) {
+    return `cache:tenant:slug:${slug}`
+  }
 
   async findById(id: string) {
     const tenant = await this.prisma.tenant.findUnique({
@@ -16,19 +38,39 @@ export class TenantsService {
   }
 
   /**
-   * Busca pública (chamada pelo middleware Next.js) — retorna apenas
-   * campos seguros para resolver o subdomínio. NUNCA expor settings/email/phone aqui.
+   * Busca pública (chamada pelo middleware Next.js a cada request de subdomínio).
+   * Retorna apenas campos seguros — NUNCA expor settings/email/phone.
+   *
+   * Cacheado em Redis por 5min (cache miss falls back pra DB sem erro).
    */
-  findBySlugPublic(slug: string) {
-    return this.prisma.tenant.findUnique({
+  async findBySlugPublic(slug: string): Promise<CachedTenantPublic | null> {
+    const cacheKey = this.slugCacheKey(slug)
+
+    // 1. Tentar cache primeiro
+    const cached = await this.cache.getJSON<CachedTenantPublic>(cacheKey)
+    if (cached) return cached
+
+    // 2. Fallback DB
+    const tenant = await this.prisma.tenant.findUnique({
       where: { slug, active: true },
       select: { id: true, name: true, plan: true, slug: true, logo: true },
     })
+
+    // 3. Cachear resposta (mesmo se null — evita stampede no DB com slugs inexistentes)
+    if (tenant) {
+      await this.cache.setJSON(cacheKey, tenant, SLUG_CACHE_TTL_SECONDS)
+    } else {
+      // Negative cache: 1min pra slugs inexistentes (evita abuso/brute-force)
+      await this.cache.setJSON(cacheKey, null, 60)
+    }
+
+    return tenant
   }
 
   /**
    * Update por ID — usa updateMany com filtro composto (id) para garantir que
    * a contagem de linhas afetadas seja explícita (NotFound se 0).
+   * Invalida cache do slug se houver match.
    */
   async update(id: string, dto: UpdateTenantDto) {
     const updated = await this.prisma.tenant.updateMany({
@@ -38,7 +80,10 @@ export class TenantsService {
     if (updated.count === 0) {
       throw new NotFoundException('Tenant não encontrado')
     }
-    return this.findById(id)
+    const fresh = await this.findById(id)
+    // Invalidar cache do slug (se houver) — mudou logo/name/plan visíveis
+    await this.cache.del(this.slugCacheKey(fresh.slug))
+    return fresh
   }
 
   async getDashboardStats(tenantId: string) {
