@@ -25,7 +25,10 @@ echo ""
 echo "📥 [1/6] Atualizando código (branch $BRANCH)..."
 git fetch --all --prune
 git checkout "$BRANCH"
+# Reset hard + clean garantem que mudanças locais (rebuild de tsconfig,
+# arquivos temporários do PM2/build) não atrapalhem o git operations.
 git reset --hard "origin/$BRANCH"
+git clean -fd --exclude='node_modules' --exclude='.next' --exclude='dist'
 echo "   HEAD: $(git log --oneline -1)"
 
 echo ""
