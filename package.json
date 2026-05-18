@@ -28,6 +28,7 @@
       "@prisma/client",
       "@prisma/engines",
       "@scarf/scarf",
+      "@swc/core",
       "browser-tabs-lock",
       "bufferutil",
       "core-js",
