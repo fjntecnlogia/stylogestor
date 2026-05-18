@@ -1,5 +1,6 @@
-import { Tabs } from 'expo-router'
-import { View, Text, StyleSheet } from 'react-native'
+import { Tabs, Redirect } from 'expo-router'
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
+import { useAuth } from '@clerk/clerk-expo'
 
 function TabIcon({ emoji, label, focused }: { emoji: string; label: string; focused: boolean }) {
   return (
@@ -11,6 +12,22 @@ function TabIcon({ emoji, label, focused }: { emoji: string; label: string; focu
 }
 
 export default function TabsLayout() {
+  const { isLoaded, isSignedIn } = useAuth()
+
+  // Aguarda Clerk hidratar antes de decidir
+  if (!isLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1A3A6B' }}>
+        <ActivityIndicator color="#F5A623" size="large" />
+      </View>
+    )
+  }
+
+  // Bloqueia acesso direto via deeplink se nao estiver autenticado
+  if (!isSignedIn) {
+    return <Redirect href="/(auth)/login" />
+  }
+
   return (
     <Tabs
       screenOptions={{
