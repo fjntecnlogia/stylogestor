@@ -22,36 +22,33 @@
 
 ## Comandos
 ```bash
-pnpm --filter @stylogestor/api dev      # nest start --watch (porta padrão 3001)
-pnpm --filter @stylogestor/api exec tsc --noEmit   # type-check
-pnpm --filter @stylogestor/api build    # nest build (precisa swap manual — ver abaixo)
+pnpm --filter @stylogestor/api dev              # nest start --watch (porta padrão 3001)
+pnpm --filter @stylogestor/api exec tsc --noEmit  # type-check (sem swap de tsconfig)
+pnpm --filter @stylogestor/api build            # nest build via scripts/build.js
+                                                  # — swap automático do tsconfig
 ```
 
-### ⚠️ Build: workaround obrigatório
+### Build: por que tem um script
 
-Stripe v22 mudou seus exports (`export = StripeConstructor`). Resultado:
-- `tsc --noEmit` precisa de `moduleResolution: bundler` para resolver `Stripe.Event`,
-  `Stripe.Customer` etc. (tsconfig.json atual).
-- Mas `node dist/main.js` precisa de `module: commonjs` (caso contrário,
-  `ERR_MODULE_NOT_FOUND` em imports sem `.js`).
+Stripe v22 mudou exports (`export = StripeConstructor`). Os tipos `Stripe.Event`,
+`Stripe.Customer` etc. só resolvem com `moduleResolution: bundler` no tsconfig.json
+(necessário para `tsc --noEmit`). Mas o Node CJS runtime precisa de `module: commonjs`
++ `moduleResolution: node` — senão `node dist/main.js` quebra com
+`ERR_MODULE_NOT_FOUND` em imports sem `.js` explícito.
 
-Tentamos SWC builder (produziu código quebrado com `_classExtraInitializers`,
-`continue` fora de loop, `sourceMappingURL` no meio do arquivo — bugs do
-SWC 1.15.x com nossa combinação de decorators + async). Não funcionou.
+`scripts/build.js` resolve isso automaticamente:
+1. Backup do tsconfig.json em memória
+2. Swap → commonjs/node
+3. Roda `nest build`
+4. **Restaura tsconfig original** (até em caso de erro, via try/finally)
 
-**Workaround atual em deploy** — antes de `pnpm build`, swapar o tsconfig:
+`tsc --noEmit` continua usando o tsconfig sem touch e resolve tipos OK.
 
-```bash
-node -e "const fs=require('fs');const p='packages/api/tsconfig.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.compilerOptions.module='commonjs';c.compilerOptions.moduleResolution='node';fs.writeFileSync(p,JSON.stringify(c,null,2))"
-pnpm --filter @stylogestor/api build
-# Restaurar (opcional, antes do próximo `tsc --noEmit`):
-node -e "const fs=require('fs');const p='packages/api/tsconfig.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.compilerOptions.module='esnext';c.compilerOptions.moduleResolution='bundler';fs.writeFileSync(p,JSON.stringify(c,null,2))"
-```
+Se quiser ver o build sem o swap (debug): `pnpm exec npm run build:raw`.
 
-**TODO permanente**: aguardar fix do SWC ou migrar pra Stripe v17 (que tinha
-namespace pattern simples) ou reescrever todos os `Stripe.X` para acessar via
-`Stripe.Stripe.X` apenas no contexto de build com tsc, mas isso quebra o
-tsc --noEmit com bundler. Sem solução limpa atualmente.
+Tentamos SWC builder no passado — produziu bugs em runtime (legacy/TC39
+decorators misturados, sourceMappingURL no meio do arquivo, continue fora de
+loop). SWC 1.15.x não funciona com nossa combinação NestJS+Stripe. Removido.
 
 ## Princípios não-negociáveis
 1. 🔒 **Multi-tenant isolado**: TODO query Prisma filtra por `tenantId`. Sem exceção. Em updates/deletes por id, use `updateMany`/`deleteMany` com `where: { id, tenantId }` (não apenas `where: { id }`).
