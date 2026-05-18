@@ -2,7 +2,15 @@ name: 🚀 Deploy STYLOGESTOR
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'infra/**'
+      - 'Dockerfile.api'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 jobs:
@@ -25,8 +33,14 @@ jobs:
       - name: Instalar dependências
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
+      - name: Gerar Prisma Client (necessário pro typecheck)
+        run: pnpm --filter @stylogestor/database run generate
+
+      - name: Typecheck API
         run: pnpm --filter @stylogestor/api exec tsc --noEmit || true
+
+      - name: Typecheck Web
+        run: pnpm --filter web exec tsc --noEmit || true
 
   # ─── 2. Build das imagens Docker ─────────────────────────
   build:
@@ -88,9 +102,12 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
           script: |
             cd /opt/stylogestor
-            git pull origin main
+            git fetch --all
+            git checkout master
+            git reset --hard origin/master
             bash infra/vps/deploy.sh
             echo "✅ Deploy concluído: $(date)"
 

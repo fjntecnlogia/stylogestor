@@ -5,9 +5,9 @@
 # ============================================================
 set -e
 
-REPO="https://github.com/SEU_USUARIO/stylogestor.git"
+REPO="https://github.com/fjntecnlogia/stylogestor.git"
 APP_DIR="/opt/stylogestor"
-BRANCH="main"
+BRANCH="master"
 
 echo "🚀 Iniciando deploy do STYLOGESTOR..."
 
