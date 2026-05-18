@@ -1,11 +1,9 @@
 import type { NextConfig } from "next";
-import path from "node:path";
 
-const nextConfig: NextConfig = {
-  // Standalone gera .next/standalone com server.js + deps tracadas — usado pelo Dockerfile.
-  output: "standalone",
-  // Monorepo pnpm: tracing precisa olhar a raiz pra capturar packages siblings.
-  outputFileTracingRoot: path.join(__dirname, "../.."),
-};
+// Nota: o ambiente atual da VPS usa PM2 + `next start` (não Docker standalone).
+// Se voltarmos a usar Docker no futuro, reativar `output: "standalone"` +
+// `outputFileTracingRoot` apontando pra raiz do monorepo, E garantir que o
+// Dockerfile copia `.next/static` e `public` pra dentro do standalone.
+const nextConfig: NextConfig = {};
 
 export default nextConfig;
