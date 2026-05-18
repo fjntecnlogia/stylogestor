@@ -68,17 +68,23 @@ else
 fi
 
 echo ""
-echo "🔄 [6/6] Recarregando processos PM2..."
-# pm2 reload é zero-downtime em cluster mode; em fork mode equivale a restart.
-# Se algum processo não existe ainda, alerta mas não para o deploy.
-for proc in stylo-api stylo-web stylo-admin stylo-booking stylo-site; do
-  if pm2 describe "$proc" > /dev/null 2>&1; then
-    pm2 reload "$proc" --update-env
-    echo "   ✅ $proc reloaded"
-  else
-    echo "   ⚠️  $proc não está no PM2 — pule o reload ou rode pm2 start manual"
-  fi
-done
+echo "🔄 [6/6] Reload/start dos processos PM2 via ecosystem.config.js..."
+# Usa o ecosystem.config.js como fonte da verdade da config (cwd, porta,
+# exec_mode). Se algum processo já existe, recarrega; se não, cria.
+# Isso evita "drift" (alguém alterou config manualmente e o reload usa a
+# config local do PM2, não a definida no repo).
+ECOSYSTEM_FILE="$APP_DIR/infra/vps/ecosystem.config.js"
+
+if [ ! -f "$ECOSYSTEM_FILE" ]; then
+  echo "   ❌ ecosystem.config.js não encontrado em $ECOSYSTEM_FILE"
+  exit 1
+fi
+
+# `pm2 startOrReload` lê o ecosystem e:
+#   - inicia processos que não existem
+#   - reload (zero-downtime cluster, restart fork) dos que já existem
+#   - atualiza env vars e args com --update-env
+pm2 startOrReload "$ECOSYSTEM_FILE" --update-env
 
 pm2 save > /dev/null
 
