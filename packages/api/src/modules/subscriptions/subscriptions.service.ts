@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import Stripe from 'stripe'
+import { ClerkMetadataService } from '../../common/clerk/clerk-metadata.service'
 import { PrismaService } from '../../common/prisma/prisma.service'
+import { EmailService } from '../notifications/email.service'
 import {
   getInvoiceTenantId,
   getPeriodEnd,
@@ -40,11 +42,30 @@ function mapStripeStatus(status: Stripe.Subscription.Status): SubStatus {
   return 'canceled'
 }
 
+/**
+ * Resolução de identidade a partir do metadata do Stripe.
+ *
+ * O Next.js (apps/web) cria checkouts com metadata { userId (clerkId), planId, tenantSlug }.
+ * A API NestJS cria checkouts com metadata { tenantId, plan, ciclo }.
+ *
+ * Pra dar suporte aos dois formatos (Fase 2A — dual write), normalizamos
+ * pra { tenantId, plan, clerkUserId? } a partir do que veio.
+ */
+interface NormalizedMetadata {
+  tenantId: string
+  plan: Plan
+  clerkUserId?: string
+}
+
 @Injectable()
 export class SubscriptionsService {
   private readonly logger = new Logger(SubscriptionsService.name)
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly clerkMetadata: ClerkMetadataService,
+    private readonly email: EmailService,
+  ) {}
 
   getPlans() {
     return PLANOS
@@ -52,6 +73,52 @@ export class SubscriptionsService {
 
   getCurrent(tenantId: string) {
     return this.prisma.subscription.findUnique({ where: { tenantId } })
+  }
+
+  /**
+   * Normaliza metadata do Stripe (suporta os 2 formatos: NestJS e Next.js).
+   * Faz lookup clerkUserId → tenantId via User + TenantUser quando necessário.
+   * Retorna null se não conseguir resolver (ex: usuário sem tenant ativo).
+   */
+  private async normalizeMetadata(
+    md: Record<string, string> | null | undefined,
+  ): Promise<NormalizedMetadata | null> {
+    if (!md) return null
+
+    // Formato NestJS: { tenantId, plan }
+    if (md.tenantId && isValidPlan(md.plan)) {
+      return { tenantId: md.tenantId, plan: md.plan }
+    }
+
+    // Formato Next.js: { userId (clerkId), planId }
+    const clerkUserId = md.userId
+    const plan = md.planId
+    if (!clerkUserId || !isValidPlan(plan)) return null
+
+    // Lookup: clerkUserId → user → primeiro tenant ativo
+    const user = await this.prisma.user.findUnique({
+      where: { clerkId: clerkUserId },
+      include: {
+        tenants: {
+          where: { active: true },
+          select: { tenantId: true },
+          take: 1,
+        },
+      },
+    })
+
+    if (!user || user.tenants.length === 0) {
+      this.logger.warn(
+        `Lookup clerkUserId→tenant falhou: clerkId=${clerkUserId} (user sem tenant ativo)`,
+      )
+      return null
+    }
+
+    return {
+      tenantId: user.tenants[0].tenantId,
+      plan,
+      clerkUserId,
+    }
   }
 
   // ── Handler principal de eventos Stripe ──────────────────────
@@ -89,15 +156,9 @@ export class SubscriptionsService {
 
   // ── Checkout concluído (usuário pagou) ───────────────────────
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-    const tenantId = session.metadata?.tenantId
-    const plan = session.metadata?.plan
-    if (!tenantId || !isValidPlan(plan)) {
-      // Eventos sem `tenantId` vêm do checkout do Next.js (apps/web), que usa
-      // o formato { userId, planId } em vez de { tenantId, plan }. Esses são
-      // processados pelo handler do Next em /api/webhooks/stripe.
-      // Aqui só ignoramos silenciosamente — webhook_events já gravou idempotência.
-      // TODO Fase 2: adicionar lookup userId→tenant e processar também aqui.
-      this.logger.debug(`checkout.session.completed ignorado (sem tenantId): ${session.id}`)
+    const md = await this.normalizeMetadata(session.metadata as Record<string, string> | null)
+    if (!md) {
+      this.logger.debug(`checkout.session.completed ignorado (sem metadata válido): ${session.id}`)
       return
     }
 
@@ -109,13 +170,13 @@ export class SubscriptionsService {
       ? session.subscription
       : session.subscription?.id || ''
 
-    // Multi-tabela atômico: ou os 2 ou nenhum
+    // 1. Multi-tabela atômico no DB
     await this.prisma.$transaction([
       this.prisma.subscription.upsert({
-        where: { tenantId },
+        where: { tenantId: md.tenantId },
         create: {
-          tenantId,
-          plan,
+          tenantId: md.tenantId,
+          plan: md.plan,
           status: 'active',
           stripeSubId,
           stripeCustomerId,
@@ -123,56 +184,62 @@ export class SubscriptionsService {
           currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         },
         update: {
-          plan,
+          plan: md.plan,
           status: 'active',
           stripeSubId,
           stripeCustomerId,
         },
       }),
       this.prisma.tenant.update({
-        where: { id: tenantId },
-        data: { plan },
+        where: { id: md.tenantId },
+        data: { plan: md.plan },
       }),
     ])
 
-    this.logger.log(`✅ Assinatura ativada: Tenant ${tenantId} → Plano ${plan}`)
+    this.logger.log(`✅ Assinatura ativada: Tenant ${md.tenantId} → Plano ${md.plan}`)
+
+    // 2. Sync Clerk metadata (não bloqueia se falhar)
+    if (md.clerkUserId) {
+      await this.clerkMetadata.updateSubscription(md.clerkUserId, {
+        subscriptionStatus: 'active',
+        plan: md.plan,
+        stripeSubId,
+      })
+    }
+
+    // 3. Email de boas-vindas (best-effort)
+    const customerEmail = session.customer_details?.email
+    const customerName = session.customer_details?.name
+    if (customerEmail && customerName) {
+      await this.email.sendWelcome(customerEmail, customerName)
+    }
   }
 
   // ── Assinatura atualizada (renovação, upgrade, downgrade) ────
   private async handleSubscriptionUpdated(sub: Stripe.Subscription) {
-    const tenantId = sub.metadata?.tenantId
-    if (!tenantId) {
-      // Mesma situação do checkout: vem do Next.js sem tenantId.
-      this.logger.debug(`subscription.updated ignorado (sem tenantId): ${sub.id}`)
+    const md = await this.normalizeMetadata(sub.metadata as Record<string, string> | null)
+    if (!md) {
+      this.logger.debug(`subscription.updated ignorado (sem metadata válido): ${sub.id}`)
       return
     }
 
-    const plan = sub.metadata?.plan
-    if (!isValidPlan(plan)) {
-      // Sem default silencioso. Se vier vazio/quebrado quando TEM tenantId,
-      // alerta — billing não pode promover/rebaixar tenant por engano.
-      this.logger.error(
-        `subscription.updated com plan inválido para tenant ${tenantId}: '${plan}'. Abortando.`,
-      )
-      throw new BadRequestException(`Plano inválido em metadata: ${plan}`)
-    }
-
     const status = mapStripeStatus(sub.status)
-
     const periodStart = new Date(getPeriodStart(sub) * 1000)
     const periodEnd = new Date(getPeriodEnd(sub) * 1000)
 
     const subscriptionWrite = this.prisma.subscription.upsert({
-      where: { tenantId },
+      where: { tenantId: md.tenantId },
       create: {
-        tenantId, plan, status,
+        tenantId: md.tenantId,
+        plan: md.plan,
+        status,
         stripeSubId: sub.id,
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
       },
       update: {
         status,
-        plan,
+        plan: md.plan,
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
       },
@@ -181,30 +248,46 @@ export class SubscriptionsService {
     if (status === 'active') {
       await this.prisma.$transaction([
         subscriptionWrite,
-        this.prisma.tenant.update({ where: { id: tenantId }, data: { plan } }),
+        this.prisma.tenant.update({ where: { id: md.tenantId }, data: { plan: md.plan } }),
       ])
     } else {
       await subscriptionWrite
+    }
+
+    // Sync Clerk metadata pra middleware Next ver o status novo
+    if (md.clerkUserId) {
+      await this.clerkMetadata.updateSubscription(md.clerkUserId, {
+        subscriptionStatus: status,
+        plan: md.plan,
+        stripeSubId: sub.id,
+      })
     }
   }
 
   // ── Assinatura cancelada ─────────────────────────────────────
   private async handleSubscriptionCanceled(sub: Stripe.Subscription) {
-    const tenantId = sub.metadata?.tenantId
-    if (!tenantId) return
+    const md = await this.normalizeMetadata(sub.metadata as Record<string, string> | null)
+    if (!md) return
 
     await this.prisma.$transaction([
       this.prisma.subscription.update({
-        where: { tenantId },
+        where: { tenantId: md.tenantId },
         data: { status: 'canceled', canceledAt: new Date() },
       }),
       this.prisma.tenant.update({
-        where: { id: tenantId },
+        where: { id: md.tenantId },
         data: { plan: 'FREE' },
       }),
     ])
 
-    this.logger.log(`❌ Assinatura cancelada: Tenant ${tenantId}`)
+    this.logger.log(`❌ Assinatura cancelada: Tenant ${md.tenantId}`)
+
+    // Sync Clerk → middleware Next bloqueia acesso
+    if (md.clerkUserId) {
+      await this.clerkMetadata.updateSubscription(md.clerkUserId, {
+        subscriptionStatus: 'canceled',
+      })
+    }
   }
 
   // ── Pagamento confirmado ─────────────────────────────────────
@@ -215,6 +298,19 @@ export class SubscriptionsService {
     this.logger.log(
       `💰 Pagamento confirmado: R$ ${(invoice.amount_paid / 100).toFixed(2)} | Tenant ${tenantId}`,
     )
+
+    // Sync Clerk: ativa status (caso estivesse past_due antes)
+    // Aqui só temos tenantId via invoice metadata. Pra atualizar Clerk
+    // precisamos achar o user. Vai pelo TenantUser primeiro (owner).
+    const owner = await this.prisma.tenantUser.findFirst({
+      where: { tenantId, active: true, role: 'owner' },
+      include: { user: { select: { clerkId: true } } },
+    })
+    if (owner?.user?.clerkId) {
+      await this.clerkMetadata.updateSubscription(owner.user.clerkId, {
+        subscriptionStatus: 'active',
+      })
+    }
   }
 
   // ── Pagamento falhou ─────────────────────────────────────────
@@ -222,14 +318,31 @@ export class SubscriptionsService {
     const tenantId = getInvoiceTenantId(invoice)
     if (!tenantId) return
 
-    // Sem .catch silencioso — se o update falhar, propaga e o webhook devolve 500
-    // (Stripe re-tenta). Ficar `active` localmente quando Stripe diz `past_due` é
-    // bypass de billing — NUNCA engolir.
     await this.prisma.subscription.update({
       where: { tenantId },
       data: { status: 'past_due' },
     })
 
     this.logger.warn(`⚠️ Pagamento falhou: Tenant ${tenantId}`)
+
+    // Sync Clerk + Email pro owner
+    const owner = await this.prisma.tenantUser.findFirst({
+      where: { tenantId, active: true, role: 'owner' },
+      include: { user: { select: { clerkId: true, email: true, name: true } } },
+    })
+
+    if (owner?.user?.clerkId) {
+      await this.clerkMetadata.updateSubscription(owner.user.clerkId, {
+        subscriptionStatus: 'past_due',
+      })
+    }
+
+    if (owner?.user?.email && owner.user.name) {
+      const amount = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      }).format((invoice.amount_due ?? 0) / 100)
+      await this.email.sendPaymentFailed(owner.user.email, owner.user.name, amount)
+    }
   }
 }
