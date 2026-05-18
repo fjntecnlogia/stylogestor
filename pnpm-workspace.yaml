@@ -10,6 +10,8 @@ allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
   '@scarf/scarf': true
+  '@sentry/cli': true
+  '@sentry-internal/node-cpu-profiler': true
   '@swc/core': true
   browser-tabs-lock: true
   bufferutil: true
