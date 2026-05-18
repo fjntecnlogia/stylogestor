@@ -19,6 +19,7 @@ import { SubscriptionsService } from './subscriptions.service'
 import { StripeService } from './stripe.service'
 import { PrismaService } from '../../common/prisma/prisma.service'
 import { TenantGuard } from '../../common/guards/tenant.guard'
+import { TenantThrottleGuard } from '../../common/guards/tenant-throttle.guard'
 import { Public } from '../../common/decorators/public.decorator'
 import {
   CurrentTenant,
@@ -45,7 +46,7 @@ export class SubscriptionsController {
 
   /** Assinatura atual do tenant */
   @ApiBearerAuth()
-  @UseGuards(TenantGuard)
+  @UseGuards(TenantGuard, TenantThrottleGuard)
   @Get('current')
   getCurrent(@CurrentTenant() t: TenantPayload) {
     return this.service.getCurrent(t.id)
@@ -53,7 +54,7 @@ export class SubscriptionsController {
 
   /** Criar sessão de checkout no Stripe */
   @ApiBearerAuth()
-  @UseGuards(TenantGuard)
+  @UseGuards(TenantGuard, TenantThrottleGuard)
   @Post('checkout')
   async createCheckout(
     @CurrentTenant() t: TenantPayload,
@@ -74,7 +75,7 @@ export class SubscriptionsController {
 
   /** Portal do cliente Stripe (gerenciar cartão, cancelar) */
   @ApiBearerAuth()
-  @UseGuards(TenantGuard)
+  @UseGuards(TenantGuard, TenantThrottleGuard)
   @Post('portal')
   async createPortal(@CurrentTenant() t: TenantPayload) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'

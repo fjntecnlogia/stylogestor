@@ -4,11 +4,12 @@ import { ProfessionalsService } from './professionals.service'
 import { CreateProfessionalDto } from './dto/create-professional.dto'
 import { UpdateProfessionalDto } from './dto/update-professional.dto'
 import { TenantGuard } from '../../common/guards/tenant.guard'
+import { TenantThrottleGuard } from '../../common/guards/tenant-throttle.guard'
 import { TenantContextInterceptor } from '../../common/interceptors/tenant-context.interceptor'
 import { CurrentTenant, TenantPayload } from '../../common/decorators/current-tenant.decorator'
 
 @ApiTags('Professionals') @ApiBearerAuth()
-@UseGuards(TenantGuard) @UseInterceptors(TenantContextInterceptor)
+@UseGuards(TenantGuard, TenantThrottleGuard) @UseInterceptors(TenantContextInterceptor)
 @Controller('professionals')
 export class ProfessionalsController {
   constructor(private service: ProfessionalsService) {}

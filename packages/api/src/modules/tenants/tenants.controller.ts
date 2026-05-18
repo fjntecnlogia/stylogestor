@@ -13,6 +13,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { TenantsService } from './tenants.service'
 import { UpdateTenantDto } from './dto/update-tenant.dto'
 import { TenantGuard } from '../../common/guards/tenant.guard'
+import { TenantThrottleGuard } from '../../common/guards/tenant-throttle.guard'
 import { TenantContextInterceptor } from '../../common/interceptors/tenant-context.interceptor'
 import { Public } from '../../common/decorators/public.decorator'
 import { CurrentTenant, TenantPayload } from '../../common/decorators/current-tenant.decorator'
@@ -23,7 +24,7 @@ export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
 
   @ApiBearerAuth()
-  @UseGuards(TenantGuard)
+  @UseGuards(TenantGuard, TenantThrottleGuard)
   @UseInterceptors(TenantContextInterceptor)
   @Get('me')
   getMe(@CurrentTenant() tenant: TenantPayload) {
@@ -31,7 +32,7 @@ export class TenantsController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(TenantGuard)
+  @UseGuards(TenantGuard, TenantThrottleGuard)
   @UseInterceptors(TenantContextInterceptor)
   @Get('me/dashboard')
   getDashboard(@CurrentTenant() tenant: TenantPayload) {
@@ -39,7 +40,7 @@ export class TenantsController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(TenantGuard)
+  @UseGuards(TenantGuard, TenantThrottleGuard)
   @UseInterceptors(TenantContextInterceptor)
   @Patch('me')
   update(@CurrentTenant() tenant: TenantPayload, @Body() dto: UpdateTenantDto) {

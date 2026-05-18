@@ -4,11 +4,12 @@ import { ClientsService } from './clients.service'
 import { CreateClientDto } from './dto/create-client.dto'
 import { UpdateClientDto } from './dto/update-client.dto'
 import { TenantGuard } from '../../common/guards/tenant.guard'
+import { TenantThrottleGuard } from '../../common/guards/tenant-throttle.guard'
 import { TenantContextInterceptor } from '../../common/interceptors/tenant-context.interceptor'
 import { CurrentTenant, TenantPayload } from '../../common/decorators/current-tenant.decorator'
 
 @ApiTags('Clients') @ApiBearerAuth()
-@UseGuards(TenantGuard) @UseInterceptors(TenantContextInterceptor)
+@UseGuards(TenantGuard, TenantThrottleGuard) @UseInterceptors(TenantContextInterceptor)
 @Controller('clients')
 export class ClientsController {
   constructor(private service: ClientsService) {}

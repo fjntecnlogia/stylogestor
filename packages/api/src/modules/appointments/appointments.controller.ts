@@ -8,12 +8,13 @@ import { CreateAppointmentDto } from './dto/create-appointment.dto'
 import { UpdateAppointmentDto } from './dto/update-appointment.dto'
 import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto'
 import { TenantGuard } from '../../common/guards/tenant.guard'
+import { TenantThrottleGuard } from '../../common/guards/tenant-throttle.guard'
 import { TenantContextInterceptor } from '../../common/interceptors/tenant-context.interceptor'
 import { CurrentTenant, TenantPayload } from '../../common/decorators/current-tenant.decorator'
 
 @ApiTags('Appointments')
 @ApiBearerAuth()
-@UseGuards(TenantGuard)
+@UseGuards(TenantGuard, TenantThrottleGuard)
 @UseInterceptors(TenantContextInterceptor)
 @Controller('appointments')
 export class AppointmentsController {

@@ -3,11 +3,12 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { FinancialService } from './financial.service'
 import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { TenantGuard } from '../../common/guards/tenant.guard'
+import { TenantThrottleGuard } from '../../common/guards/tenant-throttle.guard'
 import { TenantContextInterceptor } from '../../common/interceptors/tenant-context.interceptor'
 import { CurrentTenant, TenantPayload } from '../../common/decorators/current-tenant.decorator'
 
 @ApiTags('Financial') @ApiBearerAuth()
-@UseGuards(TenantGuard) @UseInterceptors(TenantContextInterceptor)
+@UseGuards(TenantGuard, TenantThrottleGuard) @UseInterceptors(TenantContextInterceptor)
 @Controller('financial')
 export class FinancialController {
   constructor(private service: FinancialService) {}
