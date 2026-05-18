@@ -15,6 +15,11 @@ set -euo pipefail
 APP_DIR="/opt/stylogestor"
 BRANCH="master"
 
+# CI=true faz o pnpm rodar em modo non-interactive (sem prompts).
+# Sem isso, o install pode abortar pedindo confirmação que nunca vem
+# (ex: ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY).
+export CI=true
+
 cd "$APP_DIR"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
