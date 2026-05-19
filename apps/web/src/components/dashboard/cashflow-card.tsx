@@ -1,48 +1,46 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { useTenantPersistedState } from '@/lib/tenant-storage'
-import { getInitialAppointments, type AppointmentFixture } from '../agenda/__fixtures__/appointments'
+import { useDashboardData } from './use-dashboard-data'
 import { getInitialWeek } from './__fixtures__/cashflow'
 
+// Map método (enum do banco) pra cor visual
 const METHOD_COLORS: Record<string, string> = {
-  PIX:      '#1B8A5A',
-  Dinheiro: '#F5A623',
-  Cartão:   '#1A3A6B',
+  PIX:         '#1B8A5A',
+  CASH:        '#F5A623',
+  CREDIT_CARD: '#1A3A6B',
+  DEBIT_CARD:  '#7C3AED',
+  TRANSFER:    '#06B6D4',
+  OTHER:       '#9CA3AF',
+}
+
+const METHOD_LABEL: Record<string, string> = {
+  PIX:         'PIX',
+  CASH:        'Dinheiro',
+  CREDIT_CARD: 'Cartão',
+  DEBIT_CARD:  'Débito',
+  TRANSFER:    'Transferência',
+  OTHER:       'Outros',
 }
 
 /**
- * Card de fluxo de caixa.
- * - "Hoje": deriva dos atendimentos COMPLETED do storage do tenant.
- * - "Semana": gráfico semanal — ainda dependente de fixture até existir
- *   histórico real de atendimentos por dia.
+ * Card de fluxo de caixa do dashboard.
+ * - "Hoje": deriva dos Payments reais do dia (criados quando agenda
+ *   marca atendimento como COMPLETED com payMethod). Fonte: API.
+ * - "Semana": gráfico mock por enquanto — quando histórico real
+ *   estiver agregado, plugar /api/reports/weekly.
  */
 export function CashflowCard() {
   const [view, setView] = useState<'hoje' | 'semana'>('hoje')
-  const [appointments] = useTenantPersistedState<AppointmentFixture[]>(
-    'agenda:appointments',
-    getInitialAppointments(),
-  )
+  const { data, loading } = useDashboardData()
   const [week] = useState(() => getInitialWeek())
 
-  const entries = useMemo(
-    () =>
-      appointments
-        .filter((a) => a.status === 'COMPLETED')
-        .map((a) => ({
-          label: `${a.service} — ${a.client.split(' ')[0]}`,
-          value: a.price - a.discount,
-          type: 'in' as const,
-          method: a.payMethod || 'PIX',
-        })),
-    [appointments],
-  )
-
-  const totalIn  = entries.filter(e => e.type === 'in').reduce((s, e) => s + e.value, 0)
+  const entries = data.paymentsHoje
+  const totalIn = data.kpis.totalHoje
   const totalOut = 0 // saídas serão plugadas quando módulo de despesas existir
-  const net      = totalIn - totalOut
-  const maxWeek  = week.length > 0 ? Math.max(...week.map(d => d.v)) : 1
+  const net = totalIn - totalOut
+  const maxWeek = week.length > 0 ? Math.max(...week.map(d => d.v)) : 1
 
   return (
     <div className="bg-white rounded-2xl border border-[#E8E6E2] shadow-sm overflow-hidden">
@@ -80,8 +78,9 @@ export function CashflowCard() {
             </div>
           </div>
 
-          {entries.length === 0 ? (
-            // Empty state — sem entradas hoje
+          {loading ? (
+            <div className="px-5 py-10 text-center text-sm text-[#9CA3AF]">Carregando...</div>
+          ) : entries.length === 0 ? (
             <div className="px-5 py-10 text-center">
               <p className="text-4xl mb-2">💸</p>
               <p className="font-sora font-bold text-[#111827] text-sm">Nenhuma entrada hoje</p>
@@ -91,33 +90,37 @@ export function CashflowCard() {
             </div>
           ) : (
             <>
-              {/* Lançamentos */}
               <div className="divide-y divide-[#F3F4F6]">
-                {entries.map((e, i) => (
-                  <div key={i} className="flex items-center justify-between px-5 py-2.5 hover:bg-[#F8F6F2] transition-colors">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: METHOD_COLORS[e.method] ?? '#9CA3AF' }} />
-                      <span className="text-sm text-[#4A4A5A] truncate">{e.label}</span>
-                      <span className="text-[10px] text-[#9CA3AF] bg-[#F3F4F6] px-1.5 py-0.5 rounded shrink-0">{e.method}</span>
+                {entries.map((e) => {
+                  const color = METHOD_COLORS[e.method] ?? METHOD_COLORS.OTHER
+                  const label = METHOD_LABEL[e.method] ?? e.method
+                  return (
+                    <div key={e.id} className="flex items-center justify-between px-5 py-2.5 hover:bg-[#F8F6F2] transition-colors">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                        <span className="text-sm text-[#4A4A5A] truncate">
+                          {e.service} — <span className="text-[#9CA3AF]">{e.client.split(' ')[0]}</span>
+                        </span>
+                        <span className="text-[10px] text-[#9CA3AF] bg-[#F3F4F6] px-1.5 py-0.5 rounded shrink-0">{label}</span>
+                      </div>
+                      <span className="text-sm font-semibold shrink-0 text-[#1B8A5A]">
+                        +R${e.amount}
+                      </span>
                     </div>
-                    <span className={`text-sm font-semibold shrink-0 ${e.type === 'in' ? 'text-[#1B8A5A]' : 'text-red-500'}`}>
-                      {e.type === 'in' ? '+' : '-'}R${e.value}
-                    </span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
-              {/* Total + botão */}
               <div className="px-5 py-4 bg-[#F8F6F2] border-t border-[#E8E6E2]">
                 <div className="flex justify-between items-center mb-3">
                   <span className="font-semibold text-[#1C1C2E]">Total do dia</span>
                   <span className="font-sora font-bold text-xl text-[#1B8A5A]">R$ {net}</span>
                 </div>
                 <Link
-                  href="/agenda"
+                  href="/financeiro"
                   className="w-full bg-[#1A3A6B] text-white text-sm font-bold py-3 rounded-xl hover:bg-[#142d55] transition-colors flex items-center justify-center gap-2"
                 >
-                  🔒 Fechar caixa do dia →
+                  📊 Ver financeiro completo →
                 </Link>
               </div>
             </>
@@ -126,7 +129,6 @@ export function CashflowCard() {
       ) : (
         <>
           {week.length === 0 ? (
-            // Empty state — sem histórico semanal
             <div className="px-5 py-10 text-center">
               <p className="text-4xl mb-2">📊</p>
               <p className="font-sora font-bold text-[#111827] text-sm">Sem histórico ainda</p>

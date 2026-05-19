@@ -24,24 +24,25 @@ export function FinanceiroView() {
   const [chartData, setChartData]       = useState<WeekDataFixture[]>(() => getInitialWeekData())
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodFixture[]>(() => getInitialPaymentMethods())
   const [loading, setLoading]           = useState(false)
-  const [isRealData, setIsRealData]     = useState(false)
   const { success } = useToast()
 
-  // Buscar dados reais da API
+  // Buscar dados reais da API. Em prod, o financeiro deriva 100% do banco:
+  //   - Entradas: Transactions type=INCOME (criadas auto quando agenda
+  //     conclui atendimento + payMethod, OU manualmente via gestor)
+  //   - Saídas: Transactions type=EXPENSE (manuais)
+  // Mock fallback removido — em vez de mostrar dados fake, mostramos
+  // os arrays vazios reais (UI já tem empty state).
   const fetchData = useCallback(async (p: string) => {
     setLoading(true)
     try {
       const res = await fetch(`/api/reports/financeiro?periodo=${p}`)
       if (!res.ok) throw new Error('API error')
       const data = await res.json()
-      if (data.transactions?.length >= 0) {
-        setTransactions(data.transactions.length > 0 ? data.transactions : getInitialTransactions())
-        if (data.chartData?.length > 0) setChartData(data.chartData)
-        if (data.paymentMethods?.length > 0) setPaymentMethods(data.paymentMethods)
-        setIsRealData(data.transactions.length > 0)
-      }
-    } catch {
-      // Fallback para mock se API falhar
+      setTransactions(Array.isArray(data.transactions) ? data.transactions : [])
+      setChartData(Array.isArray(data.chartData) ? data.chartData : [])
+      setPaymentMethods(Array.isArray(data.paymentMethods) ? data.paymentMethods : [])
+    } catch (err) {
+      console.warn('[financeiro] fetch falhou', err)
     } finally {
       setLoading(false)
     }
@@ -56,22 +57,35 @@ export function FinanceiroView() {
   const currentIncome  = transactions.filter((t) => t.type === 'INCOME').reduce((s, t) => s + t.amount, 0)
   const currentExpense = transactions.filter((t) => t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0)
 
-  const handleAddTransaction = () => {
+  const handleAddTransaction = async () => {
     if (!newDesc || !newVal) return
-    const novo = {
-      id: String(transactions.length + 1),
-      type: newType,
-      desc: newDesc,
-      cat: newType === 'INCOME' ? 'Serviço' : 'Despesa',
-      method: newMethod,
-      amount: Number(newVal),
-      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      date: 'Hoje',
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: newType,
+          amount: Number(newVal),
+          description: newDesc,
+          category: newType === 'INCOME' ? 'Outros' : 'Despesa',
+          paymentMethod: newMethod,
+        }),
+      })
+      const novo = await res.json()
+      if (!res.ok) {
+        success(novo.error ? `❌ ${novo.error}` : 'Erro ao registrar')
+        return
+      }
+      setTransactions((p) => [novo, ...p])
+      setNewDesc(''); setNewVal('')
+      setAddModal(false)
+      success(`${newType === 'INCOME' ? 'Entrada' : 'Saída'} de R$ ${newVal} registrada! ✓`)
+      // Re-fetch pra atualizar KPIs/chart/paymentMethods agregados
+      fetchData(periodo)
+    } catch (err) {
+      success('Erro de conexão')
+      console.error(err)
     }
-    setTransactions((p) => [novo, ...p])
-    setNewDesc(''); setNewVal('')
-    setAddModal(false)
-    success(`${newType === 'INCOME' ? 'Entrada' : 'Saída'} de R$ ${newVal} registrada!`)
   }
 
   return (
@@ -161,9 +175,7 @@ export function FinanceiroView() {
       <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="font-sora font-bold text-[#111827]">
-              Receita — {isRealData ? '📊 dados reais' : '📋 dados demonstração'}
-            </p>
+            <p className="font-sora font-bold text-[#111827]">Receita</p>
             {loading && <p className="text-xs text-[#6B7280]">Carregando...</p>}
           </div>
           <div className="flex gap-3 text-xs text-[#6B7280]">

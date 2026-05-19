@@ -27,6 +27,7 @@ export async function GET() {
       receitaMes,
       despesaMes,
       novosClientesMes,
+      paymentsHoje,
     ] = await Promise.all([
       prisma.appointment.findMany({
         where: { tenantId, date: { gte: hoje, lt: amanha }, status: { notIn: ['CANCELED', 'NO_SHOW'] } },
@@ -34,6 +35,7 @@ export async function GET() {
           client:       { select: { name: true, phone: true } },
           professional: { select: { name: true } },
           services:     { include: { service: { select: { name: true } } } },
+          payments:     { select: { method: true, amount: true } },
         },
         orderBy: { startTime: 'asc' },
       }),
@@ -52,10 +54,29 @@ export async function GET() {
       prisma.client.count({
         where: { tenantId, createdAt: { gte: inicioMes } },
       }),
+      // Pagamentos do dia (entradas reais via /agenda concluindo atendimentos)
+      prisma.payment.findMany({
+        where: {
+          appointment: { tenantId },
+          paidAt: { gte: hoje, lt: amanha },
+        },
+        include: {
+          appointment: {
+            select: {
+              client: { select: { name: true } },
+              services: { include: { service: { select: { name: true } } } },
+            },
+          },
+        },
+        orderBy: { paidAt: 'asc' },
+      }),
     ])
 
     const receitaTotal = Number(receitaMes._sum.amount ?? 0)
     const despesaTotal = Number(despesaMes._sum.amount ?? 0)
+    const totalHoje = paymentsHoje.reduce((s, p) => s + Number(p.amount), 0)
+    const completedHoje = agendamentosHoje.filter((a) => a.status === 'COMPLETED').length
+    const ticketMedio = completedHoje > 0 ? Math.round(totalHoje / completedHoje) : 0
 
     // Alertas
     const alerts = []
@@ -89,6 +110,14 @@ export async function GET() {
         totalPrice: Number(a.totalPrice),
         status: a.status,
       })),
+      paymentsHoje: paymentsHoje.map((p) => ({
+        id: p.id,
+        client: p.appointment.client.name,
+        service: p.appointment.services.map((s) => s.service.name).join(' + ') || '—',
+        amount: Number(p.amount),
+        method: p.method,
+        paidAt: p.paidAt.toISOString(),
+      })),
       kpis: {
         agendamentosHoje: agendamentosHoje.length,
         agendamentosMes,
@@ -97,6 +126,12 @@ export async function GET() {
         receitaMes: receitaTotal,
         despesaMes: despesaTotal,
         lucroMes: receitaTotal - despesaTotal,
+        totalHoje,
+        ticketMedio,
+        completedHoje,
+        pendentesHoje: agendamentosHoje.filter((a) =>
+          ['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS'].includes(a.status),
+        ).length,
       },
       alerts,
     })

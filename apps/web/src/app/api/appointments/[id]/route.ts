@@ -75,27 +75,45 @@ export async function PATCH(
       },
     })
 
-    // Se virou COMPLETED + payMethod informado → cria Payment.
+    // Se virou COMPLETED + payMethod informado → cria Payment + Transaction.
     // (Idempotente — só cria se ainda não existe Payment pra esse appointment)
     if (status === 'COMPLETED' && payMethod) {
       const existing = await prisma.payment.findFirst({ where: { appointmentId: id } })
       if (!existing) {
-        await prisma.payment.create({
-          data: {
-            appointmentId: id,
-            amount: owned.totalPrice,
-            method: normalizePayMethod(payMethod),
-          },
-        })
-        // Atualiza o cliente: totalVisits++, totalSpent += amount, lastVisit = now
-        await prisma.client.update({
-          where: { id: owned.clientId },
-          data: {
-            totalVisits: { increment: 1 },
-            totalSpent: { increment: owned.totalPrice },
-            lastVisit: new Date(),
-          },
-        })
+        const normalizedMethod = normalizePayMethod(payMethod)
+        await prisma.$transaction([
+          // Payment (registro técnico do pagamento)
+          prisma.payment.create({
+            data: {
+              appointmentId: id,
+              amount: owned.totalPrice,
+              method: normalizedMethod,
+            },
+          }),
+          // Transaction (movimentação financeira — alimenta o /financeiro)
+          prisma.transaction.create({
+            data: {
+              tenantId,
+              type: 'INCOME',
+              category: 'Serviço',
+              description: 'Atendimento concluído',
+              amount: owned.totalPrice,
+              date: new Date(),
+              paymentMethod: normalizedMethod,
+              appointmentId: id,
+              status: 'confirmed',
+            },
+          }),
+          // Cliente: incrementa visitas + valor gasto + lastVisit
+          prisma.client.update({
+            where: { id: owned.clientId },
+            data: {
+              totalVisits: { increment: 1 },
+              totalSpent: { increment: owned.totalPrice },
+              lastVisit: new Date(),
+            },
+          }),
+        ])
       }
     }
 
@@ -121,8 +139,17 @@ export async function PATCH(
   }
 }
 
+/**
+ * DELETE /api/appointments/[id]
+ *
+ * Soft delete por default: muda status pra CANCELED + grava cancelReason.
+ * Preserva o histórico (financeiro, comissão, fidelidade do cliente).
+ *
+ * Hard delete só com ?hard=true (uso administrativo, raro). Cascade
+ * cleanup via schema.
+ */
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ) {
   const tenantId = await getCurrentTenantId()
@@ -132,10 +159,25 @@ export async function DELETE(
   const owned = await prisma.appointment.findFirst({ where: { id, tenantId } })
   if (!owned) return NextResponse.json({ error: 'Agendamento não encontrado' }, { status: 404 })
 
+  const hard = req.nextUrl.searchParams.get('hard') === 'true'
+  const reason = req.nextUrl.searchParams.get('reason') ?? ''
+
   try {
-    // Cascade via schema (AppointmentService tem onDelete: Cascade).
-    await prisma.appointment.delete({ where: { id } })
-    return NextResponse.json({ ok: true })
+    if (hard) {
+      await prisma.appointment.delete({ where: { id } })
+      return NextResponse.json({ ok: true, hardDeleted: true })
+    }
+
+    // Soft delete: status='CANCELED' + cancelReason. Histórico fica
+    // disponível em /financeiro e /clientes pra auditoria.
+    await prisma.appointment.update({
+      where: { id },
+      data: {
+        status: 'CANCELED',
+        cancelReason: reason || 'Cancelado pelo gestor',
+      },
+    })
+    return NextResponse.json({ ok: true, softDeleted: true })
   } catch (err) {
     console.error('[APPOINTMENT_DELETE_ERROR]', err)
     return NextResponse.json({ error: 'Erro ao excluir agendamento' }, { status: 500 })

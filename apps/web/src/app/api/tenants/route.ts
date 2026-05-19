@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { prisma, getSetting, SETTING_KEYS } from '@stylogestor/database'
 import { sendWelcomeEmail } from '@/lib/resend'
+import { sendWhatsApp, msgWelcomeGestor } from '@/lib/whatsapp'
 
 // POST /api/tenants — criar tenant no onboarding
 export async function POST(req: NextRequest) {
@@ -153,6 +154,16 @@ export async function POST(req: NextRequest) {
       sendWelcomeEmail(userEmail, name).catch((err) =>
         console.error('[WELCOME_EMAIL_ERROR]', err),
       )
+    }
+
+    // WhatsApp de boas-vindas — non-blocking. Mesmo phone usado no
+    // cadastro da barbearia. Se phone vazio ou WhatsApp não configurado,
+    // só loga e segue.
+    if (phone) {
+      sendWhatsApp({
+        phone,
+        message: msgWelcomeGestor({ tenantName: name, trialDays }),
+      }).catch((err) => console.error('[WELCOME_WHATSAPP_ERROR]', err))
     }
 
     // Retorna os profissionais e serviços já criados — usados pelo frontend

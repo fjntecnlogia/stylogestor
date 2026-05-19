@@ -87,6 +87,27 @@ A equipe da ${p.barbershop} deseja um dia especial para você! 🎉
 Temos um presente esperando por você. Venha nos visitar! ✂️`
 }
 
+/**
+ * Boas-vindas pro gestor que acabou de criar a barbearia.
+ * Disparada pelo POST /api/tenants logo após o cadastro.
+ */
+export function msgWelcomeGestor(p: { tenantName: string; trialDays: number }) {
+  return `🎉 *Bem-vindo(a) ao STYLOGESTOR!*
+
+Sua barbearia *${p.tenantName}* está pronta pra começar a usar o sistema! ✂️
+
+✨ *Você ganhou ${p.trialDays} dias de trial gratuito.*
+
+📱 Próximos passos:
+1️⃣ Acesse: https://app.stylogestor.com.br/dashboard
+2️⃣ Cadastre seus profissionais e serviços
+3️⃣ Compartilhe seu link de agendamento com seus clientes
+
+Qualquer dúvida, é só responder essa mensagem! 💬
+
+_Equipe STYLOGESTOR_`
+}
+
 export function msgFidelidade(p: {
   clientName: string; stamps: number; goal: number; reward: string
 }) {
