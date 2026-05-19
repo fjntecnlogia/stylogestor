@@ -91,6 +91,12 @@ jobs:
           script: |
             set -e
             cd /opt/stylogestor
+            # git pull ANTES de invocar o script — sem isso, o bash já
+            # carregou a versão antiga do deploy-pm2.sh em memória e
+            # mudanças no próprio script só pegam no DEPLOY SEGUINTE
+            # (clássico problema de self-updating script).
+            git fetch origin master
+            git reset --hard origin/master
             bash infra/vps/deploy-pm2.sh
 
       - name: Sucesso
