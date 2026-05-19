@@ -260,6 +260,12 @@ export function AdminDashboard() {
   const [planDraft, setPlanDraft] = useState<{ name: string; priceMonthly: number; profLimit: number }>({
     name: '', priceMonthly: 0, profLimit: 1,
   })
+  // Modal de excluir barbearia (hard delete — destrutivo, exige digitar o nome)
+  const [excluirTenant, setExcluirTenant] = useState<typeof tenants[0] | null>(null)
+  const [excluirConfirmText, setExcluirConfirmText] = useState('')
+  const [excluindoLoading, setExcluindoLoading] = useState(false)
+  // Estado de carregamento do cancelar (PATCH soft delete)
+  const [cancelandoLoading, setCancelandoLoading] = useState<string | null>(null)
 
   // Helper de label do limite de profissionais por plano
   const planLimitLabel = (n: number) =>
@@ -309,6 +315,91 @@ export function AdminDashboard() {
     setFormTenant({ name: '', email: '', phone: '', city: '', plan: 'PRO', slug: '' })
     setNovoTenantOpen(false)
   }, [formTenant])
+
+  // Cancelar barbearia (soft delete — atualiza banco via PATCH).
+  // Mantém o tenant no estado local com status='canceled' pra reaparecer
+  // na lista marcado como cancelado.
+  const handleCancelarTenant = useCallback(async (tenantId: string, tenantName: string) => {
+    if (!confirm(`Cancelar a assinatura de "${tenantName}"?\n\nA barbearia fica marcada como cancelada e o gestor perde acesso. Dados ficam no banco — você pode reativar depois.`)) return
+    setCancelandoLoading(tenantId)
+    try {
+      const res = await fetch(`/api/tenants/${tenantId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(`Erro ao cancelar: ${err.error ?? res.statusText}`)
+        return
+      }
+      // Atualiza estado local
+      setTenants((prev) => prev.map((t) => (t.id === tenantId ? { ...t, status: 'canceled', mrr: 0 } : t)))
+    } catch (err) {
+      alert('Erro de rede ao cancelar.')
+      console.error(err)
+    } finally {
+      setCancelandoLoading(null)
+    }
+  }, [])
+
+  // Reativar tenant cancelado
+  const handleReativarTenant = useCallback(async (tenantId: string, tenantName: string) => {
+    if (!confirm(`Reativar "${tenantName}"?`)) return
+    setCancelandoLoading(tenantId)
+    try {
+      const res = await fetch(`/api/tenants/${tenantId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reactivate' }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(`Erro ao reativar: ${err.error ?? res.statusText}`)
+        return
+      }
+      setTenants((prev) => prev.map((t) => (t.id === tenantId ? { ...t, status: 'active' } : t)))
+    } catch (err) {
+      alert('Erro de rede ao reativar.')
+      console.error(err)
+    } finally {
+      setCancelandoLoading(null)
+    }
+  }, [])
+
+  // Excluir barbearia (hard delete — apaga do banco, sem volta).
+  // Confirmação dupla via modal pedindo pra digitar o nome exato.
+  const handleExcluirTenant = useCallback(async () => {
+    if (!excluirTenant) return
+    if (excluirConfirmText !== excluirTenant.name) {
+      alert('O nome digitado não bate. Confira e tente de novo.')
+      return
+    }
+    setExcluindoLoading(true)
+    try {
+      const res = await fetch(
+        `/api/tenants/${excluirTenant.id}?confirmName=${encodeURIComponent(excluirTenant.name)}`,
+        { method: 'DELETE' },
+      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(`Erro ao excluir: ${err.error ?? res.statusText}`)
+        return
+      }
+      // Remove do estado + sai da tela de detalhe
+      const id = excluirTenant.id
+      setTenants((prev) => prev.filter((t) => t.id !== id))
+      setExcluirTenant(null)
+      setExcluirConfirmText('')
+      setSelectedTenant(null)
+      setPage('tenants')
+    } catch (err) {
+      alert('Erro de rede ao excluir.')
+      console.error(err)
+    } finally {
+      setExcluindoLoading(false)
+    }
+  }, [excluirTenant, excluirConfirmText])
 
   const handleNav = (id: string) => { setPage(id); setSidebarOpen(false) }
 
@@ -1065,8 +1156,31 @@ export function AdminDashboard() {
                       <button onClick={() => { if (confirm(`Suspender ${t.name}?`)) setTenantsSuspended(p => [...p, t.id]) }} className="text-xs bg-red-500/20 text-red-400 px-3 py-2 rounded-xl hover:bg-red-500/30 font-bold">⛔ Suspender</button>
                     )}
                     {isSuspended && (
-                      <button onClick={() => setTenantsSuspended(p => p.filter(i => i !== t.id))} className="text-xs bg-[#1B8A5A] text-white px-3 py-2 rounded-xl hover:bg-[#156b47] font-bold">🔄 Reativar</button>
+                      <button onClick={() => setTenantsSuspended(p => p.filter(i => i !== t.id))} className="text-xs bg-[#1B8A5A] text-white px-3 py-2 rounded-xl hover:bg-[#156b47] font-bold">🔄 Reativar suspensão</button>
                     )}
+                    {t.status !== 'canceled' ? (
+                      <button
+                        onClick={() => handleCancelarTenant(t.id, t.name)}
+                        disabled={cancelandoLoading === t.id}
+                        className="text-xs bg-orange-500/20 text-orange-300 px-3 py-2 rounded-xl hover:bg-orange-500/30 font-bold disabled:opacity-50"
+                      >
+                        {cancelandoLoading === t.id ? '...' : '🚫 Cancelar'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleReativarTenant(t.id, t.name)}
+                        disabled={cancelandoLoading === t.id}
+                        className="text-xs bg-[#1B8A5A] text-white px-3 py-2 rounded-xl hover:bg-[#156b47] font-bold disabled:opacity-50"
+                      >
+                        {cancelandoLoading === t.id ? '...' : '🔄 Reativar'}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setExcluirTenant(t); setExcluirConfirmText('') }}
+                      className="text-xs bg-red-600 text-white px-3 py-2 rounded-xl hover:bg-red-700 font-bold"
+                    >
+                      🗑️ Excluir
+                    </button>
                   </div>
                 </div>
 
@@ -2460,6 +2574,83 @@ export function AdminDashboard() {
                 disabled={!formTenant.name.trim() || !formTenant.email.trim()}
                 className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity">
                 ✓ Cadastrar barbearia
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EXCLUIR BARBEARIA (hard delete — destrutivo) ── */}
+      {excluirTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => !excluindoLoading && setExcluirTenant(null)}
+          />
+          <div className="relative bg-[#1C2333] border border-red-500/30 rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🗑️</span>
+                <h3 className="font-sora font-bold text-white">Excluir barbearia</h3>
+              </div>
+              <button
+                onClick={() => !excluindoLoading && setExcluirTenant(null)}
+                className="text-white/40 hover:text-white text-2xl"
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
+                <p className="text-sm text-red-300 font-semibold mb-1">⚠️ Ação irreversível</p>
+                <p className="text-xs text-white/70 leading-relaxed">
+                  Isso vai apagar permanentemente <span className="font-bold text-white">{excluirTenant.name}</span>{' '}
+                  e todos os dados associados:
+                </p>
+                <ul className="text-xs text-white/60 mt-2 ml-4 list-disc space-y-0.5">
+                  <li>{excluirTenant.clients} {excluirTenant.clients === 1 ? 'cliente' : 'clientes'} cadastrados</li>
+                  <li>{excluirTenant.appts} {excluirTenant.appts === 1 ? 'agendamento' : 'agendamentos'}</li>
+                  <li>Profissionais, serviços, horários e assinatura</li>
+                </ul>
+                <p className="text-xs text-white/60 mt-2">
+                  Se for só pra bloquear o acesso, prefira <span className="font-semibold text-orange-300">Cancelar</span>{' '}
+                  — preserva os dados.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs text-white/60 font-semibold block mb-1.5">
+                  Pra confirmar, digite o nome exato:{' '}
+                  <span className="font-mono text-white">{excluirTenant.name}</span>
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={excluirConfirmText}
+                  onChange={(e) => setExcluirConfirmText(e.target.value)}
+                  placeholder={excluirTenant.name}
+                  disabled={excluindoLoading}
+                  className="w-full bg-[#0F172A] border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-500/50 disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-white/10 flex gap-3">
+              <button
+                onClick={() => setExcluirTenant(null)}
+                disabled={excluindoLoading}
+                className="flex-1 border border-white/10 text-white/60 text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleExcluirTenant}
+                disabled={excluindoLoading || excluirConfirmText !== excluirTenant.name}
+                className="flex-1 bg-red-600 text-white text-sm font-bold py-2.5 rounded-xl hover:bg-red-700 disabled:opacity-40 transition-opacity"
+              >
+                {excluindoLoading ? 'Excluindo...' : '🗑️ Excluir permanentemente'}
               </button>
             </div>
           </div>
