@@ -70,19 +70,30 @@ fi
 
 # Baseline retroativo: o banco tem tabelas antigas (Tenant, Client, etc)
 # criadas via `db push` sem registro no _prisma_migrations. O Prisma
-# aborta com P3005 'schema is not empty'. Solução: marca todas as
-# migrations ANTIGAS como aplicadas (idempotente — falha silenciosamente
-# se já estiverem). A migration MAIS RECENTE fica de fora pra ser
-# aplicada por migrate deploy.
-MIGRATIONS_DIR="$APP_DIR/packages/database/prisma/migrations"
-if [ -d "$MIGRATIONS_DIR" ]; then
-  ALL_MIGRATIONS=$(ls "$MIGRATIONS_DIR" | grep -v migration_lock.toml | sort)
-  NEWEST=$(echo "$ALL_MIGRATIONS" | tail -1)
-  for mig in $ALL_MIGRATIONS; do
-    if [ "$mig" = "$NEWEST" ]; then continue; fi
+# aborta com P3005 'schema is not empty'. Solução: lista HARDCODED de
+# migrations que sabidamente já estão aplicadas no banco — marca elas
+# como `applied` no _prisma_migrations (idempotente, falha silencioso
+# se já marcada). Migrations NOVAS são aplicadas normal por migrate deploy.
+#
+# IMPORTANTE: pra cada migration nova futura, deixar fora dessa lista.
+# Após o deploy aplicar com sucesso, ADICIONE aqui pro próximo deploy
+# ser idempotente. Sem isso, migrate resolve --applied pode pular
+# migrations que ainda não rodaram (bug que tivemos com cash_closures).
+LEGACY_APPLIED_MIGRATIONS="
+20260517_add_webhook_events
+20260519_add_system_settings_and_promo_codes
+"
+for mig in $LEGACY_APPLIED_MIGRATIONS; do
+  if [ -n "$mig" ]; then
     pnpm --filter @stylogestor/database exec prisma migrate resolve --applied "$mig" 2>/dev/null || true
-  done
-fi
+  fi
+done
+
+# Conserto one-time: a cash_closures foi marcada incorretamente como
+# applied no deploy anterior (script com bug usava 'newest alfabético').
+# Marca como rolled-back pra que o migrate deploy abaixo a aplique de
+# verdade. Idempotente — se já está corretamente aplicada, falha silencioso.
+pnpm --filter @stylogestor/database exec prisma migrate resolve --rolled-back "20260519_add_cash_closures" 2>/dev/null || true
 
 # Roda migrate deploy. Se falhar, ABORTA — antes era || true, mas isso
 # mascarava erros graves (tipo a missing column que quebrou o promo-codes).
