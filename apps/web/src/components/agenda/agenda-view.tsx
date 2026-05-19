@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { format, addDays, subDays, startOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { AppointmentModal, type NewAppointmentPayload } from './appointment-modal'
@@ -9,10 +9,16 @@ import { AppointmentDetailModal } from './appointment-detail-modal'
 import { FechamentoDiaModal } from './fechamento-dia-modal'
 import { getInitialAppointments, type AppointmentFixture } from './__fixtures__/appointments'
 
-const PROFISSIONAIS = [
-  { id: '1', name: 'João Silva',  color: '#1A3A6B', initials: 'JS' },
-  { id: '2', name: 'Pedro Costa', color: '#7C3AED', initials: 'PC' },
-]
+// Cores fallback pra profissionais sem cor salva — distribui via hash do id
+const PROF_COLORS = ['#1A3A6B', '#7C3AED', '#1B8A5A', '#F5A623', '#EC4899', '#10B981']
+function profColor(id: string): string {
+  let hash = 0
+  for (const c of id) hash = (hash * 31 + c.charCodeAt(0)) >>> 0
+  return PROF_COLORS[hash % PROF_COLORS.length]
+}
+function profInitials(name: string): string {
+  return name.split(' ').slice(0, 2).map((s) => s[0]).join('').toUpperCase()
+}
 
 const HORARIOS = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30',
   '12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30',
@@ -36,40 +42,101 @@ export function AgendaView() {
   const [fechamentoOpen, setFechamentoOpen] = useState(false)
   const [selectedAppt, setSelectedAppt] = useState<AppointmentFixture | null>(null)
   const [appointments, setAppointments] = useState<AppointmentFixture[]>(() => getInitialAppointments())
+  // Lista de profissionais carregada da API — substitui o array hardcoded
+  // PROFISSIONAIS que tinha 2 fakes. Cada barbearia vê os seus.
+  const [profissionais, setProfissionais] = useState<Array<{ id: string; name: string; color: string; initials: string }>>([])
 
-  const { success } = useToast()
+  const { success, error } = useToast()
 
-  const concluirAppt = (id: string) => {
-    setAppointments(p => p.map(a => a.id === id ? { ...a, status: 'COMPLETED' } : a))
-    success('Agendamento concluído ✅')
+  // Hidrata profissionais do banco (uma vez no mount)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/professionals')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ id: string; name: string }>) => {
+        if (cancelled || !Array.isArray(data)) return
+        setProfissionais(
+          data.map((p) => ({
+            id: p.id,
+            name: p.name,
+            color: profColor(p.id),
+            initials: profInitials(p.name),
+          })),
+        )
+      })
+      .catch(() => { /* silencioso */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // Hidrata appointments do banco — re-fetch quando data muda
+  useEffect(() => {
+    let cancelled = false
+    const dateStr = format(selectedDate, 'yyyy-MM-dd')
+    fetch(`/api/appointments?date=${dateStr}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: AppointmentFixture[]) => {
+        if (cancelled || !Array.isArray(data)) return
+        setAppointments(data)
+      })
+      .catch(() => { /* silencioso — mantém cache local */ })
+    return () => { cancelled = true }
+  }, [selectedDate])
+
+  const concluirAppt = async (id: string) => {
+    try {
+      const res = await fetch(`/api/appointments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'COMPLETED', payMethod: 'PIX' }),
+      })
+      const updated = await res.json()
+      if (!res.ok) { error(updated.error || 'Erro ao concluir'); return }
+      setAppointments((p) => p.map((a) => (a.id === id ? { ...a, ...updated } : a)))
+      success('Agendamento concluído ✅')
+    } catch (err) {
+      error('Erro de conexão')
+      console.error(err)
+    }
   }
 
-  const cancelarAppt = (id: string) => {
-    setAppointments(p => p.map(a => a.id === id ? { ...a, status: 'CANCELED' } : a))
-    success('Agendamento cancelado')
+  const cancelarAppt = async (id: string) => {
+    try {
+      const res = await fetch(`/api/appointments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'CANCELED' }),
+      })
+      const updated = await res.json()
+      if (!res.ok) { error(updated.error || 'Erro ao cancelar'); return }
+      setAppointments((p) => p.map((a) => (a.id === id ? { ...a, ...updated } : a)))
+      success('Agendamento cancelado')
+    } catch (err) {
+      error('Erro de conexão')
+      console.error(err)
+    }
   }
 
-  const addAppt = (payload: NewAppointmentPayload) => {
-    const startMin = parseInt(payload.time.slice(0, 2)) * 60 + parseInt(payload.time.slice(3, 5))
-    const endMin = startMin + payload.duration
-    const endH = String(Math.floor(endMin / 60)).padStart(2, '0')
-    const endM = String(endMin % 60).padStart(2, '0')
-    setAppointments(p => [...p, {
-      id: `new-${Date.now()}`,
-      professionalId: payload.professionalId,
-      client: payload.clientName,
-      phone: payload.clientPhone,
-      service: payload.serviceLabel,
-      price: payload.price,
-      discount: 0,
-      payMethod: '',
-      start: payload.time,
-      end: `${endH}:${endM}`,
-      status: 'SCHEDULED',
-      duration: payload.duration,
-      note: '',
-    }])
-    success(`Agendamento de ${payload.clientName} criado! ✅`)
+  const addAppt = async (payload: NewAppointmentPayload) => {
+    try {
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: payload.clientId,
+          professionalId: payload.professionalId,
+          serviceIds: payload.serviceIds,
+          date: payload.date,
+          time: payload.time,
+        }),
+      })
+      const novo = await res.json()
+      if (!res.ok) { error(novo.error || 'Erro ao criar agendamento'); return }
+      setAppointments((p) => [...p, novo])
+      success(`Agendamento de ${payload.clientName} criado! ✅`)
+    } catch (err) {
+      error('Erro de conexão ao criar agendamento')
+      console.error(err)
+    }
   }
 
   const handleConcluir = (id: string, e: React.MouseEvent) => {
@@ -198,7 +265,7 @@ export function AgendaView() {
             </div>
 
             {/* Colunas dos profissionais */}
-            {PROFISSIONAIS.map((prof) => {
+            {profissionais.map((prof) => {
               const appts = appointments.filter((a) => a.professionalId === prof.id)
               return (
                 <div key={prof.id} className="flex-1 min-w-[220px] border-r border-[#E5E7EB] last:border-r-0">
@@ -305,7 +372,7 @@ export function AgendaView() {
             </thead>
             <tbody className="divide-y divide-[#E5E7EB]">
               {[...appointments].sort((a, b) => a.start.localeCompare(b.start)).map((appt) => {
-                const prof = PROFISSIONAIS.find((p) => p.id === appt.professionalId)
+                const prof = profissionais.find((p) => p.id === appt.professionalId)
                 const cfg = STATUS_CONFIG[appt.status as keyof typeof STATUS_CONFIG]
                 return (
                   <tr key={appt.id} className="hover:bg-[#F9FAFB] transition-colors cursor-pointer"
@@ -442,7 +509,7 @@ export function AgendaView() {
           open={detailOpen}
           onClose={() => setDetailOpen(false)}
           appointment={selectedAppt}
-          professionalName={PROFISSIONAIS.find(p => p.id === selectedAppt.professionalId)?.name}
+          professionalName={profissionais.find(p => p.id === selectedAppt.professionalId)?.name}
           onConcluir={concluirAppt}
           onCancelar={cancelarAppt}
         />
