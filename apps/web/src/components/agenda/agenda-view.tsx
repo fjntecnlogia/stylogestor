@@ -7,6 +7,10 @@ import { AppointmentModal, type NewAppointmentPayload } from './appointment-moda
 import { useToast } from '@/components/ui/toast'
 import { AppointmentDetailModal } from './appointment-detail-modal'
 import { FechamentoDiaModal } from './fechamento-dia-modal'
+import {
+  CompleteAppointmentModal,
+  type AppointmentToComplete,
+} from './complete-appointment-modal'
 import { getInitialAppointments, type AppointmentFixture } from './__fixtures__/appointments'
 
 // Cores fallback pra profissionais sem cor salva — distribui via hash do id
@@ -82,22 +86,34 @@ export function AgendaView() {
     return () => { cancelled = true }
   }, [selectedDate])
 
-  const concluirAppt = async (id: string) => {
-    try {
-      const res = await fetch(`/api/appointments/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'COMPLETED', payMethod: 'PIX' }),
-      })
-      const updated = await res.json()
-      if (!res.ok) { error(updated.error || 'Erro ao concluir'); return }
-      setAppointments((p) => p.map((a) => (a.id === id ? { ...a, ...updated } : a)))
-      success('Agendamento concluído ✅')
-    } catch (err) {
-      error('Erro de conexão')
-      console.error(err)
-    }
+  // Modal de seleção de forma de pagamento ao concluir agendamento.
+  // Substitui o payMethod hardcoded='PIX' anterior — agora cada
+  // atendimento sai com o método real escolhido pelo gestor.
+  const [completing, setCompleting] = useState<AppointmentToComplete | null>(null)
+
+  const concluirAppt = (id: string) => {
+    const apt = appointments.find((a) => a.id === id)
+    if (!apt) return
+    setCompleting({
+      id: apt.id,
+      client: apt.client,
+      service: apt.service,
+      price: apt.price - apt.discount,
+      start: apt.start,
+    })
   }
+
+  // Após confirmar pagamento no modal, re-fetch da agenda pra refletir
+  // o novo status no grid de horários sem precisar mudar de data + voltar.
+  const refetchAppointments = useCallback(async () => {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd')
+    try {
+      const r = await fetch(`/api/appointments?date=${dateStr}`)
+      if (!r.ok) return
+      const data = await r.json()
+      if (Array.isArray(data)) setAppointments(data)
+    } catch { /* silencioso */ }
+  }, [selectedDate])
 
   const cancelarAppt = async (id: string) => {
     try {
@@ -515,6 +531,13 @@ export function AgendaView() {
         />
       )}
       <FechamentoDiaModal open={fechamentoOpen} onClose={() => setFechamentoOpen(false)} appointments={appointments} totalDia={totalDia} />
+
+      {/* Modal de selecionar forma de pagamento ao concluir atendimento */}
+      <CompleteAppointmentModal
+        appointment={completing}
+        onClose={() => setCompleting(null)}
+        onSuccess={() => { refetchAppointments() }}
+      />
     </div>
   )
 }

@@ -1,8 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/components/ui/toast'
 import { useDashboardData } from './use-dashboard-data'
+import {
+  CompleteAppointmentModal,
+  type AppointmentToComplete,
+} from '../agenda/complete-appointment-modal'
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   CONFIRMED:   { label: 'Confirmado', cls: 'bg-[#1B8A5A]/10 text-[#1B8A5A]' },
@@ -15,27 +20,21 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
 
 export function AppointmentsToday() {
   const { data, loading, refresh } = useDashboardData()
-  const { success, error } = useToast()
+  const { error } = useToast()
   const apts = data.agendamentosHoje
+  // Modal de seleção de forma de pagamento ao concluir
+  const [completing, setCompleting] = useState<AppointmentToComplete | null>(null)
 
-  const handleDone = async (id: string) => {
-    try {
-      const res = await fetch(`/api/appointments/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'COMPLETED', payMethod: 'PIX' }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        error(err.error || 'Erro ao concluir')
-        return
-      }
-      success('Atendimento concluído! ✅')
-      refresh() // re-fetch pra atualizar KPIs também
-    } catch (err) {
-      error('Erro de conexão')
-      console.error(err)
-    }
+  const handleDone = (id: string) => {
+    const apt = apts.find((a) => a.id === id)
+    if (!apt) return
+    setCompleting({
+      id: apt.id,
+      client: apt.clientName,
+      service: apt.services,
+      price: apt.totalPrice,
+      time: apt.time,
+    })
   }
 
   const handleCancel = async (id: string) => {
@@ -165,6 +164,13 @@ export function AppointmentsToday() {
           </div>
         </>
       )}
+
+      {/* Modal de seleção de forma de pagamento */}
+      <CompleteAppointmentModal
+        appointment={completing}
+        onClose={() => setCompleting(null)}
+        onSuccess={() => { refresh() }}
+      />
     </div>
   )
 }
