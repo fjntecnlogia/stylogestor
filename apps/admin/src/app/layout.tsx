@@ -19,40 +19,66 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <ClerkProvider
       localization={ptBR}
       appearance={{
-        // baseTheme: dark resolve o problema de contraste — sem isso o
-        // Clerk usa o tema light em cima de fundo escuro e textos ficam
-        // ilegíveis (cinza claro sobre cinza claro).
+        // baseTheme: dark = base do Clerk (resolve cor de fundo + ajuda
+        // o auto-contraste). Mas o dark theme do Clerk usa seletores
+        // CSS específicos que sobrescrevem classes Tailwind comuns —
+        // por isso usamos prefixo `!` (Tailwind !important) nos textos
+        // críticos abaixo.
         baseTheme: dark,
         variables: {
-          colorPrimary: '#F5A623',          // amarelo STYLOGESTOR (CTAs)
-          colorBackground: '#1C2333',        // card do login
-          colorInputBackground: '#0F172A',   // inputs (mais escuro pra destacar)
+          colorPrimary: '#F5A623',
+          colorBackground: '#1C2333',
+          colorInputBackground: '#0F172A',
           colorInputText: '#FFFFFF',
           colorText: '#FFFFFF',
-          colorTextSecondary: '#94A3B8',     // labels e helper text
+          colorTextSecondary: '#CBD5E1',     // slate-300 (bem visível)
           colorDanger: '#EF4444',
           borderRadius: '0.75rem',
           fontFamily: 'var(--font-inter), system-ui, sans-serif',
         },
         elements: {
           rootBox: 'mx-auto',
-          card: 'bg-[#1C2333] border border-white/10 shadow-2xl',
-          headerTitle: 'font-sora text-white text-xl',
-          headerSubtitle: 'text-white/60 text-sm',
+          card: '!bg-[#1C2333] border border-white/10 shadow-2xl',
+          // Headers — prefixo ! força sobrescrita do Clerk dark theme
+          headerTitle: '!text-white !font-sora text-xl font-bold',
+          headerSubtitle: '!text-white/70 text-sm',
+          // Botão Google
           socialButtonsBlockButton:
-            'bg-white/5 hover:bg-white/10 border border-white/10 text-white',
-          socialButtonsBlockButtonText: 'text-white font-medium',
-          dividerLine: 'bg-white/10',
-          dividerText: 'text-white/40',
-          formFieldLabel: 'text-white font-medium',
+            '!bg-white/5 hover:!bg-white/10 border border-white/10',
+          socialButtonsBlockButtonText: '!text-white font-medium',
+          socialButtonsProviderIcon: '!text-white',
+          // Divisor "ou"
+          dividerLine: '!bg-white/15',
+          dividerText: '!text-white/60 font-medium',
+          // Labels e inputs
+          formFieldLabel: '!text-white font-semibold',
+          formFieldLabelRow: '!text-white',
           formFieldInput:
-            'bg-[#0F172A] border border-white/10 text-white placeholder:text-white/30',
+            '!bg-[#0F172A] !border-white/10 !text-white placeholder:!text-white/40',
+          formFieldInputShowPasswordButton: '!text-white/60',
+          // Botão principal (Continuar)
           formButtonPrimary:
-            'bg-[#F5A623] hover:bg-[#e0951c] text-[#1A3A6B] font-bold shadow-lg',
-          footerActionText: 'text-white/50',
-          footerActionLink: 'text-[#F5A623] hover:text-[#e0951c] font-semibold',
-          identityPreviewText: 'text-white',
-          identityPreviewEditButton: 'text-[#F5A623]',
+            '!bg-[#F5A623] hover:!bg-[#e0951c] !text-[#1A3A6B] font-bold shadow-lg',
+          // Footer "Não possui uma conta? Registre-se"
+          footer: '!bg-transparent',
+          footerActionText: '!text-white/70',
+          footerActionLink: '!text-[#F5A623] hover:!text-[#e0951c] font-semibold',
+          footerAction__signIn: '!text-white/70',
+          // Banner "Development mode"
+          internal: '!text-white/40',
+          // UserButton popover (sidebar do admin)
+          userButtonPopoverCard: '!bg-[#1C2333] border border-white/10',
+          userButtonPopoverText: '!text-white',
+          userButtonPopoverActionButton: '!text-white hover:!bg-white/5',
+          userButtonPopoverActionButtonText: '!text-white',
+          userButtonPopoverFooter: '!bg-transparent !text-white/40',
+          // Identity preview (volta da tela de password)
+          identityPreviewText: '!text-white',
+          identityPreviewEditButton: '!text-[#F5A623]',
+          // Form de senha
+          formResendCodeLink: '!text-[#F5A623]',
+          alternativeMethodsBlockButton:
+            '!text-white hover:!bg-white/5 !border-white/10',
         },
       }}
     >
