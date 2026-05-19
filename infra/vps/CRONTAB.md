@@ -14,6 +14,12 @@ crontab -e
 # Roda diariamente às 09:00 BRT — antes do horário comercial pra dar tempo
 # do gestor reagir e renovar / resgatar código antes do trial vencer.
 0 9 * * * curl -fsS -H "X-Cron-Secret: $CRON_SECRET" https://app.stylogestor.com.br/api/cron/trial-warnings >> /var/log/stylogestor-cron.log 2>&1
+
+# STYLOGESTOR — lembrete de agendamento 24h antes (WhatsApp)
+# Roda DE HORA EM HORA pra cobrir todos os agendamentos.
+# Idempotente via Appointment.reminderSent — mesmo cliente nunca recebe
+# 2 mensagens. Pula appointments sem telefone do cliente.
+0 * * * * curl -fsS -H "X-Cron-Secret: $CRON_SECRET" https://app.stylogestor.com.br/api/cron/appointment-reminders >> /var/log/stylogestor-cron.log 2>&1
 ```
 
 ## Variável de ambiente

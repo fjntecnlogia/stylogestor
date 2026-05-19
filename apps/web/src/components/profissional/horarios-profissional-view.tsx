@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -16,8 +16,8 @@ interface Bloqueio {
   professionalId: string
   date: string         // YYYY-MM-DD
   type: 'full_day' | 'interval'
-  startTime?: string   // HH:mm — só se type=interval
-  endTime?: string     // HH:mm — só se type=interval
+  startTime?: string
+  endTime?: string
   reason: string
   createdAt: string
 }
@@ -33,14 +33,13 @@ export function HorariosProfissionalView() {
   )
   const me = allProfessionals.find((p) => p.id === professionalId) ?? allProfessionals[0]
 
-  // Bloqueios persistidos por tenant
-  const [bloqueios, setBloqueios] = useTenantPersistedState<Bloqueio[]>(
-    'profissional:bloqueios',
-    [],
-  )
+  // Bloqueios reais via API — antes era localStorage. Agora persiste no banco
+  // e o /api/appointments lê pra bloquear conflitos.
+  const [bloqueios, setBloqueios] = useState<Bloqueio[]>([])
 
   // Estado do form de novo bloqueio
   const [adding, setAdding] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [novoBloqueio, setNovoBloqueio] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     type: 'full_day' as 'full_day' | 'interval',
@@ -49,50 +48,75 @@ export function HorariosProfissionalView() {
     reason: '',
   })
 
-  const { success, info } = useToast()
+  const { success, info, error } = useToast()
 
-  // Bloqueios deste profissional, ordenados por data
-  const meusBloqueios = bloqueios
-    .filter((b) => b.professionalId === professionalId)
-    .sort((a, b) => a.date.localeCompare(b.date))
+  // Hidrata bloqueios do banco no mount
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/professional-blocks')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Bloqueio[]) => {
+        if (cancelled || !Array.isArray(data)) return
+        setBloqueios(data)
+      })
+      .catch(() => { /* silencioso */ })
+    return () => { cancelled = true }
+  }, [])
 
-  // Datas próximas com bloqueio (próximos 30 dias)
+  const meusBloqueios = bloqueios.sort((a, b) => a.date.localeCompare(b.date))
   const hoje = format(new Date(), 'yyyy-MM-dd')
   const proximosBloqueios = meusBloqueios.filter((b) => b.date >= hoje)
-  const passados = meusBloqueios.filter((b) => b.date < hoje).slice(0, 3) // mostra só 3
+  const passados = meusBloqueios.filter((b) => b.date < hoje).slice(0, 3)
 
-  const handleAdicionar = () => {
+  const handleAdicionar = async () => {
     if (!novoBloqueio.reason.trim()) {
       info('Informe o motivo do bloqueio')
       return
     }
-    const novo: Bloqueio = {
-      id: `bl-${Date.now()}`,
-      professionalId,
-      date: novoBloqueio.date,
-      type: novoBloqueio.type,
-      reason: novoBloqueio.reason.trim(),
-      createdAt: new Date().toISOString(),
-      ...(novoBloqueio.type === 'interval'
-        ? { startTime: novoBloqueio.startTime, endTime: novoBloqueio.endTime }
-        : {}),
+    setSaving(true)
+    try {
+      const res = await fetch('/api/professional-blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: novoBloqueio.date,
+          type: novoBloqueio.type,
+          startTime: novoBloqueio.type === 'interval' ? novoBloqueio.startTime : undefined,
+          endTime: novoBloqueio.type === 'interval' ? novoBloqueio.endTime : undefined,
+          reason: novoBloqueio.reason,
+        }),
+      })
+      const novo = await res.json()
+      if (!res.ok) { error(novo.error || 'Erro ao criar bloqueio'); return }
+      setBloqueios((p) => [...p, novo])
+      success('Bloqueio adicionado ✅')
+      setAdding(false)
+      setNovoBloqueio({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        type: 'full_day',
+        startTime: '12:00',
+        endTime: '13:00',
+        reason: '',
+      })
+    } catch (err) {
+      error('Erro de conexão')
+      console.error(err)
+    } finally {
+      setSaving(false)
     }
-    setBloqueios((p) => [...p, novo])
-    success('Bloqueio adicionado ✅')
-    setAdding(false)
-    setNovoBloqueio({
-      date: format(new Date(), 'yyyy-MM-dd'),
-      type: 'full_day',
-      startTime: '12:00',
-      endTime: '13:00',
-      reason: '',
-    })
   }
 
-  const handleRemover = (id: string) => {
+  const handleRemover = async (id: string) => {
     if (!confirm('Remover este bloqueio?')) return
-    setBloqueios((p) => p.filter((b) => b.id !== id))
-    success('Bloqueio removido')
+    try {
+      const res = await fetch(`/api/professional-blocks/${id}`, { method: 'DELETE' })
+      if (!res.ok) { error('Erro ao remover'); return }
+      setBloqueios((p) => p.filter((b) => b.id !== id))
+      success('Bloqueio removido')
+    } catch (err) {
+      error('Erro de conexão')
+      console.error(err)
+    }
   }
 
   const formatBloqueioDate = (date: string) => {

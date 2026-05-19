@@ -237,6 +237,37 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Validação contra ProfessionalBlock (folga, almoço, intervalo).
+    // Diferente do BusinessSchedule (horário GERAL semanal), bloqueios
+    // são exceções pontuais do barbeiro pra aquele dia específico.
+    const dateBR = startBR.toISOString().slice(0, 10) // YYYY-MM-DD em BRT
+    const blocks = await prisma.professionalBlock.findMany({
+      where: {
+        tenantId,
+        professionalId,
+        date: new Date(`${dateBR}T00:00:00.000Z`), // armazenado como Date (sem hora)
+      },
+    })
+    for (const b of blocks) {
+      if (b.type === 'full_day') {
+        return NextResponse.json(
+          { error: `${professional.name} bloqueou o dia todo: ${b.reason}` },
+          { status: 409 },
+        )
+      }
+      if (b.type === 'interval' && b.startTime && b.endTime) {
+        const overlapsBlock = startHHmm < b.endTime && endHHmm > b.startTime
+        if (overlapsBlock) {
+          return NextResponse.json(
+            {
+              error: `${professional.name} tem bloqueio entre ${b.startTime} e ${b.endTime} (${b.reason}).`,
+            },
+            { status: 409 },
+          )
+        }
+      }
+    }
+
     // Detecção de conflito de horário do mesmo profissional. Inclui o
     // BUFFER configurado nas settings (ex: buffer=15min impede que outro
     // atendimento comece menos de 15min depois do anterior terminar).

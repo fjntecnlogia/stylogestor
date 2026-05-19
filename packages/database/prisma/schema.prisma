@@ -77,6 +77,7 @@ model Tenant {
   subscription  Subscription?
   schedules     BusinessSchedule[]
   cashClosures  CashClosure[]
+  professionalBlocks ProfessionalBlock[]
 
   @@map("tenants")
 }
@@ -138,6 +139,7 @@ model Professional {
   schedules    ProfessionalSchedule[]
   appointments Appointment[]
   commissions  Commission[]
+  blocks       ProfessionalBlock[]
 
   @@index([tenantId])
   @@map("professionals")
@@ -438,6 +440,35 @@ model WebhookEvent {
   @@unique([provider, eventId])
   @@index([provider, processedAt])
   @@map("webhook_events")
+}
+
+// ============================================================
+// PROFESSIONAL BLOCK — Bloqueios pontuais do barbeiro
+// ============================================================
+// Diferente de BusinessSchedule (que é o horário GERAL semanal da barbearia),
+// ProfessionalBlock cobre exceções: folgas pontuais, almoço, intervalos.
+// Bloqueia agendamento naquela janela específica.
+//
+// type='full_day': bloqueia o dia inteiro (startTime/endTime ignorados)
+// type='interval': bloqueia janela específica do dia (startTime/endTime obrigatórios)
+
+model ProfessionalBlock {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @db.Uuid
+  professionalId String   @db.Uuid
+  date           DateTime @db.Date
+  type           String   // 'full_day' | 'interval'
+  startTime      String?  // HH:mm — null se full_day
+  endTime        String?  // HH:mm — null se full_day
+  reason         String
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, date])
+  @@index([professionalId, date])
+  @@map("professional_blocks")
 }
 
 // ============================================================
