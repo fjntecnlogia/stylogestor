@@ -157,6 +157,19 @@ export function AdminDashboard() {
   const [automacoes, setAutomacoes] = useState(() => loadLS('sg_automacoes', AUTOMACOES))
   const [afiliados, setAfiliados] = useState(() => loadLS('sg_afiliados', AFILIADOS))
   const [tenantsSuspended, setTenantsSuspended] = useState<string[]>(() => loadLS('sg_suspended', []))
+  // Planos editáveis (config do SaaS — persistidos via sg_plans)
+  const [plans, setPlans] = useState<Array<{ id: string; name: string; priceMonthly: number; profLimit: number }>>(
+    () => loadLS('sg_plans', [
+      { id: 'starter', name: 'Starter', priceMonthly: 79,  profLimit: 1 },
+      { id: 'pro',     name: 'Pro',     priceMonthly: 149, profLimit: 5 },
+      { id: 'premium', name: 'Premium', priceMonthly: 249, profLimit: -1 },
+    ]),
+  )
+  // Notas internas por tenant — { [tenantId]: 'texto da nota' }
+  const [tenantNotes, setTenantNotes] = useState<Record<string, string>>(
+    () => loadLS('sg_tenant_notes', {}),
+  )
+  const [noteDraft, setNoteDraft] = useState('')
 
   // Sincronizar com localStorage sempre que mudam
   useEffect(() => { saveLS('sg_tickets', tickets) }, [tickets])
@@ -164,6 +177,18 @@ export function AdminDashboard() {
   useEffect(() => { saveLS('sg_automacoes', automacoes) }, [automacoes])
   useEffect(() => { saveLS('sg_afiliados', afiliados) }, [afiliados])
   useEffect(() => { saveLS('sg_suspended', tenantsSuspended) }, [tenantsSuspended])
+  useEffect(() => { saveLS('sg_plans', plans) }, [plans])
+  useEffect(() => { saveLS('sg_tenant_notes', tenantNotes) }, [tenantNotes])
+  // Quando troca de tenant na visualização detalhada, prefilla o draft da
+  // nota com o valor já salvo. Sem isso o textarea preserva texto entre
+  // tenants e o gestor pode salvar a nota da barbearia X dentro da Y.
+  useEffect(() => {
+    if (selectedTenant) setNoteDraft(tenantNotes[selectedTenant.id] ?? '')
+    else setNoteDraft('')
+    // tenantNotes intencionalmente fora das deps: queremos só sincronizar
+    // no momento da troca de tenant, não a cada salvamento.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTenant?.id])
 
   // ── Buscar tenants REAIS do banco ────────────────────────────────
   const [dbStats, setDbStats] = useState({ totalMRR: 0, active: 0, trials: 0, totalClients: 0, totalAppts: 0 })
@@ -211,6 +236,15 @@ export function AdminDashboard() {
   const [tenantTab, setTenantTab] = useState<'overview'|'financeiro'|'atividade'|'suporte'>('overview')
   const [novoTenantOpen, setNovoTenantOpen] = useState(false)
   const [formTenant, setFormTenant] = useState({ name: '', email: '', phone: '', city: '', plan: 'PRO', slug: '' })
+  // Modal de edição de plano (config > planos e preços)
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null)
+  const [planDraft, setPlanDraft] = useState<{ name: string; priceMonthly: number; profLimit: number }>({
+    name: '', priceMonthly: 0, profLimit: 1,
+  })
+
+  // Helper de label do limite de profissionais por plano
+  const planLimitLabel = (n: number) =>
+    n === -1 ? 'Ilimitado' : `${n} profissional${n === 1 ? '' : 'is'}`
 
   // ── Derivados — usa DB quando disponível, fallback para local ────
   const active   = tenants.filter((t) => t.status === 'active')
@@ -968,9 +1002,24 @@ export function AdminDashboard() {
                       <div className="flex gap-2 pt-1">
                         <a href={`https://${t.slug}.stylogestor.com.br`} target="_blank" className="flex-1 text-center text-xs bg-white/10 text-white py-2 rounded-xl hover:bg-white/20">🔗 Link agendamento</a>
                         {t.status === 'past_due' && (
-                          <button onClick={() => { setCobrancaEnviada(t.id); setTimeout(() => setCobrancaEnviada(null), 3000) }}
-                            className="flex-1 text-xs bg-[#FEE2E2] text-[#991B1B] font-bold py-2 rounded-xl hover:bg-[#FECACA]">
-                            {cobrancaEnviada === t.id ? '✓ Enviado!' : '💳 Cobrar'}
+                          <button
+                            onClick={() => {
+                              // TODO: integrar com Stripe/Pagar.me — endpoint
+                              // POST /api/admin/tenants/:id/charge ainda não existe.
+                              // Por enquanto registra a tentativa como nota interna
+                              // pra ficar rastreável.
+                              if (!confirm(`Disparar cobrança manual pra ${t.name}? (Stripe/Pagar.me ainda não integrado — vai registrar como nota interna)`)) return
+                              const carimbo = `[${new Date().toLocaleString('pt-BR')}] Cobrança disparada manualmente pelo admin.`
+                              setTenantNotes((prev) => ({
+                                ...prev,
+                                [t.id]: prev[t.id] ? `${prev[t.id]}\n${carimbo}` : carimbo,
+                              }))
+                              setCobrancaEnviada(t.id)
+                              setTimeout(() => setCobrancaEnviada(null), 3000)
+                            }}
+                            className="flex-1 text-xs bg-[#FEE2E2] text-[#991B1B] font-bold py-2 rounded-xl hover:bg-[#FECACA]"
+                          >
+                            {cobrancaEnviada === t.id ? '✓ Registrado!' : '💳 Cobrar'}
                           </button>
                         )}
                         {t.status === 'canceled' && (
@@ -1335,11 +1384,34 @@ export function AdminDashboard() {
                     {/* Adicionar nota interna */}
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
                       <p className="font-sora font-bold text-white mb-3">📝 Nota interna</p>
-                      <textarea rows={3} placeholder="Adicione observações sobre esta barbearia (visível apenas para admins)..."
-                        className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-3 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50 resize-none mb-3" />
-                      <button className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:opacity-90">
-                        💾 Salvar nota
-                      </button>
+                      <textarea
+                        rows={3}
+                        placeholder="Adicione observações sobre esta barbearia (visível apenas para admins)..."
+                        value={noteDraft}
+                        onChange={(e) => setNoteDraft(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-3 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50 resize-none mb-3"
+                      />
+                      <div className="flex items-center justify-between gap-3">
+                        <button
+                          onClick={() => {
+                            const txt = noteDraft.trim()
+                            setTenantNotes((prev) => {
+                              const next = { ...prev }
+                              if (txt) next[t.id] = txt
+                              else delete next[t.id]
+                              return next
+                            })
+                          }}
+                          className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:opacity-90"
+                        >
+                          💾 Salvar nota
+                        </button>
+                        {tenantNotes[t.id] && (
+                          <span className="text-[10px] text-white/40">
+                            ✓ Nota salva ({tenantNotes[t.id].length} caracteres)
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1614,19 +1686,23 @@ export function AdminDashboard() {
               <div className="grid grid-cols-1 gap-4">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
                   <h3 className="font-sora font-bold text-white">Planos e preços</h3>
-                  {[
-                    { plan: 'Starter', price: 'R$ 79/mês', profis: '1 profissional' },
-                    { plan: 'Pro',     price: 'R$ 149/mês', profis: '5 profissionais' },
-                    { plan: 'Premium', price: 'R$ 249/mês', profis: 'Ilimitado' },
-                  ].map((p) => (
-                    <div key={p.plan} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                  {plans.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
                       <div>
-                        <p className="font-semibold text-white">{p.plan}</p>
-                        <p className="text-xs text-white/40">{p.profis}</p>
+                        <p className="font-semibold text-white">{p.name}</p>
+                        <p className="text-xs text-white/40">{planLimitLabel(p.profLimit)}</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[#F5A623] font-bold">{p.price}</span>
-                        <button className="text-xs bg-white/10 text-white px-3 py-1 rounded-lg hover:bg-white/20">Editar</button>
+                        <span className="text-[#F5A623] font-bold">R$ {p.priceMonthly}/mês</span>
+                        <button
+                          onClick={() => {
+                            setPlanDraft({ name: p.name, priceMonthly: p.priceMonthly, profLimit: p.profLimit })
+                            setEditingPlanId(p.id)
+                          }}
+                          className="text-xs bg-white/10 text-white px-3 py-1 rounded-lg hover:bg-white/20"
+                        >
+                          Editar
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -2268,6 +2344,94 @@ export function AdminDashboard() {
                 disabled={!formTenant.name.trim() || !formTenant.email.trim()}
                 className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity">
                 ✓ Cadastrar barbearia
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EDITAR PLANO ── */}
+      {editingPlanId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingPlanId(null)} />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <div>
+                <h3 className="font-sora font-bold text-white">💰 Editar plano</h3>
+                <p className="text-xs text-white/40 mt-0.5">Configuração visível na landing e na cobrança</p>
+              </div>
+              <button onClick={() => setEditingPlanId(null)} className="text-white/40 hover:text-white text-2xl" aria-label="Fechar">×</button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Nome do plano</label>
+                <input
+                  value={planDraft.name}
+                  onChange={(e) => setPlanDraft((d) => ({ ...d, name: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">Preço mensal (R$)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={planDraft.priceMonthly}
+                  onChange={(e) => setPlanDraft((d) => ({ ...d, priceMonthly: Number(e.target.value) }))}
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-1.5">
+                  Limite de profissionais
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={-1}
+                    disabled={planDraft.profLimit === -1}
+                    value={planDraft.profLimit === -1 ? '' : planDraft.profLimit}
+                    onChange={(e) => setPlanDraft((d) => ({ ...d, profLimit: Math.max(1, Number(e.target.value || 1)) }))}
+                    placeholder="Quantidade"
+                    className="flex-1 bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50 disabled:opacity-40"
+                  />
+                  <label className="flex items-center gap-2 text-xs text-white/60 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={planDraft.profLimit === -1}
+                      onChange={(e) => setPlanDraft((d) => ({ ...d, profLimit: e.target.checked ? -1 : 5 }))}
+                      className="accent-[#F5A623]"
+                    />
+                    Ilimitado
+                  </label>
+                </div>
+                <p className="text-[10px] text-white/30 mt-1">
+                  Preview: {planDraft.name || '—'} · R$ {planDraft.priceMonthly}/mês · {planLimitLabel(planDraft.profLimit)}
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-white/10 flex gap-3">
+              <button onClick={() => setEditingPlanId(null)}
+                className="flex-1 border border-white/10 text-white/60 text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5">
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setPlans((prev) => prev.map((p) =>
+                    p.id === editingPlanId
+                      ? { ...p, name: planDraft.name.trim() || p.name, priceMonthly: planDraft.priceMonthly, profLimit: planDraft.profLimit }
+                      : p,
+                  ))
+                  setEditingPlanId(null)
+                }}
+                disabled={!planDraft.name.trim() || planDraft.priceMonthly < 0}
+                className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity"
+              >
+                ✓ Salvar plano
               </button>
             </div>
           </div>
