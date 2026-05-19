@@ -12,13 +12,17 @@
  *   - stylo-booking  → 3003  (booking.stylogestor.com.br)
  *   - stylo-admin    → 3004  (admin.stylogestor.com.br)
  */
+// Usa 'pnpm start' (simples, igual a API que já funciona em cluster) +
+// PORT via env var. Next.js lê process.env.PORT por default — sem
+// precisar passar -p na CLI. Evita o bug do 'pnpm exec' não achar 'next'
+// no PATH do PM2 daemon (que tem env mínimo).
 module.exports = {
   apps: [
     {
       name: 'stylo-web',
       cwd: '/opt/stylogestor/apps/web',
       script: 'pnpm',
-      args: 'exec next start -p 3000',
+      args: 'start',
       exec_mode: 'fork',
       autorestart: true,
       max_memory_restart: '512M',
@@ -39,7 +43,7 @@ module.exports = {
       name: 'stylo-site',
       cwd: '/opt/stylogestor/apps/site',
       script: 'pnpm',
-      args: 'exec next start -p 3002',
+      args: 'start',
       exec_mode: 'fork',
       autorestart: true,
       max_memory_restart: '512M',
@@ -49,7 +53,7 @@ module.exports = {
       name: 'stylo-booking',
       cwd: '/opt/stylogestor/apps/booking',
       script: 'pnpm',
-      args: 'exec next start -p 3003',
+      args: 'start',
       exec_mode: 'fork',
       autorestart: true,
       max_memory_restart: '512M',
@@ -59,7 +63,7 @@ module.exports = {
       name: 'stylo-admin',
       cwd: '/opt/stylogestor/apps/admin',
       script: 'pnpm',
-      args: 'exec next start -p 3004',
+      args: 'start',
       exec_mode: 'fork',
       autorestart: true,
       max_memory_restart: '512M',
