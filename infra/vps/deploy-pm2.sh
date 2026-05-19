@@ -91,9 +91,12 @@ done
 
 # Conserto one-time: a cash_closures foi marcada incorretamente como
 # applied no deploy anterior (script com bug usava 'newest alfabético').
-# Marca como rolled-back pra que o migrate deploy abaixo a aplique de
-# verdade. Idempotente — se já está corretamente aplicada, falha silencioso.
-pnpm --filter @stylogestor/database exec prisma migrate resolve --rolled-back "20260519_add_cash_closures" 2>/dev/null || true
+# `migrate resolve --rolled-back` só funciona em migrations FAILED, não
+# applied. Solução: deleta o registro do _prisma_migrations via SQL
+# direto. O migrate deploy abaixo então detecta como pendente e roda
+# o CREATE TABLE de verdade.
+echo "DELETE FROM _prisma_migrations WHERE migration_name = '20260519_add_cash_closures';" | \
+  pnpm --filter @stylogestor/database exec prisma db execute --stdin --schema="$APP_DIR/packages/database/prisma/schema.prisma" 2>/dev/null || true
 
 # Roda migrate deploy. Se falhar, ABORTA — antes era || true, mas isso
 # mascarava erros graves (tipo a missing column que quebrou o promo-codes).
