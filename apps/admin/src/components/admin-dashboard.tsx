@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { UserButton, useUser } from '@clerk/nextjs'
+import { useToast } from '@/components/ui/toast'
 
 // ── Tipo do tenant vindo da API ──────────────────────────────────
 type TenantDB = {
@@ -159,6 +160,7 @@ const CANAIS_OPCOES = [
 
 export function AdminDashboard() {
   const { user } = useUser()
+  const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning } = useToast()
   const adminEmail = user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses?.[0]?.emailAddress ?? ''
   const adminName = user?.firstName || adminEmail.split('@')[0] || 'Admin'
   const [page, setPage] = useState('dashboard')
@@ -311,7 +313,7 @@ export function AdminDashboard() {
   const handleSaveTrialDays = useCallback(async () => {
     const n = Number(trialDaysDraft)
     if (!Number.isFinite(n) || n < 0 || n > 365) {
-      alert('Digite um número entre 0 e 365.')
+      toastWarning('Digite um número entre 0 e 365.')
       return
     }
     setSavingTrialDays(true)
@@ -322,20 +324,21 @@ export function AdminDashboard() {
         body: JSON.stringify({ days: n }),
       })
       const data = await res.json()
-      if (!res.ok) { alert(`Erro: ${data.error ?? res.statusText}`); return }
+      if (!res.ok) { toastError(`Erro: ${data.error ?? res.statusText}`); return }
       setDefaultTrialDays(data.days)
+      toastSuccess(`Trial padrão salvo: ${data.days} dias`)
     } catch (err) {
-      alert('Erro de rede ao salvar.')
+      toastError('Erro de rede ao salvar')
       console.error(err)
     } finally {
       setSavingTrialDays(false)
     }
-  }, [trialDaysDraft])
+  }, [trialDaysDraft, toastSuccess, toastError, toastWarning])
 
   // Criar novo código promocional
   const handleCreatePromo = useCallback(async () => {
     if (!novoPromoForm.code.trim() || novoPromoForm.trialDays <= 0) {
-      alert('Código e dias de trial são obrigatórios.')
+      toastWarning('Código e dias de trial são obrigatórios')
       return
     }
     setCreatingPromo(true)
@@ -351,16 +354,18 @@ export function AdminDashboard() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) { alert(`Erro: ${data.error ?? res.statusText}`); return }
+      if (!res.ok) { toastError(`Erro: ${data.error ?? res.statusText}`); return }
       setPromoCodes((prev) => [data, ...prev])
+      const codeCreated = data.code
       setNovoPromoForm({ code: '', description: '', trialDays: 30, usageLimit: '' })
+      toastSuccess(`Código ${codeCreated} criado!`)
     } catch (err) {
-      alert('Erro de rede.')
+      toastError('Erro de rede ao criar código')
       console.error(err)
     } finally {
       setCreatingPromo(false)
     }
-  }, [novoPromoForm])
+  }, [novoPromoForm, toastSuccess, toastError, toastWarning])
 
   // Desativar/ativar código promocional
   const handleTogglePromo = useCallback(async (id: string, active: boolean) => {
@@ -371,24 +376,28 @@ export function AdminDashboard() {
         body: JSON.stringify({ active }),
       })
       const data = await res.json()
-      if (!res.ok) { alert(`Erro: ${data.error ?? res.statusText}`); return }
+      if (!res.ok) { toastError(`Erro: ${data.error ?? res.statusText}`); return }
       setPromoCodes((prev) => prev.map((p) => (p.id === id ? { ...p, active: data.active } : p)))
+      toastInfo(active ? 'Código reativado' : 'Código desativado')
     } catch (err) {
+      toastError('Erro de rede')
       console.error(err)
     }
-  }, [])
+  }, [toastError, toastInfo])
 
   // Deletar código promocional
   const handleDeletePromo = useCallback(async (id: string, code: string) => {
     if (!confirm(`Excluir o código "${code}"?`)) return
     try {
       const res = await fetch(`/api/saas-settings/promo-codes/${id}`, { method: 'DELETE' })
-      if (!res.ok) { alert('Erro ao excluir código'); return }
+      if (!res.ok) { toastError('Erro ao excluir código'); return }
       setPromoCodes((prev) => prev.filter((p) => p.id !== id))
+      toastSuccess(`Código ${code} excluído`)
     } catch (err) {
+      toastError('Erro de rede')
       console.error(err)
     }
-  }, [])
+  }, [toastError, toastSuccess])
 
   // Aplicar mudança de trial no tenant (a partir do modal)
   const handleApplyTrialChange = useCallback(async () => {
@@ -399,10 +408,10 @@ export function AdminDashboard() {
       if (trialModalTab === 'days') {
         body = { action: 'extendTrialDays', days: Number(trialExtendDays) }
       } else if (trialModalTab === 'date') {
-        if (!trialNewDate) { alert('Escolha uma data.'); setTrialModalLoading(false); return }
+        if (!trialNewDate) { toastWarning('Escolha uma data'); setTrialModalLoading(false); return }
         body = { action: 'setTrialEndsAt', date: trialNewDate }
       } else {
-        if (!trialPromoCode.trim()) { alert('Digite o código.'); setTrialModalLoading(false); return }
+        if (!trialPromoCode.trim()) { toastWarning('Digite o código'); setTrialModalLoading(false); return }
         body = { action: 'applyPromoCode', code: trialPromoCode }
       }
 
@@ -412,24 +421,23 @@ export function AdminDashboard() {
         body: JSON.stringify(body),
       })
       const data = await res.json()
-      if (!res.ok) { alert(`Erro: ${data.error ?? res.statusText}`); return }
+      if (!res.ok) { toastError(`Erro: ${data.error ?? res.statusText}`); return }
 
-      // Mensagem de sucesso variável
       const msg = trialModalTab === 'code'
         ? `Código ${data.code} aplicado! +${data.trialDaysAdded} dias.`
         : `Trial atualizado. Novo fim: ${new Date(data.trialEndsAt).toLocaleDateString('pt-BR')}`
-      alert(msg)
+      toastSuccess(msg)
       setTrialModalTenant(null)
       setTrialExtendDays('15')
       setTrialNewDate('')
       setTrialPromoCode('')
     } catch (err) {
-      alert('Erro de rede.')
+      toastError('Erro de rede')
       console.error(err)
     } finally {
       setTrialModalLoading(false)
     }
-  }, [trialModalTenant, trialModalTab, trialExtendDays, trialNewDate, trialPromoCode])
+  }, [trialModalTenant, trialModalTab, trialExtendDays, trialNewDate, trialPromoCode, toastSuccess, toastError, toastWarning])
 
   // Helper de label do limite de profissionais por plano
   const planLimitLabel = (n: number) =>
@@ -494,18 +502,18 @@ export function AdminDashboard() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        alert(`Erro ao cancelar: ${err.error ?? res.statusText}`)
+        toastError(`Erro ao cancelar: ${err.error ?? res.statusText}`)
         return
       }
-      // Atualiza estado local
       setTenants((prev) => prev.map((t) => (t.id === tenantId ? { ...t, status: 'canceled', mrr: 0 } : t)))
+      toastSuccess(`${tenantName} cancelada`)
     } catch (err) {
-      alert('Erro de rede ao cancelar.')
+      toastError('Erro de rede ao cancelar')
       console.error(err)
     } finally {
       setCancelandoLoading(null)
     }
-  }, [])
+  }, [toastSuccess, toastError])
 
   // Reativar tenant cancelado
   const handleReativarTenant = useCallback(async (tenantId: string, tenantName: string) => {
@@ -519,24 +527,25 @@ export function AdminDashboard() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        alert(`Erro ao reativar: ${err.error ?? res.statusText}`)
+        toastError(`Erro ao reativar: ${err.error ?? res.statusText}`)
         return
       }
       setTenants((prev) => prev.map((t) => (t.id === tenantId ? { ...t, status: 'active' } : t)))
+      toastSuccess(`${tenantName} reativada`)
     } catch (err) {
-      alert('Erro de rede ao reativar.')
+      toastError('Erro de rede ao reativar')
       console.error(err)
     } finally {
       setCancelandoLoading(null)
     }
-  }, [])
+  }, [toastSuccess, toastError])
 
   // Excluir barbearia (hard delete — apaga do banco, sem volta).
   // Confirmação dupla via modal pedindo pra digitar o nome exato.
   const handleExcluirTenant = useCallback(async () => {
     if (!excluirTenant) return
     if (excluirConfirmText !== excluirTenant.name) {
-      alert('O nome digitado não bate. Confira e tente de novo.')
+      toastWarning('O nome digitado não bate. Confira e tente de novo.')
       return
     }
     setExcluindoLoading(true)
@@ -547,23 +556,24 @@ export function AdminDashboard() {
       )
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        alert(`Erro ao excluir: ${err.error ?? res.statusText}`)
+        toastError(`Erro ao excluir: ${err.error ?? res.statusText}`)
         return
       }
-      // Remove do estado + sai da tela de detalhe
       const id = excluirTenant.id
+      const deletedName = excluirTenant.name
       setTenants((prev) => prev.filter((t) => t.id !== id))
       setExcluirTenant(null)
       setExcluirConfirmText('')
       setSelectedTenant(null)
       setPage('tenants')
+      toastSuccess(`${deletedName} excluída permanentemente`)
     } catch (err) {
-      alert('Erro de rede ao excluir.')
+      toastError('Erro de rede ao excluir')
       console.error(err)
     } finally {
       setExcluindoLoading(false)
     }
-  }, [excluirTenant, excluirConfirmText])
+  }, [excluirTenant, excluirConfirmText, toastSuccess, toastError, toastWarning])
 
   const handleNav = (id: string) => { setPage(id); setSidebarOpen(false) }
 

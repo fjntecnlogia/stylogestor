@@ -49,8 +49,30 @@ pnpm --filter @stylogestor/database run generate
 
 echo ""
 echo "🔧 [4/6] Aplicando migrations pendentes (se houver)..."
+# Prisma precisa do DATABASE_URL no environment. O env real está nos
+# `.env.production.local` de cada app, mas o `prisma migrate deploy`
+# roda no contexto do packages/database. Extrai a URL do web (que é
+# a fonte de verdade da prod) e injeta inline.
+WEB_ENV="$APP_DIR/apps/web/.env.production.local"
+if [ -f "$WEB_ENV" ] && grep -q "^DATABASE_URL=" "$WEB_ENV"; then
+  # shellcheck disable=SC2155
+  export DATABASE_URL=$(grep "^DATABASE_URL=" "$WEB_ENV" | head -1 | cut -d'=' -f2-)
+  # Tira aspas se vierem
+  DATABASE_URL="${DATABASE_URL%\"}"
+  DATABASE_URL="${DATABASE_URL#\"}"
+  DATABASE_URL="${DATABASE_URL%\'}"
+  DATABASE_URL="${DATABASE_URL#\'}"
+  export DATABASE_URL
+  echo "   ✓ DATABASE_URL carregado do web/.env.production.local"
+else
+  echo "   ⚠️  DATABASE_URL não encontrado em $WEB_ENV — migrate vai falhar"
+fi
+
+# Roda migrate deploy. Se falhar, ABORTA — antes era || true, mas isso
+# mascarava erros graves (tipo a missing column que quebrou o promo-codes).
 pnpm --filter @stylogestor/database exec prisma migrate deploy || {
-  echo "   ⚠️  Migrate falhou — pode ser que não haja migrations novas. Seguindo."
+  echo "   ❌ Migrate FALHOU — abortando deploy pra não publicar app com schema desincronizado."
+  exit 1
 }
 
 echo ""

@@ -3,6 +3,7 @@ import { Sora, Inter } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { ptBR } from '@clerk/localizations'
 import { dark } from '@clerk/themes'
+import { ToastProvider } from '@/components/ui/toast'
 import './globals.css'
 
 const sora = Sora({ subsets: ['latin'], variable: '--font-sora', weight: ['400','600','700','800'] })
@@ -83,7 +84,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       }}
     >
       <html lang="pt-BR" className={`${sora.variable} ${inter.variable}`}>
-        <body className="bg-[#0F172A] text-white antialiased">{children}</body>
+        <body className="bg-[#0F172A] text-white antialiased">
+          <ToastProvider>{children}</ToastProvider>
+        </body>
       </html>
     </ClerkProvider>
   )
