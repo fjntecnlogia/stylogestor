@@ -84,18 +84,67 @@ export function ProfissionaisView() {
     success('Profissional atualizado!')
   }
 
-  // Empty state quando NEXT_PUBLIC_USE_MOCKS=false e o módulo de profissionais
-  // ainda não está plugado na API.
+  // Form de novo profissional — JSX como variável (NÃO componente nested,
+  // pra evitar remontagem a cada keystroke que mata o foco do input).
+  // Reusado tanto no empty state (sem profissionais ainda) quanto na barra
+  // lateral (já tem profissionais).
+  const novoProfFormJsx = (
+    <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-4 space-y-3">
+      <p className="font-semibold text-[#1A3A6B] text-sm">Novo profissional</p>
+      <input placeholder="Nome completo" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+        className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]" />
+      <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+        className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]">
+        {['Barbeiro','Cabeleireiro','Manicure','Esteticista','Outros'].map(r => <option key={r}>{r}</option>)}
+      </select>
+      <input placeholder="Telefone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+        className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]" />
+      <div>
+        <label className="text-xs text-[#4A4A5A]">Comissão: {form.commission}%</label>
+        <input type="range" min="10" max="70" value={form.commission} onChange={e => setForm(f => ({ ...f, commission: Number(e.target.value) }))} className="w-full" />
+      </div>
+
+      {/* Email — opcional. Se preenchido, dispara convite Clerk pro barbeiro acessar /profissional */}
+      <div className="pt-2 border-t border-[#BFDBFE]">
+        <label className="text-xs font-semibold text-[#1A3A6B] block mb-1">
+          Email (opcional — envia acesso ao painel)
+        </label>
+        <input type="email" placeholder="barbeiro@email.com" value={form.email}
+          onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+          className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]" />
+        <p className="text-[10px] text-[#6B7280] mt-1">
+          Se preencher, o profissional recebe convite por email pra criar senha e acessar a agenda dele.
+        </p>
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={handleAdd} disabled={invitingId !== null || !form.name.trim() || !form.phone.trim()}
+          className="flex-1 bg-[#1A3A6B] disabled:opacity-50 text-white text-sm font-bold py-2 rounded-xl hover:bg-[#142d55]">
+          {invitingId ? 'Enviando convite...' : 'Salvar'}
+        </button>
+        <button onClick={() => setAdding(false)} className="flex-1 border border-[#E8E6E2] text-[#4A4A5A] text-sm py-2 rounded-xl hover:bg-[#F8F6F2]">Cancelar</button>
+      </div>
+    </div>
+  )
+
+  // Empty state quando NEXT_PUBLIC_USE_MOCKS=false e nenhum profissional
+  // foi cadastrado ainda. Renderiza o form inline se adding=true (sem
+  // isso o botão do empty state mudava o state mas o form nunca aparecia
+  // porque ficava dentro do return principal).
   if (!selected) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-12 text-center">
-        <p className="text-5xl mb-3">✂️</p>
-        <p className="font-sora font-bold text-[#111827] text-lg">Nenhum profissional cadastrado</p>
-        <p className="text-sm text-[#6B7280] mt-1 mb-4">Cadastre o primeiro profissional pra começar a usar a agenda.</p>
-        <button onClick={() => setAdding(true)}
-          className="bg-[#1A3A6B] text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-[#142d55] text-sm">
-          + Novo profissional
-        </button>
+      <div className="max-w-md mx-auto space-y-4">
+        {adding ? novoProfFormJsx : (
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-12 text-center">
+            <p className="text-5xl mb-3">✂️</p>
+            <p className="font-sora font-bold text-[#111827] text-lg">Nenhum profissional cadastrado</p>
+            <p className="text-sm text-[#6B7280] mt-1 mb-4">Cadastre o primeiro profissional pra começar a usar a agenda.</p>
+            <button onClick={() => setAdding(true)}
+              className="bg-[#1A3A6B] text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-[#142d55] text-sm">
+              + Novo profissional
+            </button>
+          </div>
+        )}
       </div>
     )
   }
@@ -109,45 +158,8 @@ export function ProfissionaisView() {
           + Novo profissional
         </button>
 
-        {/* Modal adicionar */}
-        {adding && (
-          <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-4 space-y-3">
-            <p className="font-semibold text-[#1A3A6B] text-sm">Novo profissional</p>
-            <input placeholder="Nome completo" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]" />
-            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-              className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]">
-              {['Barbeiro','Cabeleireiro','Manicure','Esteticista','Outros'].map(r => <option key={r}>{r}</option>)}
-            </select>
-            <input placeholder="Telefone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-              className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]" />
-            <div>
-              <label className="text-xs text-[#4A4A5A]">Comissão: {form.commission}%</label>
-              <input type="range" min="10" max="70" value={form.commission} onChange={e => setForm(f => ({ ...f, commission: Number(e.target.value) }))} className="w-full" />
-            </div>
-
-            {/* Email — opcional. Se preenchido, dispara convite Clerk pro barbeiro acessar /profissional */}
-            <div className="pt-2 border-t border-[#BFDBFE]">
-              <label className="text-xs font-semibold text-[#1A3A6B] block mb-1">
-                Email (opcional — envia acesso ao painel)
-              </label>
-              <input type="email" placeholder="barbeiro@email.com" value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]" />
-              <p className="text-[10px] text-[#6B7280] mt-1">
-                Se preencher, o profissional recebe convite por email pra criar senha e acessar a agenda dele.
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <button onClick={handleAdd} disabled={invitingId !== null}
-                className="flex-1 bg-[#1A3A6B] disabled:opacity-50 text-white text-sm font-bold py-2 rounded-xl hover:bg-[#142d55]">
-                {invitingId ? 'Enviando convite...' : 'Salvar'}
-              </button>
-              <button onClick={() => setAdding(false)} className="flex-1 border border-[#E8E6E2] text-[#4A4A5A] text-sm py-2 rounded-xl hover:bg-[#F8F6F2]">Cancelar</button>
-            </div>
-          </div>
-        )}
+        {/* Form de adicionar */}
+        {adding && novoProfFormJsx}
 
         {professionals.map((p) => (
           <button key={p.id} onClick={() => { setSelected(p); setEditing(false); setAdding(false) }}
