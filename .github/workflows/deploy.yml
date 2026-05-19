@@ -59,6 +59,10 @@ jobs:
         run: pnpm --filter web build
         env:
           NEXT_TELEMETRY_DISABLED: '1'
+          # Smoke build com a MESMA flag que a VPS roda. Sem isso, bugs de
+          # prerender com fixtures vazias (typeof X === 'undefined') só
+          # apareciam durante o deploy real e quebravam o pm2 reload.
+          NEXT_PUBLIC_USE_MOCKS: 'false'
 
   # ─── 2. Deploy via SSH+PM2 na VPS Hostinger ──────────────────────
   deploy:

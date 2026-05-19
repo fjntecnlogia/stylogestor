@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { useToast } from '@/components/ui/toast'
 import { useTenantPersistedState } from '@/lib/tenant-storage'
-import { getInitialProfessionals } from '../../components/profissionais/__fixtures__/professionals'
+import { getInitialProfessionals, type ProfessionalFixture } from '../../components/profissionais/__fixtures__/professionals'
+import { MissingProfile } from './missing-profile'
 
 interface PerfilEditavel {
   bio: string
@@ -24,7 +25,11 @@ export function PerfilProfissionalView() {
   const professionalId = (user?.publicMetadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
 
   // Dados base do profissional (vêm do gestor — só leitura aqui)
-  const allProfessionals = getInitialProfessionals()
+  // Lê do storage compartilhado com /profissionais (preenchido no onboarding).
+  const [allProfessionals] = useTenantPersistedState<ProfessionalFixture[]>(
+    'professionals',
+    getInitialProfessionals(),
+  )
   const me = allProfessionals.find((p) => p.id === professionalId) ?? allProfessionals[0]
 
   // Perfil editável persistido por tenant (chave inclui o id do profissional pra não misturar)
@@ -44,6 +49,9 @@ export function PerfilProfissionalView() {
   const [novaEspec, setNovaEspec] = useState('')
 
   const { success, info } = useToast()
+
+  // Sem perfil ainda → empty state (evita crash de SSR e UX de "perfil ainda não criado")
+  if (!me) return <MissingProfile titulo="Meu Perfil" />
 
   const startEdit = () => {
     setDraft(perfil)

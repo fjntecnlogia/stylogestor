@@ -7,7 +7,8 @@ import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/components/ui/toast'
 import { useTenantPersistedState } from '@/lib/tenant-storage'
 import { getInitialAppointments, type AppointmentFixture } from '../agenda/__fixtures__/appointments'
-import { getInitialProfessionals } from '../../components/profissionais/__fixtures__/professionals'
+import { getInitialProfessionals, type ProfessionalFixture } from '../../components/profissionais/__fixtures__/professionals'
+import { MissingProfile } from './missing-profile'
 
 const METHOD_COLORS: Record<string, string> = {
   PIX:      '#1B8A5A',
@@ -21,8 +22,11 @@ export function FechamentoProfissionalView() {
   const professionalId = (user?.publicMetadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
   const { success } = useToast()
 
-  // Dados do profissional logado (pra pegar a comissão configurada pelo gestor)
-  const allProfessionals = getInitialProfessionals()
+  // Lista de profissionais compartilhada com /profissionais (gestor)
+  const [allProfessionals] = useTenantPersistedState<ProfessionalFixture[]>(
+    'professionals',
+    getInitialProfessionals(),
+  )
   const me = allProfessionals.find((p) => p.id === professionalId) ?? allProfessionals[0]
 
   // Date picker (futuro: ler agendamentos do dia selecionado quando endpoint real existir)
@@ -39,6 +43,9 @@ export function FechamentoProfissionalView() {
     () => allAppointments.filter((a) => a.professionalId === professionalId && a.status === 'COMPLETED'),
     [allAppointments, professionalId],
   )
+
+  // Sem perfil → mostra empty state sem tentar calcular comissão (evita crash em SSR/prerender)
+  if (!me) return <MissingProfile titulo="Fechamento do Dia" />
 
   // Cálculos
   const totalBruto = concluidosDoDia.reduce((s, a) => s + a.price, 0)

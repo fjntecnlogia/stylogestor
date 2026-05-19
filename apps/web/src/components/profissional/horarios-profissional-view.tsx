@@ -7,6 +7,7 @@ import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/components/ui/toast'
 import { useTenantPersistedState } from '@/lib/tenant-storage'
 import { getInitialProfessionals, type ProfessionalFixture } from '../../components/profissionais/__fixtures__/professionals'
+import { MissingProfile } from './missing-profile'
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
 
@@ -25,8 +26,11 @@ export function HorariosProfissionalView() {
   const { user } = useUser()
   const professionalId = (user?.publicMetadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
 
-  // Encontra o profissional logado na lista (pra mostrar horário padrão)
-  const allProfessionals = getInitialProfessionals()
+  // Encontra o profissional logado na lista compartilhada com /profissionais
+  const [allProfessionals] = useTenantPersistedState<ProfessionalFixture[]>(
+    'professionals',
+    getInitialProfessionals(),
+  )
   const me = allProfessionals.find((p) => p.id === professionalId) ?? allProfessionals[0]
 
   // Bloqueios persistidos por tenant
@@ -95,6 +99,9 @@ export function HorariosProfissionalView() {
     const d = new Date(date + 'T00:00:00')
     return format(d, "EEEE, d 'de' MMMM", { locale: ptBR })
   }
+
+  // Sem perfil ainda → empty state (evita crash em SSR/prerender com USE_MOCKS=false)
+  if (!me) return <MissingProfile titulo="Meus Horários" />
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
