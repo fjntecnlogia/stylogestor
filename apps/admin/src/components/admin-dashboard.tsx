@@ -306,6 +306,14 @@ export function AdminDashboard() {
   const [trialNewDate, setTrialNewDate] = useState<string>('')
   const [trialPromoCode, setTrialPromoCode] = useState<string>('')
   const [trialModalLoading, setTrialModalLoading] = useState(false)
+  // Modal de histórico de resgates de um código promocional
+  interface Redemption {
+    id: string; tenantId: string; tenantName: string; tenantSlug: string | null
+    trialDays: number; appliedAt: string
+  }
+  const [redemptionsCode, setRedemptionsCode] = useState<PromoCode | null>(null)
+  const [redemptions, setRedemptions] = useState<Redemption[]>([])
+  const [redemptionsLoading, setRedemptionsLoading] = useState(false)
 
   // ── Handlers de settings/promo/trial (depois dos states) ──────────
 
@@ -384,6 +392,27 @@ export function AdminDashboard() {
       console.error(err)
     }
   }, [toastError, toastInfo])
+
+  // Abre modal de histórico de resgates de um código
+  const handleOpenRedemptions = useCallback(async (promo: PromoCode) => {
+    setRedemptionsCode(promo)
+    setRedemptions([])
+    setRedemptionsLoading(true)
+    try {
+      const res = await fetch(`/api/saas-settings/promo-codes/${promo.id}/redemptions`)
+      const data = await res.json()
+      if (!res.ok) {
+        toastError(data.error || 'Erro ao buscar histórico')
+        return
+      }
+      setRedemptions(Array.isArray(data) ? data : [])
+    } catch (err) {
+      toastError('Erro de rede')
+      console.error(err)
+    } finally {
+      setRedemptionsLoading(false)
+    }
+  }, [toastError])
 
   // Deletar código promocional
   const handleDeletePromo = useCallback(async (id: string, code: string) => {
@@ -2235,6 +2264,15 @@ export function AdminDashboard() {
                               Usados: {p.usedCount}{p.usageLimit ? ` / ${p.usageLimit}` : ' / ∞'}
                             </p>
                           </div>
+                          {p.usedCount > 0 && (
+                            <button
+                              onClick={() => handleOpenRedemptions(p)}
+                              className="text-xs bg-[#3B82F6]/20 hover:bg-[#3B82F6]/30 text-[#93C5FD] px-3 py-1.5 rounded-lg font-semibold"
+                              title="Ver quais barbearias usaram esse código"
+                            >
+                              📋 Histórico
+                            </button>
+                          )}
                           <button
                             onClick={() => handleTogglePromo(p.id, !p.active)}
                             className="text-xs bg-white/5 hover:bg-white/10 text-white/70 px-3 py-1.5 rounded-lg"
@@ -2889,6 +2927,85 @@ export function AdminDashboard() {
                 disabled={!formTenant.name.trim() || !formTenant.email.trim()}
                 className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity">
                 ✓ Cadastrar barbearia
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL HISTÓRICO DE RESGATES ── */}
+      {redemptionsCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setRedemptionsCode(null)}
+          />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">📋</span>
+                  <h3 className="font-sora font-bold text-white">Histórico do código</h3>
+                  <span className="font-mono font-bold text-[#F5A623] text-sm">{redemptionsCode.code}</span>
+                </div>
+                <p className="text-xs text-white/40 mt-0.5">
+                  +{redemptionsCode.trialDays} dias por uso · {redemptionsCode.usedCount} {redemptionsCode.usedCount === 1 ? 'resgate' : 'resgates'}
+                  {redemptionsCode.usageLimit && ` · limite ${redemptionsCode.usageLimit}`}
+                </p>
+              </div>
+              <button
+                onClick={() => setRedemptionsCode(null)}
+                className="text-white/40 hover:text-white text-2xl"
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {redemptionsLoading ? (
+                <div className="py-10 text-center text-white/40 text-sm">Carregando...</div>
+              ) : redemptions.length === 0 ? (
+                <div className="py-10 text-center">
+                  <p className="text-4xl mb-2">🤷</p>
+                  <p className="text-sm text-white/40">Ninguém usou esse código ainda</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {redemptions.map((r) => (
+                    <div
+                      key={r.id}
+                      className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-[#1A3A6B] flex items-center justify-center font-bold text-white text-sm shrink-0">
+                        {r.tenantName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-white text-sm truncate">{r.tenantName}</p>
+                        <p className="text-xs text-white/40">
+                          {r.tenantSlug ? `${r.tenantSlug}.stylogestor.com.br` : 'barbearia removida'}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-bold text-[#10B981]">+{r.trialDays} dias</p>
+                        <p className="text-[10px] text-white/40">
+                          {new Date(r.appliedAt).toLocaleDateString('pt-BR', {
+                            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-3 border-t border-white/10 flex justify-end">
+              <button
+                onClick={() => setRedemptionsCode(null)}
+                className="text-sm text-white/60 hover:text-white px-4 py-2 rounded-lg hover:bg-white/5 transition-colors"
+              >
+                Fechar
               </button>
             </div>
           </div>

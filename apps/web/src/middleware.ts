@@ -20,6 +20,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/tenants(.*)',            // Onboarding create tenant
   '/api/notifications(.*)',      // Email notifications
   '/api/automations(.*)',        // Automações — chamadas internamente
+  '/api/cron(.*)',               // Cron jobs — autenticados via CRON_SECRET, não Clerk
   '/api/v1/tenants/by-slug(.*)',
 ])
 

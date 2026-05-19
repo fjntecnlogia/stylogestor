@@ -267,6 +267,42 @@ export function ConfiguracoesView() {
   const toggleDay = (day: number) =>
     setHours((h) => h.map((d) => d.day === day ? { ...d, active: !d.active } : d))
 
+  const updateHourField = (day: number, field: 'start' | 'end', value: string) =>
+    setHours((h) => h.map((d) => d.day === day ? { ...d, [field]: value } : d))
+
+  // Hidrata horários do banco no mount
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/me/business-schedule')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data) => {
+        if (cancelled || !Array.isArray(data)) return
+        setHours(data)
+      })
+      .catch(() => { /* silencioso — fica com DEFAULT_HOURS */ })
+    return () => { cancelled = true }
+  }, [])
+
+  const [savingHours, setSavingHours] = useState(false)
+  const handleSaveHours = async () => {
+    setSavingHours(true)
+    try {
+      const res = await fetch('/api/me/business-schedule', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schedules: hours }),
+      })
+      const data = await res.json()
+      if (!res.ok) { error(data.error || 'Erro ao salvar horários'); return }
+      success('Horários de funcionamento salvos! ✓')
+    } catch (err) {
+      error('Erro de conexão')
+      console.error(err)
+    } finally {
+      setSavingHours(false)
+    }
+  }
+
   return (
     <>
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -371,11 +407,19 @@ export function ConfiguracoesView() {
                     <span className="font-medium text-sm text-[#1C1C2E] w-8">{label}</span>
                     {h.active && (
                       <div className="flex items-center gap-2 flex-1">
-                        <input type="time" defaultValue={h.start}
-                          className="border border-[#E8E6E2] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#1A3A6B]" />
+                        <input
+                          type="time"
+                          value={h.start}
+                          onChange={(e) => updateHourField(key, 'start', e.target.value)}
+                          className="border border-[#E8E6E2] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#1A3A6B]"
+                        />
                         <span className="text-[#4A4A5A] text-sm">até</span>
-                        <input type="time" defaultValue={h.end}
-                          className="border border-[#E8E6E2] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#1A3A6B]" />
+                        <input
+                          type="time"
+                          value={h.end}
+                          onChange={(e) => updateHourField(key, 'end', e.target.value)}
+                          className="border border-[#E8E6E2] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#1A3A6B]"
+                        />
                       </div>
                     )}
                     {!h.active && <span className="text-sm text-[#4A4A5A] flex-1">Fechado</span>}
@@ -384,10 +428,11 @@ export function ConfiguracoesView() {
               })}
             </div>
             <button
-              onClick={() => success('Horários de funcionamento salvos!')}
-              className="bg-[#1A3A6B] text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-[#142d55] transition-colors"
+              onClick={handleSaveHours}
+              disabled={savingHours}
+              className="bg-[#1A3A6B] disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-[#142d55] transition-colors"
             >
-              Salvar horários
+              {savingHours ? 'Salvando...' : 'Salvar horários'}
             </button>
           </div>
         )}

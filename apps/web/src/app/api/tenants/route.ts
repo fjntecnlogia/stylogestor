@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { prisma, getSetting, SETTING_KEYS } from '@stylogestor/database'
+import { sendWelcomeEmail } from '@/lib/resend'
 
 // POST /api/tenants — criar tenant no onboarding
 export async function POST(req: NextRequest) {
@@ -123,10 +124,15 @@ export async function POST(req: NextRequest) {
     //   - tenantSlug + tenantName: usados pelo frontend pra mostrar nome da
     //     barbearia no header e pra scoped localStorage
     //   - role 'gestor': lido pelo middleware (barbeiros recebem via invite)
+    let userEmail: string | null = null
     try {
       const client = await clerkClient()
       const existing = await client.users.getUser(userId)
       const existingMetadata = (existing.publicMetadata as Record<string, unknown>) ?? {}
+      userEmail =
+        existing.primaryEmailAddress?.emailAddress ??
+        existing.emailAddresses?.[0]?.emailAddress ??
+        null
       await client.users.updateUserMetadata(userId, {
         publicMetadata: {
           ...existingMetadata,
@@ -139,6 +145,14 @@ export async function POST(req: NextRequest) {
       console.error('[TENANT_SET_METADATA_ERROR]', metaErr)
       // Não bloqueia: tenant foi criado, só o metadata falhou.
       // Usuário pode setar manualmente no Clerk depois se necessário.
+    }
+
+    // Email de boas-vindas — disparo non-blocking (não falha o POST
+    // se o Resend tiver fora do ar / API key não setada).
+    if (userEmail) {
+      sendWelcomeEmail(userEmail, name).catch((err) =>
+        console.error('[WELCOME_EMAIL_ERROR]', err),
+      )
     }
 
     // Retorna os profissionais e serviços já criados — usados pelo frontend
