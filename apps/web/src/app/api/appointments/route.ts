@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
 import { getCurrentTenantId } from '@/lib/auth-tenant'
+import { readSettings } from '@/lib/tenant-settings'
 
 /**
  * Converte um Date pra HH:mm.
@@ -124,12 +125,45 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Lê settings do tenant ANTES de validar (precisamos pra leadHours, etc)
+    const tenantSettingsRow = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    })
+    const settings = readSettings(tenantSettingsRow?.settings)
+
+    // bookingLeadHours: antecedência mínima. Ex: 2h significa que não dá
+    // pra agendar pra daqui 1h. Útil pra dar tempo de preparar.
+    if (settings.bookingLeadHours > 0) {
+      const earliest = new Date(Date.now() + settings.bookingLeadHours * 60 * 60 * 1000)
+      if (requestedStart < earliest) {
+        return NextResponse.json(
+          {
+            error: `Agendamento exige no mínimo ${settings.bookingLeadHours}h de antecedência. Escolha um horário após ${earliest.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.`,
+          },
+          { status: 400 },
+        )
+      }
+    }
+
+    // maxBookingDaysAhead: limite no futuro. Ex: 60 dias = não agenda 90 dias depois.
+    if (settings.maxBookingDaysAhead > 0) {
+      const latest = new Date(Date.now() + settings.maxBookingDaysAhead * 24 * 60 * 60 * 1000)
+      if (requestedStart > latest) {
+        return NextResponse.json(
+          {
+            error: `Agendamento limitado a ${settings.maxBookingDaysAhead} dias à frente. Escolha até ${latest.toLocaleDateString('pt-BR')}.`,
+          },
+          { status: 400 },
+        )
+      }
+    }
+
     // Confirma que client + professional + services pertencem ao tenant
-    const [client, professional, services, tenant] = await Promise.all([
+    const [client, professional, services] = await Promise.all([
       prisma.client.findFirst({ where: { id: clientId, tenantId } }),
       prisma.professional.findFirst({ where: { id: professionalId, tenantId } }),
       prisma.service.findMany({ where: { id: { in: serviceIds }, tenantId } }),
-      prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }),
     ])
     if (!client) return NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 })
     if (!professional) return NextResponse.json({ error: 'Profissional não encontrado' }, { status: 404 })
@@ -141,41 +175,39 @@ export async function POST(req: NextRequest) {
     const startTime = combineDateTime(date, time)
     const endTime = new Date(startTime.getTime() + totalDuration * 60 * 1000)
 
-    // Detecção de conflito de horário: existe outro agendamento ATIVO
-    // do mesmo profissional cujo período se sobrepõe?
-    // Regra de sobreposição: [aStart, aEnd) ∩ [bStart, bEnd) ≠ ∅
-    //   ↔ aStart < bEnd AND aEnd > bStart
-    //
-    // O gestor pode permitir sobreposição via Configurações →
-    // Meu negócio → "Permitir múltiplos agendamentos no mesmo horário".
-    // Útil pra barbearias com mais de uma cadeira por profissional, ou
-    // pra serviços que rodam em paralelo (ex: pintura + corte de outro).
-    const settings = (tenant?.settings as { allowOverlapping?: boolean } | null) ?? {}
-    const allowOverlap = settings.allowOverlapping === true
+    // Detecção de conflito de horário do mesmo profissional. Inclui o
+    // BUFFER configurado nas settings (ex: buffer=15min impede que outro
+    // atendimento comece menos de 15min depois do anterior terminar).
+    if (!settings.allowOverlapping) {
+      const bufferMs = settings.defaultAppointmentBuffer * 60 * 1000
+      const conflictStart = new Date(startTime.getTime() - bufferMs)
+      const conflictEnd = new Date(endTime.getTime() + bufferMs)
 
-    if (!allowOverlap) {
       const conflicting = await prisma.appointment.findFirst({
         where: {
           tenantId,
           professionalId,
           status: { notIn: ['CANCELED', 'NO_SHOW'] },
-          startTime: { lt: endTime },
-          endTime: { gt: startTime },
+          startTime: { lt: conflictEnd },
+          endTime: { gt: conflictStart },
         },
         include: {
           client: { select: { name: true } },
         },
       })
       if (conflicting) {
-        const conflictStart = conflicting.startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-        const conflictEnd = conflicting.endTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        const cStart = conflicting.startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        const cEnd = conflicting.endTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        const bufferNote = settings.defaultAppointmentBuffer > 0
+          ? ` (com buffer de ${settings.defaultAppointmentBuffer}min entre atendimentos)`
+          : ''
         return NextResponse.json(
           {
-            error: `Conflito de horário: ${professional.name} já tem ${conflicting.client?.name ?? 'outro cliente'} entre ${conflictStart} e ${conflictEnd}. Pra permitir sobreposição, ative em Configurações → Meu negócio.`,
+            error: `Conflito de horário${bufferNote}: ${professional.name} já tem ${conflicting.client?.name ?? 'outro cliente'} entre ${cStart} e ${cEnd}. Pra permitir sobreposição, ative em Configurações → Meu negócio.`,
             conflict: {
               clientName: conflicting.client?.name,
-              start: conflictStart,
-              end: conflictEnd,
+              start: cStart,
+              end: cEnd,
             },
           },
           { status: 409 },

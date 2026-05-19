@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
 import { getCurrentTenantId } from '@/lib/auth-tenant'
+import { readSettings, type TenantSettings } from '@/lib/tenant-settings'
 
 /**
  * GET /api/me/tenant
- * Retorna dados da barbearia do gestor logado pra preencher o form
- * de Configurações > Dados da barbearia.
+ * Retorna dados da barbearia + settings (com defaults aplicados).
  */
 export async function GET() {
   const tenantId = await getCurrentTenantId()
@@ -22,7 +22,8 @@ export async function GET() {
     if (!tenant) return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
 
     const addr = (tenant.address as Record<string, string> | null) ?? {}
-    const settings = (tenant.settings as Record<string, unknown> | null) ?? {}
+    const settings = readSettings(tenant.settings)
+
     return NextResponse.json({
       id: tenant.id,
       slug: tenant.slug,
@@ -33,7 +34,7 @@ export async function GET() {
       city: addr.city ?? '',
       state: addr.state ?? '',
       logo: tenant.logo ?? '',
-      allowOverlapping: settings.allowOverlapping === true,
+      ...settings,
     })
   } catch (err) {
     console.error('[ME_TENANT_GET_ERROR]', err)
@@ -43,10 +44,9 @@ export async function GET() {
 
 /**
  * PATCH /api/me/tenant
- * Body: { name?, phone?, email?, address?, city?, state?, logo? }
+ * Body: campos do tenant + qualquer subset de TenantSettings.
  *
- * Atualiza dados da própria barbearia. Address é um JSON no schema —
- * empacotamos { street, city, state } pra simplicidade do front.
+ * Settings são merge no JSON existente (não sobrescreve campos não-enviados).
  */
 export async function PATCH(req: NextRequest) {
   const tenantId = await getCurrentTenantId()
@@ -54,31 +54,53 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, phone, email, address, city, state, logo, allowOverlapping } = body as {
-      name?: string; phone?: string; email?: string
-      address?: string; city?: string; state?: string; logo?: string
-      allowOverlapping?: boolean
-    }
+    const {
+      name, phone, email, address, city, state, logo,
+      allowOverlapping, requireClientPhone, autoConfirmBooking,
+      defaultAppointmentBuffer, bookingLeadHours,
+      maxBookingDaysAhead, cancelDeadlineHours,
+    } = body as Partial<{
+      name: string; phone: string; email: string
+      address: string; city: string; state: string; logo: string
+    } & TenantSettings>
 
-    // Address + settings: campos JSON merged. Lê o atual pra não
-    // sobrescrever propriedades não-enviadas.
     const current = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { address: true, settings: true },
     })
     const currentAddr = (current?.address as Record<string, string> | null) ?? {}
-    const currentSettings = (current?.settings as Record<string, unknown> | null) ?? {}
+    const currentSettings = readSettings(current?.settings)
 
     const addressData: Record<string, string> = { ...currentAddr }
     if (address !== undefined) addressData.street = address
     if (city !== undefined) addressData.city = city
     if (state !== undefined) addressData.state = state
 
-    const settingsData: Record<string, unknown> = { ...currentSettings }
-    if (allowOverlapping !== undefined) settingsData.allowOverlapping = allowOverlapping === true
-    // Prisma Json input precisa de cast — Record<string, unknown> não bate
-    // com NullableJsonNullValueInput | InputJsonValue diretamente.
-    const settingsJson = settingsData as never
+    // Merge settings — só sobrescreve as chaves que vieram no body
+    const newSettings: TenantSettings = {
+      ...currentSettings,
+      ...(allowOverlapping !== undefined ? { allowOverlapping: allowOverlapping === true } : {}),
+      ...(requireClientPhone !== undefined ? { requireClientPhone: requireClientPhone !== false } : {}),
+      ...(autoConfirmBooking !== undefined ? { autoConfirmBooking: autoConfirmBooking === true } : {}),
+      ...(defaultAppointmentBuffer !== undefined
+        ? { defaultAppointmentBuffer: Math.max(0, Math.min(120, Number(defaultAppointmentBuffer))) }
+        : {}),
+      ...(bookingLeadHours !== undefined
+        ? { bookingLeadHours: Math.max(0, Math.min(168, Number(bookingLeadHours))) }
+        : {}),
+      ...(maxBookingDaysAhead !== undefined
+        ? { maxBookingDaysAhead: Math.max(1, Math.min(365, Number(maxBookingDaysAhead))) }
+        : {}),
+      ...(cancelDeadlineHours !== undefined
+        ? { cancelDeadlineHours: Math.max(0, Math.min(168, Number(cancelDeadlineHours))) }
+        : {}),
+    }
+
+    const settingsChanged =
+      allowOverlapping !== undefined || requireClientPhone !== undefined ||
+      autoConfirmBooking !== undefined || defaultAppointmentBuffer !== undefined ||
+      bookingLeadHours !== undefined || maxBookingDaysAhead !== undefined ||
+      cancelDeadlineHours !== undefined
 
     const updated = await prisma.tenant.update({
       where: { id: tenantId },
@@ -90,7 +112,7 @@ export async function PATCH(req: NextRequest) {
         ...(address !== undefined || city !== undefined || state !== undefined
           ? { address: addressData }
           : {}),
-        ...(allowOverlapping !== undefined ? { settings: settingsJson } : {}),
+        ...(settingsChanged ? { settings: newSettings as never } : {}),
       },
       select: {
         name: true, phone: true, email: true, address: true, logo: true, settings: true,
@@ -98,7 +120,7 @@ export async function PATCH(req: NextRequest) {
     })
 
     const addr = (updated.address as Record<string, string> | null) ?? {}
-    const upSettings = (updated.settings as Record<string, unknown> | null) ?? {}
+    const final = readSettings(updated.settings)
     return NextResponse.json({
       ok: true,
       name: updated.name,
@@ -108,7 +130,7 @@ export async function PATCH(req: NextRequest) {
       city: addr.city ?? '',
       state: addr.state ?? '',
       logo: updated.logo ?? '',
-      allowOverlapping: upSettings.allowOverlapping === true,
+      ...final,
     })
   } catch (err) {
     console.error('[ME_TENANT_PATCH_ERROR]', err)

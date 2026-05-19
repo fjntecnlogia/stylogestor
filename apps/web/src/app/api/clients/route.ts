@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
 import { getCurrentTenantId } from '@/lib/auth-tenant'
+import { readSettings } from '@/lib/tenant-settings'
 
 /**
  * Computa `segment` a partir das métricas reais do cliente.
@@ -67,15 +68,29 @@ export async function POST(req: NextRequest) {
       name?: string; phone?: string; email?: string; tags?: string[]
     }
 
-    if (!name?.trim() || !phone?.trim()) {
-      return NextResponse.json({ error: 'Nome e telefone são obrigatórios' }, { status: 400 })
+    if (!name?.trim()) {
+      return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
+    }
+
+    // Telefone obrigatório ou opcional? Controlado por tenant.settings.requireClientPhone.
+    // Default: true (telefone obrigatório — padrão de barbearia que usa WhatsApp).
+    const tenantRow = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    })
+    const settings = readSettings(tenantRow?.settings)
+    if (settings.requireClientPhone && !phone?.trim()) {
+      return NextResponse.json(
+        { error: 'Telefone é obrigatório. Desligue "Exigir telefone" em Configurações se quiser cadastrar sem.' },
+        { status: 400 },
+      )
     }
 
     const created = await prisma.client.create({
       data: {
         tenantId,
         name: name.trim(),
-        phone: phone.trim(),
+        phone: phone?.trim() ?? '',
         email: email?.trim() || null,
         tags: Array.isArray(tags) ? tags : [],
         active: true,

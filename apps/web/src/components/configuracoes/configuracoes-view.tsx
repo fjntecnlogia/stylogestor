@@ -150,7 +150,14 @@ interface CompanyForm {
   city: string
   state: string
   logo: string
+  // Política de agendamentos
   allowOverlapping: boolean
+  requireClientPhone: boolean
+  autoConfirmBooking: boolean
+  defaultAppointmentBuffer: number
+  bookingLeadHours: number
+  maxBookingDaysAhead: number
+  cancelDeadlineHours: number
 }
 
 export function ConfiguracoesView() {
@@ -165,6 +172,12 @@ export function ConfiguracoesView() {
   const [company, setCompany] = useState<CompanyForm>({
     name: '', phone: '', email: '', address: '', city: '', state: '', logo: '',
     allowOverlapping: false,
+    requireClientPhone: true,
+    autoConfirmBooking: false,
+    defaultAppointmentBuffer: 0,
+    bookingLeadHours: 0,
+    maxBookingDaysAhead: 60,
+    cancelDeadlineHours: 0,
   })
   const [savingCompany, setSavingCompany] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -185,6 +198,12 @@ export function ConfiguracoesView() {
           state: data.state ?? '',
           logo: data.logo ?? '',
           allowOverlapping: data.allowOverlapping === true,
+          requireClientPhone: data.requireClientPhone !== false,
+          autoConfirmBooking: data.autoConfirmBooking === true,
+          defaultAppointmentBuffer: Number(data.defaultAppointmentBuffer ?? 0),
+          bookingLeadHours: Number(data.bookingLeadHours ?? 0),
+          maxBookingDaysAhead: Number(data.maxBookingDaysAhead ?? 60),
+          cancelDeadlineHours: Number(data.cancelDeadlineHours ?? 0),
         })
       })
       .catch(() => { /* silencioso — form fica vazio se falhar */ })
@@ -387,31 +406,84 @@ export function ConfiguracoesView() {
 
             {/* Política de agendamentos */}
             <div className="border-t border-[#E8E6E2] pt-5">
-              <h4 className="font-sora font-bold text-[#1C1C2E] mb-3 text-sm">⚙️ Política de agendamentos</h4>
-              <label className="flex items-start gap-3 p-3 rounded-xl border border-[#E8E6E2] hover:bg-[#F8F6F2] cursor-pointer transition-colors">
-                <button
-                  type="button"
-                  onClick={() => setCompany((p) => ({ ...p, allowOverlapping: !p.allowOverlapping }))}
-                  className={`w-10 h-6 rounded-full transition-colors relative shrink-0 mt-0.5 ${
-                    company.allowOverlapping ? 'bg-[#1A3A6B]' : 'bg-[#E8E6E2]'
-                  }`}
-                  aria-pressed={company.allowOverlapping}
-                >
-                  <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                    company.allowOverlapping ? 'left-5' : 'left-1'
-                  }`} />
-                </button>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#1C1C2E]">
-                    Permitir agendamentos sobrepostos no mesmo profissional
-                  </p>
-                  <p className="text-xs text-[#6B7280] mt-0.5">
-                    Por padrão (desligado), o sistema bloqueia tentativa de agendar 2 clientes no mesmo
-                    horário com o mesmo profissional. Ligue se sua barbearia tem mais de uma cadeira por
-                    pessoa ou faz atendimentos em paralelo.
-                  </p>
-                </div>
-              </label>
+              <h4 className="font-sora font-bold text-[#1C1C2E] mb-1 text-sm">⚙️ Política de agendamentos</h4>
+              <p className="text-xs text-[#6B7280] mb-4">
+                Regras pra controlar quando/como clientes podem agendar. Padrões funcionam pra maioria.
+              </p>
+
+              <div className="space-y-3">
+                {/* Toggle: agendamentos sobrepostos */}
+                <ToggleSetting
+                  label="Permitir agendamentos sobrepostos no mesmo profissional"
+                  description="Quando OFF (padrão), bloqueia 2 clientes no mesmo horário com mesmo profissional. Ligue se há mais de uma cadeira por pessoa."
+                  value={company.allowOverlapping}
+                  onChange={(v) => setCompany((p) => ({ ...p, allowOverlapping: v }))}
+                />
+
+                {/* Toggle: telefone obrigatório */}
+                <ToggleSetting
+                  label="Exigir telefone ao cadastrar cliente"
+                  description="OFF permite cadastrar cliente só com nome (útil pra clientes ocasionais). ON (padrão) garante que sempre dá pra mandar WhatsApp."
+                  value={company.requireClientPhone}
+                  onChange={(v) => setCompany((p) => ({ ...p, requireClientPhone: v }))}
+                />
+
+                {/* Toggle: auto-confirmar booking público */}
+                <ToggleSetting
+                  label="Confirmar automaticamente agendamentos do link público"
+                  description="OFF (padrão) deixa como 'Aguardando confirmação' — você revisa antes. ON marca direto como CONFIRMADO."
+                  value={company.autoConfirmBooking}
+                  onChange={(v) => setCompany((p) => ({ ...p, autoConfirmBooking: v }))}
+                />
+
+                {/* Numeric: buffer entre atendimentos */}
+                <NumberSetting
+                  label="Folga entre atendimentos (min)"
+                  description="Tempo mínimo de respiro entre 1 atendimento e outro do mesmo profissional. Ex: 15min pra organizar a estação."
+                  value={company.defaultAppointmentBuffer}
+                  min={0}
+                  max={120}
+                  step={5}
+                  suffix="min"
+                  onChange={(v) => setCompany((p) => ({ ...p, defaultAppointmentBuffer: v }))}
+                />
+
+                {/* Numeric: antecedência mínima */}
+                <NumberSetting
+                  label="Antecedência mínima pra agendar (horas)"
+                  description="Cliente só pode marcar com X horas de antecedência. 0 = sem restrição."
+                  value={company.bookingLeadHours}
+                  min={0}
+                  max={168}
+                  step={1}
+                  suffix="h"
+                  onChange={(v) => setCompany((p) => ({ ...p, bookingLeadHours: v }))}
+                />
+
+                {/* Numeric: max dias à frente */}
+                <NumberSetting
+                  label="Máximo de dias no futuro pra agendar"
+                  description="Cliente não pode marcar mais que X dias à frente. Evita 'reservas eternas' que ninguém comparece."
+                  value={company.maxBookingDaysAhead}
+                  min={1}
+                  max={365}
+                  step={1}
+                  suffix="dias"
+                  onChange={(v) => setCompany((p) => ({ ...p, maxBookingDaysAhead: v }))}
+                />
+
+                {/* Numeric: prazo pra cancelar */}
+                <NumberSetting
+                  label="Prazo mínimo pra cliente cancelar (horas)"
+                  description="Cliente cancelando pelo link público só pode até X horas antes. Você como gestor cancela qualquer hora."
+                  value={company.cancelDeadlineHours}
+                  min={0}
+                  max={168}
+                  step={1}
+                  suffix="h"
+                  onChange={(v) => setCompany((p) => ({ ...p, cancelDeadlineHours: v }))}
+                />
+              </div>
             </div>
 
             <button
@@ -644,5 +716,64 @@ export function ConfiguracoesView() {
     {/* Modal WhatsApp QR Code */}
     {whatsappModal && <WhatsAppModal onClose={() => setWhatsappModal(false)} />}
     </>
+  )
+}
+
+/** Linha de setting boolean (toggle switch). */
+function ToggleSetting({
+  label, description, value, onChange,
+}: { label: string; description: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-start gap-3 p-3 rounded-xl border border-[#E8E6E2] hover:bg-[#F8F6F2] cursor-pointer transition-colors">
+      <button
+        type="button"
+        onClick={() => onChange(!value)}
+        className={`w-10 h-6 rounded-full transition-colors relative shrink-0 mt-0.5 ${
+          value ? 'bg-[#1A3A6B]' : 'bg-[#E8E6E2]'
+        }`}
+        aria-pressed={value}
+      >
+        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+          value ? 'left-5' : 'left-1'
+        }`} />
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-[#1C1C2E]">{label}</p>
+        <p className="text-xs text-[#6B7280] mt-0.5 leading-relaxed">{description}</p>
+      </div>
+    </label>
+  )
+}
+
+/** Linha de setting numérico (input + step). */
+function NumberSetting({
+  label, description, value, min, max, step, suffix, onChange,
+}: {
+  label: string; description: string; value: number
+  min: number; max: number; step: number; suffix: string
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-xl border border-[#E8E6E2]">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-[#1C1C2E]">{label}</p>
+        <p className="text-xs text-[#6B7280] mt-0.5 leading-relaxed">{description}</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <input
+          type="number"
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          onChange={(e) => {
+            const n = Number(e.target.value)
+            if (Number.isFinite(n)) onChange(Math.max(min, Math.min(max, n)))
+          }}
+          className="w-20 border border-[#E8E6E2] rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]"
+        />
+        <span className="text-xs text-[#6B7280] font-medium">{suffix}</span>
+      </div>
+    </div>
   )
 }
