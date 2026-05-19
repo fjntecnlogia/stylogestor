@@ -99,6 +99,14 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
     }
   }
 
+  // Validação de data/hora — bloqueia agendamento no passado
+  const now = new Date()
+  const todayStr = now.toISOString().slice(0, 10) // YYYY-MM-DD
+  const minTimeForToday = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const isPastDate = date < todayStr
+  const isPastTime = date === todayStr && time < minTimeForToday
+  const isInPast = isPastDate || isPastTime
+
   const filteredClients = allClients.filter(
     (c) =>
       c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
@@ -223,8 +231,11 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
                     <input
                       type="date"
                       value={date}
+                      min={todayStr}
                       onChange={(e) => setDate(e.target.value)}
-                      className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]"
+                      className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${
+                        isPastDate ? 'border-red-300 focus:ring-red-500' : 'border-[#E8E6E2] focus:ring-[#1A3A6B]'
+                      }`}
                     />
                   </div>
                   <div>
@@ -232,11 +243,21 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
                     <input
                       type="time"
                       value={time}
+                      min={date === todayStr ? minTimeForToday : undefined}
                       onChange={(e) => setTime(e.target.value)}
-                      className="w-full border border-[#E8E6E2] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]"
+                      className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${
+                        isPastTime ? 'border-red-300 focus:ring-red-500' : 'border-[#E8E6E2] focus:ring-[#1A3A6B]'
+                      }`}
                     />
                   </div>
                 </div>
+
+                {/* Aviso se data/hora no passado */}
+                {isInPast && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">
+                    ⚠️ Esse horário já passou. Escolha uma data ou hora futura.
+                  </div>
+                )}
                 <div>
                   <label className="text-xs font-medium text-[#4A4A5A] block mb-1">Profissional</label>
                   <select
@@ -273,9 +294,13 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
               </button>
             ) : (
               <button
-                disabled={!professional || !selectedClient || selectedServices.length === 0}
+                disabled={!professional || !selectedClient || selectedServices.length === 0 || isInPast}
                 onClick={() => {
                   if (!selectedClient || selectedServices.length === 0 || !professional) return
+                  if (isInPast) {
+                    error('Não é possível agendar no passado')
+                    return
+                  }
                   const services = selectedServiceObjs
                   const prof = allProfessionals.find((p) => p.id === professional)
                   onSave?.({

@@ -112,6 +112,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Pelo menos um serviço é obrigatório' }, { status: 400 })
     }
 
+    // Validação anti-agendamento-no-passado (defesa em profundidade —
+    // a UI já bloqueia, mas client validation pode ser burlada).
+    // Tolerância de 1 minuto pra latência de rede + clock skew.
+    const requestedStart = new Date(`${date}T${time}:00`)
+    const nowWithTolerance = new Date(Date.now() - 60 * 1000)
+    if (requestedStart < nowWithTolerance) {
+      return NextResponse.json(
+        { error: 'Não é possível agendar em horário no passado' },
+        { status: 400 },
+      )
+    }
+
     // Confirma que client + professional + services pertencem ao tenant
     const [client, professional, services] = await Promise.all([
       prisma.client.findFirst({ where: { id: clientId, tenantId } }),
