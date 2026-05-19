@@ -7,6 +7,7 @@ import { CashflowCard } from '@/components/dashboard/cashflow-card'
 import { AlertsPanel } from '@/components/dashboard/alerts-panel'
 import { QuickActions } from '@/components/dashboard/quick-actions'
 import { DashboardTour } from '@/components/dashboard/dashboard-tour'
+import { TrialCard } from '@/components/dashboard/trial-card'
 
 export default function DashboardPage() {
   const { user } = useUser()
@@ -34,6 +35,9 @@ export default function DashboardPage() {
           <QuickActions />
         </div>
       </div>
+
+      {/* Trial info — só aparece se for trial/expirado/cancelado (assinante pago não vê) */}
+      <TrialCard />
 
       <div data-tour="stats">
         <StatsGrid />
