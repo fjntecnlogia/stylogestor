@@ -69,6 +69,10 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: '1'
           NEXT_PUBLIC_USE_MOCKS: 'false'
+          # Clerk só precisa de keys em runtime, mas o middleware as referencia
+          # durante o build — usar dummies pra smoke. As reais ficam na VPS.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_smokebuild_dummy'
+          CLERK_SECRET_KEY: 'sk_test_smokebuild_dummy'
 
   # ─── 2. Deploy via SSH+PM2 na VPS Hostinger ──────────────────────
   deploy:

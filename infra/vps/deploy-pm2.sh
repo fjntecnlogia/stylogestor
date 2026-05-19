@@ -70,6 +70,44 @@ for app in apps/web apps/admin; do
   echo "   ✓ $ENV_FILE — NEXT_PUBLIC_USE_MOCKS=false"
 done
 
+# ─── Bootstrap Clerk no admin ──────────────────────────────────────
+# O admin agora exige login Clerk + role super_admin (ou email no
+# allowlist ADMIN_EMAILS). Se as keys do Clerk ainda não estão no
+# .env.production.local do admin, copia do web (que já está
+# configurado em produção). Idempotente — só preenche o que falta.
+WEB_ENV="$APP_DIR/apps/web/.env.production.local"
+ADMIN_ENV="$APP_DIR/apps/admin/.env.production.local"
+copy_if_missing() {
+  local var=$1
+  if ! grep -q "^${var}=" "$ADMIN_ENV"; then
+    local value
+    value=$(grep "^${var}=" "$WEB_ENV" | head -1 | cut -d'=' -f2-)
+    if [ -n "$value" ]; then
+      echo "${var}=${value}" >> "$ADMIN_ENV"
+      echo "   ✓ Admin recebeu $var do web"
+    else
+      echo "   ⚠️  $var ausente no web — admin precisa setar manualmente"
+    fi
+  fi
+}
+copy_if_missing "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+copy_if_missing "CLERK_SECRET_KEY"
+copy_if_missing "DATABASE_URL"
+
+# ADMIN_EMAILS controla quem pode entrar no admin. Sem isso (e sem o
+# usuário ter publicMetadata.role=super_admin no Clerk), TODO login
+# cai em /acesso-negado. Não criamos default — segurança > conveniência.
+if ! grep -q "^ADMIN_EMAILS=" "$ADMIN_ENV"; then
+  echo "ADMIN_EMAILS=" >> "$ADMIN_ENV"
+  echo ""
+  echo "   ⚠️  ADMIN_EMAILS vazio em $ADMIN_ENV"
+  echo "      Sem isso o admin redireciona tudo pra /acesso-negado."
+  echo "      Pra liberar acesso, SSH na VPS e edite:"
+  echo "        echo 'ADMIN_EMAILS=seuemail@dominio.com' >> $ADMIN_ENV"
+  echo "      Depois: pm2 restart stylo-admin --update-env"
+  echo ""
+fi
+
 echo ""
 echo "🔨 [5/6] Buildando apps..."
 # Build em paralelo via turbo (mais rápido); fallback sequencial se turbo

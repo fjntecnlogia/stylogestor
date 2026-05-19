@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
+import { requireAdmin } from '@/lib/require-admin'
 
 export async function GET() {
+  const guard = await requireAdmin()
+  if (guard) return guard
+
   try {
     const tenants = await prisma.tenant.findMany({
       include: {

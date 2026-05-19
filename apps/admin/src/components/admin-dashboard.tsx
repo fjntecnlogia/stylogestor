@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { UserButton, useUser } from '@clerk/nextjs'
 
 // ── Tipo do tenant vindo da API ──────────────────────────────────
 type TenantDB = {
@@ -157,6 +158,9 @@ const CANAIS_OPCOES = [
 ]
 
 export function AdminDashboard() {
+  const { user } = useUser()
+  const adminEmail = user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses?.[0]?.emailAddress ?? ''
+  const adminName = user?.firstName || adminEmail.split('@')[0] || 'Admin'
   const [page, setPage] = useState('dashboard')
   const [search, setSearch] = useState('')
   const [ticketFiltro, setTicketFiltro] = useState<'todos' | 'aberto' | 'andamento' | 'resolvido'>('todos')
@@ -356,10 +360,21 @@ export function AdminDashboard() {
             </p>
             <p className="text-[10px] text-white/30 mt-0.5">{tenants.length} barbearias</p>
           </div>
-          <div className="bg-white/5 rounded-xl px-3 py-2.5">
-            <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Logado como</p>
-            <p className="text-xs font-semibold text-white">fjntecnologia2022</p>
-            <p className="text-[10px] text-white/40">Super Admin</p>
+          <div className="bg-white/5 rounded-xl px-3 py-2.5 flex items-center gap-2">
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: 'w-8 h-8 ring-2 ring-[#F5A623]/30',
+                  userButtonPopoverCard: 'bg-[#1C2333] border border-white/10',
+                },
+              }}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-white truncate">{adminName}</p>
+              <p className="text-[10px] text-white/40 truncate" title={adminEmail}>
+                {adminEmail || 'Super Admin'}
+              </p>
+            </div>
           </div>
         </div>
       </aside>
