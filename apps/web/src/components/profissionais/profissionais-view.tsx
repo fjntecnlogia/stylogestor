@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { useTenantPersistedState } from '@/lib/tenant-storage'
 import { getInitialProfessionals, type ProfessionalFixture } from './__fixtures__/professionals'
@@ -10,9 +10,11 @@ const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
 interface NovoProfForm { name: string; role: string; phone: string; commission: number; email: string }
 
 export function ProfissionaisView() {
-  // Persistido por tenant — barbeiros cadastrados no onboarding OU aqui ficam no mesmo storage
-  // ('professionals' é a chave compartilhada entre onboarding-flow e profissionais-view).
-  // Quando packages/api expor o módulo de profissionais, trocar por fetch.
+  // Storage local mantido como cache offline + retrocompat com mocks de dev.
+  // Em prod a fonte de verdade é GET /api/professionals (que lê do banco).
+  // O useEffect abaixo sincroniza: ao montar, busca do banco e sobrescreve
+  // o state local — resolve o bug "criei o profissional no onboarding e
+  // não aparece em /profissionais" (era diferença de slug/timing).
   const [professionals, setProfessionals] = useTenantPersistedState<ProfessionalFixture[]>(
     'professionals',
     getInitialProfessionals(),
@@ -23,7 +25,32 @@ export function ProfissionaisView() {
   const [form, setForm] = useState<NovoProfForm>({ name: '', role: 'Barbeiro', phone: '', commission: 40, email: '' })
   const [editForm, setEditForm] = useState({ name: '', role: '', phone: '', commission: 0 })
   const [invitingId, setInvitingId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const { success, error } = useToast()
+
+  // Hidrata do banco no mount (fonte de verdade)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/professionals')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data: ProfessionalFixture[]) => {
+        if (cancelled) return
+        if (Array.isArray(data)) {
+          setProfessionals(data)
+          setSelected((prev) => (prev ? (data.find((p) => p.id === prev.id) ?? data[0] ?? null) : data[0] ?? null))
+        }
+      })
+      .catch((err) => {
+        // Falha silenciosa — segue usando o cache do localStorage.
+        // Em prod sem dados ainda, fica com [] mesmo (empty state aparece).
+        console.warn('[profissionais] fetch falhou, usando cache local', err)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só roda no mount
+  }, [])
 
   // Chama /api/professionals/invite pra criar usuário Clerk + enviar email convite
   const sendInvite = async (profId: string, profName: string, email: string, phone: string) => {
@@ -48,40 +75,67 @@ export function ProfissionaisView() {
   }
 
   const handleAdd = async () => {
-    if (!form.name || !form.phone) return
-    const novo = {
-      id: String(professionals.length + 1),
-      name: form.name, role: form.role, phone: form.phone,
-      commission: form.commission, active: true,
-      schedules: [
-        { day: 1, start: '09:00', end: '18:00' }, { day: 2, start: '09:00', end: '18:00' },
-        { day: 3, start: '09:00', end: '18:00' }, { day: 4, start: '09:00', end: '18:00' },
-        { day: 5, start: '09:00', end: '18:00' }, { day: 6, start: '09:00', end: '14:00' },
-      ],
-      stats: { month: 0, revenue: 0, commission: 0 },
-    }
-    setProfessionals(p => [...p, novo])
-    setSelected(novo)
-    setAdding(false)
-    success(`Profissional ${form.name} cadastrado!`)
+    if (!form.name.trim() || !form.phone.trim()) return
+    try {
+      // Cria no banco — fonte de verdade
+      const res = await fetch('/api/professionals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          role: form.role,
+          phone: form.phone,
+          commission: form.commission,
+        }),
+      })
+      const novo = await res.json()
+      if (!res.ok) {
+        error(novo.error || 'Erro ao cadastrar profissional')
+        return
+      }
+      setProfessionals((p) => [...p, novo])
+      setSelected(novo)
+      setAdding(false)
+      success(`Profissional ${novo.name} cadastrado!`)
 
-    // Se foi informado email, dispara convite Clerk (cria login pro barbeiro acessar /profissional)
-    const emailToInvite = form.email.trim()
-    setForm({ name: '', role: 'Barbeiro', phone: '', commission: 40, email: '' })
-    if (emailToInvite) {
-      await sendInvite(novo.id, novo.name, emailToInvite, novo.phone)
+      // Se foi informado email, dispara convite Clerk (cria login pro barbeiro acessar /profissional)
+      const emailToInvite = form.email.trim()
+      setForm({ name: '', role: 'Barbeiro', phone: '', commission: 40, email: '' })
+      if (emailToInvite) {
+        await sendInvite(novo.id, novo.name, emailToInvite, novo.phone)
+      }
+    } catch (err) {
+      error('Erro de conexão ao cadastrar profissional')
+      console.error(err)
     }
   }
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!selected) return
-    setProfessionals(p => p.map(x => x.id === selected.id
-      ? { ...x, name: editForm.name || x.name, role: editForm.role || x.role, phone: editForm.phone || x.phone, commission: editForm.commission || x.commission }
-      : x
-    ))
-    setSelected(prev => prev && { ...prev, name: editForm.name || prev.name, role: editForm.role || prev.role, phone: editForm.phone || prev.phone, commission: editForm.commission || prev.commission })
-    setEditing(false)
-    success('Profissional atualizado!')
+    try {
+      const res = await fetch(`/api/professionals/${selected.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name || selected.name,
+          role: editForm.role || selected.role,
+          phone: editForm.phone || selected.phone,
+          commission: editForm.commission || selected.commission,
+        }),
+      })
+      const updated = await res.json()
+      if (!res.ok) {
+        error(updated.error || 'Erro ao salvar alterações')
+        return
+      }
+      setProfessionals((p) => p.map((x) => (x.id === selected.id ? { ...x, ...updated } : x)))
+      setSelected((prev) => (prev ? { ...prev, ...updated } : prev))
+      setEditing(false)
+      success('Profissional atualizado!')
+    } catch (err) {
+      error('Erro de conexão ao salvar')
+      console.error(err)
+    }
   }
 
   // Form de novo profissional — JSX como variável (NÃO componente nested,
