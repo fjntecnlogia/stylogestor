@@ -108,18 +108,23 @@ set_var() {
 set_var "NEXT_PUBLIC_CLERK_SIGN_IN_URL" "/login"
 set_var "NEXT_PUBLIC_CLERK_SIGN_UP_URL" "/login"
 
-# ADMIN_EMAILS controla quem pode entrar no admin. Sem isso (e sem o
-# usuário ter publicMetadata.role=super_admin no Clerk), TODO login
-# cai em /acesso-negado. Não criamos default — segurança > conveniência.
+# ADMIN_EMAILS controla quem pode entrar no admin. Default = dono do
+# sistema (FJN Tecnologia). Pra adicionar/trocar admins depois, edite
+# manualmente o $ADMIN_ENV na VPS e rode `pm2 restart stylo-admin --update-env`.
+DEFAULT_ADMIN_EMAILS="fjntecnologia2022@gmail.com"
 if ! grep -q "^ADMIN_EMAILS=" "$ADMIN_ENV"; then
-  echo "ADMIN_EMAILS=" >> "$ADMIN_ENV"
-  echo ""
-  echo "   ⚠️  ADMIN_EMAILS vazio em $ADMIN_ENV"
-  echo "      Sem isso o admin redireciona tudo pra /acesso-negado."
-  echo "      Pra liberar acesso, SSH na VPS e edite:"
-  echo "        echo 'ADMIN_EMAILS=seuemail@dominio.com' >> $ADMIN_ENV"
-  echo "      Depois: pm2 restart stylo-admin --update-env"
-  echo ""
+  echo "ADMIN_EMAILS=${DEFAULT_ADMIN_EMAILS}" >> "$ADMIN_ENV"
+  echo "   ✓ ADMIN_EMAILS=${DEFAULT_ADMIN_EMAILS} (default)"
+else
+  # Se já existe mas está vazio, popula com o default. Não sobrescreve
+  # se já tem algo configurado manualmente.
+  CURRENT=$(grep "^ADMIN_EMAILS=" "$ADMIN_ENV" | cut -d'=' -f2-)
+  if [ -z "$CURRENT" ]; then
+    sed -i "s|^ADMIN_EMAILS=.*|ADMIN_EMAILS=${DEFAULT_ADMIN_EMAILS}|" "$ADMIN_ENV"
+    echo "   ✓ ADMIN_EMAILS estava vazio → setado pra ${DEFAULT_ADMIN_EMAILS}"
+  else
+    echo "   ✓ ADMIN_EMAILS já configurado (não sobrescrevo)"
+  fi
 fi
 
 echo ""
