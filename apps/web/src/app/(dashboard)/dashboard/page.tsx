@@ -6,6 +6,7 @@ import { AppointmentsToday } from '@/components/dashboard/appointments-today'
 import { CashflowCard } from '@/components/dashboard/cashflow-card'
 import { AlertsPanel } from '@/components/dashboard/alerts-panel'
 import { QuickActions } from '@/components/dashboard/quick-actions'
+import { DashboardTour } from '@/components/dashboard/dashboard-tour'
 
 export default function DashboardPage() {
   const { user } = useUser()
@@ -17,7 +18,10 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div
+        data-tour="greeting"
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl"
+      >
         <div>
           <h1 className="text-2xl font-bold text-[#1C1C2E] font-sora">
             {greeting}, {displayName}! ✂️
@@ -26,16 +30,26 @@ export default function DashboardPage() {
             Aqui está o resumo do seu negócio hoje.
           </p>
         </div>
-        <QuickActions />
+        <div data-tour="quick-actions">
+          <QuickActions />
+        </div>
       </div>
 
-      <StatsGrid />
+      <div data-tour="stats">
+        <StatsGrid />
+      </div>
       <AlertsPanel />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <AppointmentsToday />
-        <CashflowCard />
+        <div data-tour="appointments">
+          <AppointmentsToday />
+        </div>
+        <div data-tour="cashflow">
+          <CashflowCard />
+        </div>
       </div>
+
+      <DashboardTour />
     </div>
   )
 }
