@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { PromoCodeInput } from '@/components/promo/promo-code-input'
 
 export default function BloqueadoPage() {
   return (
@@ -49,6 +50,14 @@ export default function BloqueadoPage() {
           >
             💬 Falar com suporte no WhatsApp
           </a>
+        </div>
+
+        {/* Resgate de código promocional — última saída antes de pagar */}
+        <div className="mt-6 text-left">
+          <PromoCodeInput
+            title="🎟️ Tem um código?"
+            subtitle="Se tem um código promocional, digite aqui pra ganhar dias extras."
+          />
         </div>
 
         <p className="text-xs text-[#9CA3AF] mt-6">

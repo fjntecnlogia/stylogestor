@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { useToast } from '@/components/ui/toast'
 import { PortalButton } from '@/components/ui/portal-button'
+import { PromoCodeInput } from '@/components/promo/promo-code-input'
 
 // ── Modal WhatsApp QR Code ──────────────────────────────────────
 function WhatsAppModal({ onClose }: { onClose: () => void }) {
@@ -279,6 +280,10 @@ export function ConfiguracoesView() {
               <p className="text-sm font-semibold text-[#1B8A5A]">✅ Você está no Plano Pro</p>
               <p className="text-xs text-[#4A4A5A] mt-1">Próxima cobrança: 10/06/2026 · R$ 149,00</p>
             </div>
+
+            {/* Resgate de código promocional — dá dias extras de trial */}
+            <PromoCodeInput />
+
             {PLANOS.map((p) => (
               <div key={p.id} className={`bg-white rounded-2xl border p-5 flex items-center justify-between ${p.current ? 'border-[#1A3A6B]' : 'border-[#E8E6E2]'}`}>
                 <div>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { PLANS } from '@/lib/plans'
 import { PortalButton } from '@/components/ui/portal-button'
+import { PromoCodeInput } from '@/components/promo/promo-code-input'
 
 export function PlanosView() {
   const searchParams = useSearchParams()
@@ -50,6 +51,10 @@ export function PlanosView() {
           ❌ {error}
         </div>
       )}
+
+      {/* Resgate de código promocional */}
+      <PromoCodeInput />
+
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
