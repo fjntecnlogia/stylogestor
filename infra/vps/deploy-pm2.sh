@@ -68,6 +68,22 @@ else
   echo "   ⚠️  DATABASE_URL não encontrado em $WEB_ENV — migrate vai falhar"
 fi
 
+# Baseline retroativo: o banco tem tabelas antigas (Tenant, Client, etc)
+# criadas via `db push` sem registro no _prisma_migrations. O Prisma
+# aborta com P3005 'schema is not empty'. Solução: marca todas as
+# migrations ANTIGAS como aplicadas (idempotente — falha silenciosamente
+# se já estiverem). A migration MAIS RECENTE fica de fora pra ser
+# aplicada por migrate deploy.
+MIGRATIONS_DIR="$APP_DIR/packages/database/prisma/migrations"
+if [ -d "$MIGRATIONS_DIR" ]; then
+  ALL_MIGRATIONS=$(ls "$MIGRATIONS_DIR" | grep -v migration_lock.toml | sort)
+  NEWEST=$(echo "$ALL_MIGRATIONS" | tail -1)
+  for mig in $ALL_MIGRATIONS; do
+    if [ "$mig" = "$NEWEST" ]; then continue; fi
+    pnpm --filter @stylogestor/database exec prisma migrate resolve --applied "$mig" 2>/dev/null || true
+  done
+fi
+
 # Roda migrate deploy. Se falhar, ABORTA — antes era || true, mas isso
 # mascarava erros graves (tipo a missing column que quebrou o promo-codes).
 pnpm --filter @stylogestor/database exec prisma migrate deploy || {
