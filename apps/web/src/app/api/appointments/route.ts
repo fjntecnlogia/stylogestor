@@ -125,10 +125,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Confirma que client + professional + services pertencem ao tenant
-    const [client, professional, services] = await Promise.all([
+    const [client, professional, services, tenant] = await Promise.all([
       prisma.client.findFirst({ where: { id: clientId, tenantId } }),
       prisma.professional.findFirst({ where: { id: professionalId, tenantId } }),
       prisma.service.findMany({ where: { id: { in: serviceIds }, tenantId } }),
+      prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }),
     ])
     if (!client) return NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 })
     if (!professional) return NextResponse.json({ error: 'Profissional não encontrado' }, { status: 404 })
@@ -139,6 +140,48 @@ export async function POST(req: NextRequest) {
 
     const startTime = combineDateTime(date, time)
     const endTime = new Date(startTime.getTime() + totalDuration * 60 * 1000)
+
+    // Detecção de conflito de horário: existe outro agendamento ATIVO
+    // do mesmo profissional cujo período se sobrepõe?
+    // Regra de sobreposição: [aStart, aEnd) ∩ [bStart, bEnd) ≠ ∅
+    //   ↔ aStart < bEnd AND aEnd > bStart
+    //
+    // O gestor pode permitir sobreposição via Configurações →
+    // Meu negócio → "Permitir múltiplos agendamentos no mesmo horário".
+    // Útil pra barbearias com mais de uma cadeira por profissional, ou
+    // pra serviços que rodam em paralelo (ex: pintura + corte de outro).
+    const settings = (tenant?.settings as { allowOverlapping?: boolean } | null) ?? {}
+    const allowOverlap = settings.allowOverlapping === true
+
+    if (!allowOverlap) {
+      const conflicting = await prisma.appointment.findFirst({
+        where: {
+          tenantId,
+          professionalId,
+          status: { notIn: ['CANCELED', 'NO_SHOW'] },
+          startTime: { lt: endTime },
+          endTime: { gt: startTime },
+        },
+        include: {
+          client: { select: { name: true } },
+        },
+      })
+      if (conflicting) {
+        const conflictStart = conflicting.startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        const conflictEnd = conflicting.endTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        return NextResponse.json(
+          {
+            error: `Conflito de horário: ${professional.name} já tem ${conflicting.client?.name ?? 'outro cliente'} entre ${conflictStart} e ${conflictEnd}. Pra permitir sobreposição, ative em Configurações → Meu negócio.`,
+            conflict: {
+              clientName: conflicting.client?.name,
+              start: conflictStart,
+              end: conflictEnd,
+            },
+          },
+          { status: 409 },
+        )
+      }
+    }
 
     const created = await prisma.appointment.create({
       data: {

@@ -150,6 +150,7 @@ interface CompanyForm {
   city: string
   state: string
   logo: string
+  allowOverlapping: boolean
 }
 
 export function ConfiguracoesView() {
@@ -163,6 +164,7 @@ export function ConfiguracoesView() {
   // Form controlado de dados da barbearia (Negócio tab)
   const [company, setCompany] = useState<CompanyForm>({
     name: '', phone: '', email: '', address: '', city: '', state: '', logo: '',
+    allowOverlapping: false,
   })
   const [savingCompany, setSavingCompany] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -182,6 +184,7 @@ export function ConfiguracoesView() {
           city: data.city ?? '',
           state: data.state ?? '',
           logo: data.logo ?? '',
+          allowOverlapping: data.allowOverlapping === true,
         })
       })
       .catch(() => { /* silencioso — form fica vazio se falhar */ })
@@ -381,6 +384,36 @@ export function ConfiguracoesView() {
                 )}
               </label>
             </div>
+
+            {/* Política de agendamentos */}
+            <div className="border-t border-[#E8E6E2] pt-5">
+              <h4 className="font-sora font-bold text-[#1C1C2E] mb-3 text-sm">⚙️ Política de agendamentos</h4>
+              <label className="flex items-start gap-3 p-3 rounded-xl border border-[#E8E6E2] hover:bg-[#F8F6F2] cursor-pointer transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setCompany((p) => ({ ...p, allowOverlapping: !p.allowOverlapping }))}
+                  className={`w-10 h-6 rounded-full transition-colors relative shrink-0 mt-0.5 ${
+                    company.allowOverlapping ? 'bg-[#1A3A6B]' : 'bg-[#E8E6E2]'
+                  }`}
+                  aria-pressed={company.allowOverlapping}
+                >
+                  <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                    company.allowOverlapping ? 'left-5' : 'left-1'
+                  }`} />
+                </button>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-[#1C1C2E]">
+                    Permitir agendamentos sobrepostos no mesmo profissional
+                  </p>
+                  <p className="text-xs text-[#6B7280] mt-0.5">
+                    Por padrão (desligado), o sistema bloqueia tentativa de agendar 2 clientes no mesmo
+                    horário com o mesmo profissional. Ligue se sua barbearia tem mais de uma cadeira por
+                    pessoa ou faz atendimentos em paralelo.
+                  </p>
+                </div>
+              </label>
+            </div>
+
             <button
               onClick={handleSaveCompany}
               disabled={savingCompany}
