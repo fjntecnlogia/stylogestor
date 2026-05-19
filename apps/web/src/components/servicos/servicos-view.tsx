@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { getInitialServices, type ServiceFixture } from './__fixtures__/services'
 
@@ -13,30 +13,79 @@ export function ServicosView() {
   const [editValues, setEditValues] = useState<Record<string, { price: number; duration: number }>>({})
   const [adding, setAdding] = useState(false)
   const [newService, setNewService] = useState({ name: '', price: 0, duration: 30, category: 'Corte' })
-  const { success } = useToast()
+  const { success, error } = useToast()
+
+  // Hidrata do banco no mount (fonte de verdade)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/services')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data: ServiceFixture[]) => {
+        if (!cancelled && Array.isArray(data)) setServices(data)
+      })
+      .catch((err) => console.warn('[servicos] fetch falhou, usando initial', err))
+    return () => { cancelled = true }
+  }, [])
 
   const filtered = services.filter((s) => cat === 'Todos' || s.category === cat)
 
-  const handleSave = (id: string) => {
+  const handleSave = async (id: string) => {
     const vals = editValues[id]
     if (!vals) { setEditing(null); return }
-    setServices(p => p.map(s => s.id === id ? { ...s, price: vals.price, duration: vals.duration } : s))
-    setEditing(null)
-    success('Serviço atualizado!')
+    try {
+      const res = await fetch(`/api/services/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ price: vals.price, duration: vals.duration }),
+      })
+      const updated = await res.json()
+      if (!res.ok) { error(updated.error || 'Erro ao salvar'); return }
+      setServices((p) => p.map((s) => (s.id === id ? { ...s, ...updated } : s)))
+      setEditing(null)
+      success('Serviço atualizado!')
+    } catch (err) {
+      error('Erro de conexão ao salvar')
+      console.error(err)
+    }
   }
 
-  const handleToggle = (id: string) => {
-    setServices(p => p.map(s => s.id === id ? { ...s, active: !s.active } : s))
-    success('Status do serviço atualizado!')
+  const handleToggle = async (id: string) => {
+    const current = services.find((s) => s.id === id)
+    if (!current) return
+    try {
+      const res = await fetch(`/api/services/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !current.active }),
+      })
+      const updated = await res.json()
+      if (!res.ok) { error(updated.error || 'Erro ao atualizar status'); return }
+      setServices((p) => p.map((s) => (s.id === id ? { ...s, active: updated.active } : s)))
+      success('Status do serviço atualizado!')
+    } catch (err) {
+      error('Erro de conexão')
+      console.error(err)
+    }
   }
 
-  const handleAdd = () => {
-    if (!newService.name) return
-    const novo = { ...newService, id: String(services.length + 1), active: true, count: 0 }
-    setServices(p => [...p, novo])
-    setAdding(false)
-    setNewService({ name: '', price: 0, duration: 30, category: 'Corte' })
-    success(`Serviço "${novo.name}" criado!`)
+  const handleAdd = async () => {
+    if (!newService.name.trim()) return
+    try {
+      const res = await fetch('/api/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newService),
+      })
+      const novo = await res.json()
+      if (!res.ok) { error(novo.error || 'Erro ao criar serviço'); return }
+      setServices((p) => [...p, novo])
+      setAdding(false)
+      setNewService({ name: '', price: 0, duration: 30, category: 'Corte' })
+      success(`Serviço "${novo.name}" criado!`)
+    } catch (err) {
+      error('Erro de conexão ao criar serviço')
+      console.error(err)
+    }
   }
 
   return (

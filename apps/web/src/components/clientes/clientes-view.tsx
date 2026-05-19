@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { NovoClienteModal } from './novo-cliente-modal'
 import { AppointmentModal } from '../agenda/appointment-modal'
@@ -33,11 +33,25 @@ export function ClientesView() {
   const [novoOpen, setNovoOpen]     = useState(false)
   const [agendaOpen, setAgendaOpen] = useState(false)
   const [historicoOpen, setHistoricoOpen] = useState(false)
-  // Persiste no localStorage scoped por tenant (chave: `stylogestor:{slug}:clients`).
-  // Quando o módulo packages/api/clients estiver plugado, trocar por fetch.
+  // localStorage scoped por tenant (cache offline + retrocompat com mocks).
+  // Fonte de verdade é GET /api/clients (lê do banco). useEffect abaixo
+  // hidrata o state ao montar.
   const [clients, setClients]       = useTenantPersistedState<ClientFixture[]>('clients', getInitialClients())
   const [sortBy, setSortBy]         = useState<'name' | 'visits' | 'spent'>('visits')
-  const { success } = useToast()
+  const { success, error } = useToast()
+
+  // Hidrata do banco no mount
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/clients')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data: ClientFixture[]) => {
+        if (!cancelled && Array.isArray(data)) setClients(data)
+      })
+      .catch((err) => console.warn('[clientes] fetch falhou, usando cache local', err))
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só roda no mount
+  }, [])
 
   // Histórico mockado por cliente — substituir por API quando disponível
   const getHistorico = (clientId: string) => {
@@ -71,13 +85,24 @@ export function ClientesView() {
       return a.name.localeCompare(b.name)
     })
 
-  const handleNovoCliente = (data: { name: string; phone: string; email: string; notes: string }) => {
-    setClients(p => [{
-      id: String(p.length + 1),
-      name: data.name, phone: data.phone, email: data.email,
-      visits: 0, spent: 0, lastVisit: '—', tags: [], segment: 'novo',
-    }, ...p])
-    success(`Cliente ${data.name} cadastrado! 👤`)
+  const handleNovoCliente = async (data: { name: string; phone: string; email: string; notes: string }) => {
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: data.name, phone: data.phone, email: data.email }),
+      })
+      const novo = await res.json()
+      if (!res.ok) {
+        error(novo.error || 'Erro ao cadastrar cliente')
+        return
+      }
+      setClients((p) => [novo, ...p])
+      success(`Cliente ${novo.name} cadastrado! 👤`)
+    } catch (err) {
+      error('Erro de conexão ao cadastrar cliente')
+      console.error(err)
+    }
   }
 
   const handleWhatsApp = (phone: string, name: string) => {
