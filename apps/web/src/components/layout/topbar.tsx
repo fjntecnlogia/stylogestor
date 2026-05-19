@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { UserButton, Show } from '@clerk/nextjs'
 import { AppointmentModal } from '../agenda/appointment-modal'
+import { TrialBadge } from './trial-badge'
 
 interface Props {
   onMenuToggle?: () => void
@@ -32,6 +33,8 @@ export function Topbar({ onMenuToggle }: Props) {
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
+          {/* Badge de trial — só aparece quando relevante (não polui se for assinante há tempos) */}
+          <TrialBadge />
           <button
             onClick={() => setAgendamentoOpen(true)}
             className="bg-[#1A3A6B] text-white text-xs md:text-sm font-bold px-3 md:px-4 py-2 rounded-xl hover:bg-[#142d55] transition-colors shadow-sm whitespace-nowrap"
