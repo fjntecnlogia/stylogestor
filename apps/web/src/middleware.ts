@@ -22,6 +22,8 @@ const isPublicRoute = createRouteMatcher([
   '/api/automations(.*)',        // Automações — chamadas internamente
   '/api/cron(.*)',               // Cron jobs — autenticados via CRON_SECRET, não Clerk
   '/api/v1/tenants/by-slug(.*)',
+  '/api/v1/booking(.*)',         // Booking público — cliente final agenda sem login
+  '/b/(.*)',                     // Landing pública de agendamento
 ])
 
 // Rotas permitidas mesmo sem assinatura ativa

@@ -271,9 +271,11 @@ export function ConfiguracoesView() {
   // Se ainda não estiver disponível, mostra placeholder bem-comunicado.
   const tenantSlug = (user?.publicMetadata as { tenantSlug?: string } | undefined)?.tenantSlug
   const slug = tenantSlug || (isLoaded ? 'sua-barbearia' : '...')
+  // Link público de agendamento. Até subdomain estar configurado por DNS,
+  // usa o path /b/[slug] no domínio principal — funciona desde já.
   const linkAgendamento = tenantSlug
-    ? `https://${tenantSlug}.stylogestor.com.br`
-    : 'https://sua-barbearia.stylogestor.com.br'
+    ? `https://app.stylogestor.com.br/b/${tenantSlug}`
+    : 'https://app.stylogestor.com.br/b/sua-barbearia'
 
   const handleCopyLink = () => {
     if (!tenantSlug) {
@@ -623,7 +625,7 @@ export function ConfiguracoesView() {
                   <div>
                     <p className="font-semibold text-[#1C1C2E]">Link de agendamento</p>
                     <p className="text-xs text-[#4A4A5A]">Compartilhe com seus clientes</p>
-                    <p className="text-xs mt-0.5 font-medium text-[#1B8A5A]">✓ {slug}.stylogestor.com.br</p>
+                    <p className="text-xs mt-0.5 font-medium text-[#1B8A5A]">✓ {linkAgendamento.replace('https://', '')}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
