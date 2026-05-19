@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { getInitialProducts, type ProductFixture } from './__fixtures__/products'
 
@@ -13,38 +13,90 @@ export function EstoqueView() {
   const [entradaQtd, setEntradaQtd] = useState(1)
   const [newProduct, setNewProduct] = useState({ name: '', sku: '', price: 0, cost: 0, stock: 0, minStock: 5, category: 'Finalizador' })
   const [editProduct, setEditProduct] = useState({ name: '', price: 0, minStock: 0 })
-  const { success } = useToast()
+  const { success, error } = useToast()
+
+  // Hidrata do banco no mount (fonte de verdade)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/products')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data: ProductFixture[]) => {
+        if (!cancelled && Array.isArray(data)) setProducts(data)
+      })
+      .catch((err) => console.warn('[estoque] fetch falhou, usando cache local', err))
+    return () => { cancelled = true }
+  }, [])
 
   const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.includes(search)
+    p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku ?? '').includes(search)
   )
   const lowStock = products.filter((p) => p.stock <= p.minStock)
 
-  const handleEntrada = (id: string) => {
+  const handleEntrada = async (id: string) => {
     if (entradaQtd <= 0) return
-    setProducts(p => p.map(x => x.id === id ? { ...x, stock: x.stock + entradaQtd } : x))
-    setEntradaId(null)
-    setEntradaQtd(1)
-    success(`Entrada de ${entradaQtd} unidade(s) registrada!`)
+    const product = products.find((p) => p.id === id)
+    if (!product) return
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock: product.stock + entradaQtd }),
+      })
+      const updated = await res.json()
+      if (!res.ok) { error(updated.error || 'Erro ao registrar entrada'); return }
+      setProducts((p) => p.map((x) => (x.id === id ? { ...x, ...updated } : x)))
+      setEntradaId(null)
+      setEntradaQtd(1)
+      success(`Entrada de ${entradaQtd} unidade(s) registrada!`)
+    } catch (err) {
+      error('Erro de conexão')
+      console.error(err)
+    }
   }
 
-  const handleEdit = (id: string) => {
-    setProducts(p => p.map(x => x.id === id ? {
-      ...x,
-      name: editProduct.name || x.name,
-      price: editProduct.price || x.price,
-      minStock: editProduct.minStock || x.minStock,
-    } : x))
-    setEditId(null)
-    success('Produto atualizado!')
+  const handleEdit = async (id: string) => {
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(editProduct.name ? { name: editProduct.name } : {}),
+          ...(editProduct.price ? { price: editProduct.price } : {}),
+          ...(editProduct.minStock ? { minStock: editProduct.minStock } : {}),
+        }),
+      })
+      const updated = await res.json()
+      if (!res.ok) { error(updated.error || 'Erro ao atualizar'); return }
+      setProducts((p) => p.map((x) => (x.id === id ? { ...x, ...updated } : x)))
+      setEditId(null)
+      success('Produto atualizado!')
+    } catch (err) {
+      error('Erro de conexão')
+      console.error(err)
+    }
   }
 
-  const handleAdd = () => {
-    if (!newProduct.name || !newProduct.sku) return
-    setProducts(p => [...p, { ...newProduct, id: String(p.length + 1) }])
-    setAdding(false)
-    setNewProduct({ name: '', sku: '', price: 0, cost: 0, stock: 0, minStock: 5, category: 'Finalizador' })
-    success('Produto cadastrado!')
+  const handleAdd = async () => {
+    if (!newProduct.name.trim()) {
+      error('Nome do produto é obrigatório')
+      return
+    }
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProduct),
+      })
+      const novo = await res.json()
+      if (!res.ok) { error(novo.error || 'Erro ao cadastrar produto'); return }
+      setProducts((p) => [...p, novo])
+      setAdding(false)
+      setNewProduct({ name: '', sku: '', price: 0, cost: 0, stock: 0, minStock: 5, category: 'Finalizador' })
+      success(`Produto "${novo.name}" cadastrado!`)
+    } catch (err) {
+      error('Erro de conexão ao cadastrar produto')
+      console.error(err)
+    }
   }
 
   return (

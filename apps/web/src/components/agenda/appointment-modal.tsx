@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { useToast } from '@/components/ui/toast'
+import { NovoClienteModal } from '../clientes/novo-cliente-modal'
 // Reusa as mesmas fixtures das views irmãs. Quando a API real estiver
 // plugada, basta trocar essas chamadas por fetches específicos (ex:
 // listar só clientes ativos via /api/clients?active=1).
@@ -46,10 +48,56 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
   const [time, setTime] = useState(defaultTime || '09:00')
   const [step, setStep] = useState<'client' | 'services' | 'schedule'>('client')
 
-  // Sources das listas (mocks até a API plugar). Filtra inativos no momento da seleção.
-  const [allClients] = useState(() => getInitialClients())
-  const [allServices] = useState(() => getInitialServices().filter((s) => s.active))
-  const [allProfessionals] = useState(() => getInitialProfessionals().filter((p) => p.active))
+  // Sources das listas. Hidrata do banco via API ao montar — fonte de
+  // verdade. Fallback pros mocks caso a API falhe (não bloqueia o uso).
+  const [allClients, setAllClients] = useState<ClientFixture[]>(() => getInitialClients())
+  const [allServices, setAllServices] = useState<ServiceFixture[]>(() => getInitialServices().filter((s) => s.active))
+  const [allProfessionals, setAllProfessionals] = useState(() => getInitialProfessionals().filter((p) => p.active))
+  const [novoClienteOpen, setNovoClienteOpen] = useState(false)
+  const { success, error } = useToast()
+
+  // Hidrata as listas quando o modal abre — pega criados/editados em tempo real
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    Promise.all([
+      fetch('/api/clients').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/services').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/professionals').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([clients, services, professionals]) => {
+        if (cancelled) return
+        if (Array.isArray(clients) && clients.length > 0) setAllClients(clients)
+        if (Array.isArray(services) && services.length > 0) setAllServices(services.filter((s: ServiceFixture) => s.active))
+        if (Array.isArray(professionals) && professionals.length > 0) setAllProfessionals(professionals.filter((p: { active: boolean }) => p.active))
+      })
+      .catch(() => { /* silencioso — segue com cache */ })
+    return () => { cancelled = true }
+  }, [open])
+
+  // Cadastra cliente novo via API (chamado pelo NovoClienteModal embutido)
+  const handleNovoCliente = async (data: { name: string; phone: string; email: string; notes: string }) => {
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: data.name, phone: data.phone, email: data.email }),
+      })
+      const novo = await res.json()
+      if (!res.ok) {
+        error(novo.error || 'Erro ao cadastrar cliente')
+        return
+      }
+      // Adiciona à lista + já seleciona pro próximo passo
+      setAllClients((prev) => [novo, ...prev])
+      setSelectedClient(novo)
+      setClientSearch('')
+      success(`Cliente ${novo.name} cadastrado! 👤`)
+    } catch (err) {
+      error('Erro de conexão')
+      console.error(err)
+    }
+  }
 
   const filteredClients = allClients.filter(
     (c) =>
@@ -116,7 +164,10 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
                     </button>
                   ))}
                 </div>
-                <button className="text-sm text-[#1A3A6B] font-medium hover:underline">
+                <button
+                  onClick={() => setNovoClienteOpen(true)}
+                  className="text-sm text-[#1A3A6B] font-medium hover:underline"
+                >
                   + Cadastrar novo cliente
                 </button>
               </div>
@@ -250,6 +301,13 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
           </div>
         </Dialog.Content>
       </Dialog.Portal>
+
+      {/* Sub-modal de cadastro rápido de cliente — abre por cima do AppointmentModal */}
+      <NovoClienteModal
+        open={novoClienteOpen}
+        onClose={() => setNovoClienteOpen(false)}
+        onSave={handleNovoCliente}
+      />
     </Dialog.Root>
   )
 }

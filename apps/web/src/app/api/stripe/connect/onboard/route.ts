@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { auth, currentUser } from '@clerk/nextjs/server'
 import { getStripe } from '@/lib/stripe'
 
 // Cria conta Express no Stripe Connect para a barbearia receber pagamentos
@@ -8,7 +8,27 @@ export async function POST(req: NextRequest) {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-    const { tenantName, email } = await req.json()
+    const body = await req.json().catch(() => ({}))
+    const { tenantName, email: bodyEmail } = body as { tenantName?: string; email?: string }
+
+    // Email: 1º tenta o que veio no body, 2º busca do Clerk se vazio/inválido.
+    // Stripe Connect EXIGE email válido — antes mandávamos string vazia e
+    // dava "Invalid email address".
+    let email = bodyEmail
+    if (!email || !email.includes('@') || email.endsWith('@clerk.temp')) {
+      const user = await currentUser()
+      email =
+        user?.primaryEmailAddress?.emailAddress ??
+        user?.emailAddresses?.[0]?.emailAddress ??
+        undefined
+    }
+    if (!email) {
+      return NextResponse.json(
+        { error: 'Email não configurado. Adicione um email no seu perfil Clerk antes de conectar com Stripe.' },
+        { status: 400 },
+      )
+    }
+
     const stripe = getStripe()
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
 
@@ -22,7 +42,7 @@ export async function POST(req: NextRequest) {
         transfers: { requested: true },
       },
       business_type: 'individual',
-      metadata: { userId, tenantName },
+      metadata: { userId, tenantName: tenantName ?? '' },
     })
 
     // Link de onboarding

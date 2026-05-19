@@ -142,6 +142,16 @@ const DEFAULT_HOURS = [
   { day: 0, start: '09:00', end: '13:00', active: false },
 ]
 
+interface CompanyForm {
+  name: string
+  phone: string
+  email: string
+  address: string
+  city: string
+  state: string
+  logo: string
+}
+
 export function ConfiguracoesView() {
   const [tab, setTab] = useState<'negocio' | 'horarios' | 'plano' | 'integracao'>('negocio')
   const [hours, setHours] = useState(DEFAULT_HOURS)
@@ -149,6 +159,91 @@ export function ConfiguracoesView() {
   const [linkCopied, setLinkCopied] = useState(false)
   const { success, error } = useToast()
   const { user, isLoaded } = useUser()
+
+  // Form controlado de dados da barbearia (Negócio tab)
+  const [company, setCompany] = useState<CompanyForm>({
+    name: '', phone: '', email: '', address: '', city: '', state: '', logo: '',
+  })
+  const [savingCompany, setSavingCompany] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+
+  // Hidrata os dados da barbearia ao montar
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/me/tenant')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data) => {
+        if (cancelled) return
+        setCompany({
+          name: data.name ?? '',
+          phone: data.phone ?? '',
+          email: data.email ?? '',
+          address: data.address ?? '',
+          city: data.city ?? '',
+          state: data.state ?? '',
+          logo: data.logo ?? '',
+        })
+      })
+      .catch(() => { /* silencioso — form fica vazio se falhar */ })
+  }, [])
+
+  const handleSaveCompany = async () => {
+    if (!company.name.trim()) {
+      error('Nome da barbearia é obrigatório')
+      return
+    }
+    setSavingCompany(true)
+    try {
+      const res = await fetch('/api/me/tenant', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(company),
+      })
+      const updated = await res.json()
+      if (!res.ok) { error(updated.error || 'Erro ao salvar'); return }
+      setCompany((prev) => ({ ...prev, ...updated }))
+      success('Dados da barbearia salvos! ✓')
+    } catch (err) {
+      error('Erro de conexão')
+      console.error(err)
+    } finally {
+      setSavingCompany(false)
+    }
+  }
+
+  // Upload de logo: por enquanto converte pra base64 e salva no campo
+  // tenant.logo (string). Quando o módulo de storage chegar (S3/Cloudflare R2),
+  // trocar por upload de verdade e guardar a URL pública.
+  const handleLogoUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      error('Arquivo muito grande. Máximo 2MB.')
+      return
+    }
+    setUploadingLogo(true)
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      // Persiste imediatamente — logo upload já vale como save
+      const res = await fetch('/api/me/tenant', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logo: dataUrl }),
+      })
+      const updated = await res.json()
+      if (!res.ok) { error(updated.error || 'Erro ao salvar logo'); return }
+      setCompany((prev) => ({ ...prev, logo: updated.logo ?? dataUrl }))
+      success(`Logo "${file.name}" salva!`)
+    } catch (err) {
+      error('Erro ao fazer upload')
+      console.error(err)
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
 
   // Slug do tenant vem do Clerk publicMetadata (setado pelo webhook do Stripe no signup).
   // Se ainda não estiver disponível, mostra placeholder bem-comunicado.
@@ -199,40 +294,63 @@ export function ConfiguracoesView() {
           <div className="bg-white rounded-2xl border border-[#E8E6E2] p-6 space-y-5">
             <h3 className="font-sora font-bold text-[#1C1C2E]">Dados da barbearia</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { label: 'Nome da barbearia', placeholder: 'Barbearia do João', type: 'text' },
-                { label: 'Telefone', placeholder: '(11) 99999-9999', type: 'tel' },
-                { label: 'E-mail', placeholder: 'contato@barbearia.com', type: 'email' },
-                { label: 'Endereço', placeholder: 'Rua das Flores, 123', type: 'text' },
-                { label: 'Cidade', placeholder: 'São Paulo', type: 'text' },
-                { label: 'Estado', placeholder: 'SP', type: 'text' },
-              ].map((f) => (
-                <div key={f.label}>
+              {([
+                { key: 'name',    label: 'Nome da barbearia', placeholder: 'Barbearia do João', type: 'text' },
+                { key: 'phone',   label: 'Telefone',          placeholder: '(11) 99999-9999',   type: 'tel' },
+                { key: 'email',   label: 'E-mail',            placeholder: 'contato@barbearia.com', type: 'email' },
+                { key: 'address', label: 'Endereço',          placeholder: 'Rua das Flores, 123', type: 'text' },
+                { key: 'city',    label: 'Cidade',            placeholder: 'São Paulo',           type: 'text' },
+                { key: 'state',   label: 'Estado',            placeholder: 'SP',                  type: 'text' },
+              ] as const).map((f) => (
+                <div key={f.key}>
                   <label className="text-xs font-medium text-[#4A4A5A] block mb-1">{f.label}</label>
-                  <input type={f.type} placeholder={f.placeholder}
-                    className="w-full border border-[#E8E6E2] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]" />
+                  <input
+                    type={f.type}
+                    placeholder={f.placeholder}
+                    value={company[f.key]}
+                    onChange={(e) => setCompany((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                    className="w-full border border-[#E8E6E2] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]"
+                  />
                 </div>
               ))}
             </div>
             <div>
               <label className="text-xs font-medium text-[#4A4A5A] block mb-1">Logo da barbearia</label>
-              <label className="border-2 border-dashed border-[#E8E6E2] rounded-xl p-6 text-center cursor-pointer hover:border-[#1A3A6B]/40 transition-colors block">
-                <input type="file" accept="image/png,image/jpeg,image/svg+xml" className="sr-only"
+              <label className={`border-2 border-dashed border-[#E8E6E2] rounded-xl p-6 text-center cursor-pointer hover:border-[#1A3A6B]/40 transition-colors block ${uploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml"
+                  disabled={uploadingLogo}
+                  className="sr-only"
                   onChange={(e) => {
                     const file = e.target.files?.[0]
-                    if (file && file.size > 2 * 1024 * 1024) { error('Arquivo muito grande. Máximo 2MB.'); return }
-                    if (file) success(`Logo "${file.name}" selecionada! Salve para aplicar.`)
-                  }} />
-                <p className="text-3xl mb-2">🖼️</p>
-                <p className="text-sm text-[#4A4A5A]">Clique para fazer upload da logo</p>
-                <p className="text-xs text-[#4A4A5A]/60">PNG, JPG ou SVG até 2MB</p>
+                    if (file) handleLogoUpload(file)
+                    e.target.value = '' // permite re-upload do mesmo arquivo
+                  }}
+                />
+                {company.logo ? (
+                  <div className="flex flex-col items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={company.logo} alt="Logo" className="max-h-20 object-contain" />
+                    <p className="text-xs text-[#4A4A5A]">Clique para trocar</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-3xl mb-2">🖼️</p>
+                    <p className="text-sm text-[#4A4A5A]">
+                      {uploadingLogo ? 'Enviando...' : 'Clique para fazer upload da logo'}
+                    </p>
+                    <p className="text-xs text-[#4A4A5A]/60">PNG, JPG ou SVG até 2MB</p>
+                  </>
+                )}
               </label>
             </div>
             <button
-              onClick={() => success('Configurações salvas com sucesso!')}
-              className="bg-[#1A3A6B] text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-[#142d55] transition-colors"
+              onClick={handleSaveCompany}
+              disabled={savingCompany}
+              className="bg-[#1A3A6B] disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-[#142d55] transition-colors"
             >
-              Salvar alterações
+              {savingCompany ? 'Salvando...' : 'Salvar alterações'}
             </button>
           </div>
         )}
