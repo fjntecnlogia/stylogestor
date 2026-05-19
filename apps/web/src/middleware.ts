@@ -47,6 +47,7 @@ const isGestorRoute = createRouteMatcher([
   '/estoque(.*)',
   '/fidelidade(.*)',
   '/financeiro(.*)',
+  '/fechamentos(.*)',
   '/profissionais(.*)',
   '/servicos(.*)',
   '/afiliados(.*)',

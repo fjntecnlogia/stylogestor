@@ -76,6 +76,7 @@ model Tenant {
   transactions  Transaction[]
   subscription  Subscription?
   schedules     BusinessSchedule[]
+  cashClosures  CashClosure[]
 
   @@map("tenants")
 }
@@ -477,6 +478,40 @@ model PromoCode {
   redemptions PromoCodeRedemption[]
 
   @@map("promo_codes")
+}
+
+// ============================================================
+// CASH CLOSURE — Fechamento de caixa do dia
+// ============================================================
+// Snapshot do dia financeiro. Quando o gestor "fecha o caixa",
+// guardamos os totais do dia (entradas, saídas, por método de
+// pagamento, comissões, etc) num registro imutável.
+// Útil pra:
+//   - Comparar planejado vs realizado depois
+//   - Gerar relatório/PDF do dia
+//   - Bloquear edições retroativas (aviso na UI, sem hard lock)
+
+model CashClosure {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @db.Uuid
+  date          DateTime @db.Date              // dia do fechamento (1 por dia/tenant)
+  totalIn       Decimal  @db.Decimal(10, 2)
+  totalOut      Decimal  @db.Decimal(10, 2)
+  net           Decimal  @db.Decimal(10, 2)
+  appointments  Int                            // count de COMPLETED no dia
+  cancelations  Int                            // count de CANCELED no dia
+  byMethod      Json                           // { PIX: 200, CASH: 150, CREDIT_CARD: 80, ... }
+  byProfessional Json                          // [{ id, name, atendimentos, faturado, comissao }]
+  totalCommissions Decimal @db.Decimal(10, 2)
+  closedAt      DateTime @default(now())
+  closedByClerkId String?                      // userId Clerk de quem fechou
+  notes         String?                        // observações livres do gestor
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, date])                   // só 1 fechamento por dia/tenant
+  @@index([tenantId, date])
+  @@map("cash_closures")
 }
 
 // Histórico de uso dos códigos — qual tenant resgatou qual código quando.

@@ -530,7 +530,11 @@ export function AgendaView() {
           onCancelar={cancelarAppt}
         />
       )}
-      <FechamentoDiaModal open={fechamentoOpen} onClose={() => setFechamentoOpen(false)} appointments={appointments} totalDia={totalDia} />
+      <FechamentoDiaModal
+        open={fechamentoOpen}
+        onClose={() => setFechamentoOpen(false)}
+        date={format(selectedDate, 'yyyy-MM-dd')}
+      />
 
       {/* Modal de selecionar forma de pagamento ao concluir atendimento */}
       <CompleteAppointmentModal

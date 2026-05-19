@@ -8,6 +8,7 @@ const NAV = [
   { href: '/agenda',        label: 'Agenda',         icon: '📅', group: 'main' },
   { href: '/clientes',      label: 'Clientes',       icon: '👥', group: 'main' },
   { href: '/financeiro',    label: 'Financeiro',     icon: '💰', group: 'main' },
+  { href: '/fechamentos',   label: 'Fechamentos',    icon: '🔒', group: 'main' },
   { href: '/profissionais', label: 'Profissionais',  icon: '✂️', group: 'main' },
   { href: '/servicos',      label: 'Serviços',       icon: '📋', group: 'main' },
   { href: '/estoque',       label: 'Estoque',        icon: '📦', group: 'main' },
