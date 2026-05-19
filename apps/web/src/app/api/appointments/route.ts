@@ -4,18 +4,14 @@ import { getCurrentTenantId } from '@/lib/auth-tenant'
 import { readSettings } from '@/lib/tenant-settings'
 
 /**
- * Converte um Date pra HH:mm.
+ * Converte Date pra HH:mm no timezone do BR.
+ * O server pode estar rodando em UTC (VPS Hostinger). Sem o timeZone
+ * explícito, o user vê o horário UTC em vez do horário dele.
  */
-function toHHmm(d: Date): string {
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false })
-}
-
-/**
- * Combina data ISO (YYYY-MM-DD) + hora HH:mm num DateTime UTC.
- * O servidor armazena em UTC; a UI lida com horário local.
- */
-function combineDateTime(dateStr: string, timeStr: string): Date {
-  return new Date(`${dateStr}T${timeStr}:00`)
+function toHHmm(d: Date, tz = 'America/Sao_Paulo'): string {
+  return d.toLocaleTimeString('pt-BR', {
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz,
+  })
 }
 
 /**
@@ -41,10 +37,13 @@ function shape(a: {
     service: a.services.map((s) => s.service.name).join(' + ') || '—',
     serviceIds: a.services.map((s) => (s as unknown as { serviceId: string }).serviceId),
     price: Number(a.totalPrice ?? 0),
-    discount: 0, // mantemos sempre 0 no shape; desconto será aplicado via Payment futuramente
+    discount: 0,
     payMethod: a.payments[0]?.method ?? '',
     start: toHHmm(a.startTime),
     end: toHHmm(a.endTime),
+    // ISOs UTC pro frontend formatar localmente quando precisar
+    startISO: a.startTime.toISOString(),
+    endISO: a.endTime.toISOString(),
     status: a.status,
     duration: a.totalDuration,
     note: a.notes ?? '',
@@ -60,10 +59,24 @@ export async function GET(req: NextRequest) {
   if (!tenantId) return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
 
   try {
-    const dateParam = req.nextUrl.searchParams.get('date')
-    const dayStr = dateParam ?? new Date().toISOString().slice(0, 10)
-    const dayStart = new Date(`${dayStr}T00:00:00`)
-    const dayEnd = new Date(`${dayStr}T23:59:59.999`)
+    // Preferimos fromISO/toISO (janela explícita do dia no fuso do cliente).
+    // Fallback pro `date` legacy — mas calculado em América/São Paulo
+    // pra não pegar UTC quando o servidor roda UTC.
+    const url = req.nextUrl
+    const fromISO = url.searchParams.get('fromISO')
+    const toISO = url.searchParams.get('toISO')
+
+    let dayStart: Date
+    let dayEnd: Date
+    if (fromISO && toISO) {
+      dayStart = new Date(fromISO)
+      dayEnd = new Date(toISO)
+    } else {
+      // Legacy: ?date=YYYY-MM-DD. Assume BRT (-03) pra alinhar com gestor BR.
+      const dayStr = url.searchParams.get('date') ?? new Date().toISOString().slice(0, 10)
+      dayStart = new Date(`${dayStr}T00:00:00-03:00`)
+      dayEnd = new Date(`${dayStr}T23:59:59.999-03:00`)
+    }
 
     const appointments = await prisma.appointment.findMany({
       where: {
@@ -98,14 +111,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { clientId, professionalId, serviceIds, date, time, notes } = body as {
+    const { clientId, professionalId, serviceIds, date, time, startISO, notes } = body as {
       clientId?: string; professionalId?: string; serviceIds?: string[]
-      date?: string; time?: string; notes?: string
+      date?: string; time?: string; startISO?: string; notes?: string
     }
 
-    if (!clientId || !professionalId || !date || !time) {
+    if (!clientId || !professionalId) {
       return NextResponse.json(
-        { error: 'clientId, professionalId, date e time são obrigatórios' },
+        { error: 'clientId e professionalId são obrigatórios' },
+        { status: 400 },
+      )
+    }
+    if (!startISO && (!date || !time)) {
+      return NextResponse.json(
+        { error: 'startISO (ou date + time) são obrigatórios' },
         { status: 400 },
       )
     }
@@ -113,10 +132,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Pelo menos um serviço é obrigatório' }, { status: 400 })
     }
 
+    // Preferimos o ISO completo enviado pelo client (já em UTC, sem
+    // ambiguidade de timezone). Fallback: date+time interpretados em BRT
+    // (-03) pra não pegar UTC quando server roda UTC.
+    const requestedStart = startISO
+      ? new Date(startISO)
+      : new Date(`${date}T${time}:00-03:00`)
+    if (isNaN(requestedStart.getTime())) {
+      return NextResponse.json({ error: 'Data/hora inválida' }, { status: 400 })
+    }
+
     // Validação anti-agendamento-no-passado (defesa em profundidade —
     // a UI já bloqueia, mas client validation pode ser burlada).
     // Tolerância de 1 minuto pra latência de rede + clock skew.
-    const requestedStart = new Date(`${date}T${time}:00`)
     const nowWithTolerance = new Date(Date.now() - 60 * 1000)
     if (requestedStart < nowWithTolerance) {
       return NextResponse.json(
@@ -172,7 +200,7 @@ export async function POST(req: NextRequest) {
     const totalPrice = services.reduce((s, sv) => s + Number(sv.price), 0)
     const totalDuration = services.reduce((s, sv) => s + sv.duration, 0)
 
-    const startTime = combineDateTime(date, time)
+    const startTime = requestedStart
     const endTime = new Date(startTime.getTime() + totalDuration * 60 * 1000)
 
     // Detecção de conflito de horário do mesmo profissional. Inclui o
@@ -196,8 +224,8 @@ export async function POST(req: NextRequest) {
         },
       })
       if (conflicting) {
-        const cStart = conflicting.startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-        const cEnd = conflicting.endTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        const cStart = toHHmm(conflicting.startTime)
+        const cEnd = toHHmm(conflicting.endTime)
         const bufferNote = settings.defaultAppointmentBuffer > 0
           ? ` (com buffer de ${settings.defaultAppointmentBuffer}min entre atendimentos)`
           : ''

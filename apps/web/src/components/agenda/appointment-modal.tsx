@@ -99,10 +99,14 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
     }
   }
 
-  // Validação de data/hora — bloqueia agendamento no passado
+  // Validação de data/hora — bloqueia agendamento no passado.
+  // Comparação feita em LOCAL do browser (mesmo fuso onde o user digita).
+  // Evita bug de UTC: antes new Date(`${date}T${time}:00`) era interpretado
+  // como UTC em algumas situações; agora comparamos timestamps diretos.
   const now = new Date()
-  const todayStr = now.toISOString().slice(0, 10) // YYYY-MM-DD
-  const minTimeForToday = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  const minTimeForToday = `${pad(now.getHours())}:${pad(now.getMinutes())}`
   const isPastDate = date < todayStr
   const isPastTime = date === todayStr && time < minTimeForToday
   const isInPast = isPastDate || isPastTime

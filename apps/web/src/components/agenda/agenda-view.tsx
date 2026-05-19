@@ -72,11 +72,17 @@ export function AgendaView() {
     return () => { cancelled = true }
   }, [])
 
-  // Hidrata appointments do banco — re-fetch quando data muda
+  // Hidrata appointments do banco — re-fetch quando data muda.
+  // Manda fromISO/toISO calculados no fuso LOCAL do browser pra evitar
+  // bug de timezone (servidor em UTC pegava janela errada).
   useEffect(() => {
     let cancelled = false
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
-    fetch(`/api/appointments?date=${dateStr}`)
+    const fromLocal = new Date(`${dateStr}T00:00:00`)
+    const toLocal = new Date(`${dateStr}T23:59:59.999`)
+    const fromISO = encodeURIComponent(fromLocal.toISOString())
+    const toISO = encodeURIComponent(toLocal.toISOString())
+    fetch(`/api/appointments?fromISO=${fromISO}&toISO=${toISO}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: AppointmentFixture[]) => {
         if (cancelled || !Array.isArray(data)) return
@@ -134,6 +140,11 @@ export function AgendaView() {
 
   const addAppt = async (payload: NewAppointmentPayload) => {
     try {
+      // Calcula ISO completo no fuso LOCAL do browser → server interpreta
+      // sem ambiguidade. Antes mandávamos só date+time e o server (UTC)
+      // interpretava errado.
+      const localStart = new Date(`${payload.date}T${payload.time}:00`)
+      const startISO = localStart.toISOString()
       const res = await fetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -141,6 +152,8 @@ export function AgendaView() {
           clientId: payload.clientId,
           professionalId: payload.professionalId,
           serviceIds: payload.serviceIds,
+          startISO,
+          // Mandar date+time também como backup (legacy fallback)
           date: payload.date,
           time: payload.time,
         }),

@@ -127,8 +127,14 @@ export async function PATCH(
       price: Number(updated.totalPrice),
       discount: 0,
       payMethod: payMethod ?? updated.payments[0]?.method ?? '',
-      start: updated.startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      end: updated.endTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      start: updated.startTime.toLocaleTimeString('pt-BR', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
+      }),
+      end: updated.endTime.toLocaleTimeString('pt-BR', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
+      }),
+      startISO: updated.startTime.toISOString(),
+      endISO: updated.endTime.toISOString(),
       status: updated.status,
       duration: updated.totalDuration,
       note: updated.notes ?? '',

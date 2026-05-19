@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@stylogestor/database'
+import { startOfTodayBR, endOfTodayBR, startOfMonthBR } from '@/lib/datetime-br'
 
 export async function GET() {
   try {
@@ -13,12 +14,13 @@ export async function GET() {
     if (!tenantUser) return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
 
     const tenantId = tenantUser.tenantId
-    const hoje = new Date()
-    hoje.setHours(0, 0, 0, 0)
-    const amanha = new Date(hoje)
-    amanha.setDate(amanha.getDate() + 1)
-
-    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+    // Datas no fuso BR — sem isso o server (UTC) pegava janela errada
+    // do dia. Ex: agendamento das 23h BRT (= 02h UTC do dia seguinte)
+    // não aparecia no "hoje" UTC.
+    const hoje = startOfTodayBR()
+    const amanha = endOfTodayBR()
+    const now = new Date()
+    const inicioMes = startOfMonthBR(now.getUTCFullYear(), now.getUTCMonth())
 
     const [
       agendamentosHoje,
@@ -30,7 +32,7 @@ export async function GET() {
       paymentsHoje,
     ] = await Promise.all([
       prisma.appointment.findMany({
-        where: { tenantId, date: { gte: hoje, lt: amanha }, status: { notIn: ['CANCELED', 'NO_SHOW'] } },
+        where: { tenantId, date: { gte: hoje, lte: amanha }, status: { notIn: ['CANCELED', 'NO_SHOW'] } },
         include: {
           client:       { select: { name: true, phone: true } },
           professional: { select: { name: true } },
@@ -58,7 +60,7 @@ export async function GET() {
       prisma.payment.findMany({
         where: {
           appointment: { tenantId },
-          paidAt: { gte: hoje, lt: amanha },
+          paidAt: { gte: hoje, lte: amanha },
         },
         include: {
           appointment: {
@@ -106,7 +108,9 @@ export async function GET() {
         clientPhone: a.client.phone,
         professionalName: a.professional.name,
         services: a.services.map(s => s.service.name).join(', '),
-        time: a.startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        time: a.startTime.toLocaleTimeString('pt-BR', {
+          hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
+        }),
         totalPrice: Number(a.totalPrice),
         status: a.status,
       })),
