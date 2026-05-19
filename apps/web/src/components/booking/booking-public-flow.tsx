@@ -46,6 +46,9 @@ export function BookingPublicFlow({ slug }: { slug: string }) {
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirmed, setConfirmed] = useState<{ status: string; message: string } | null>(null)
+  // Erro persistente do submit (ex: 409 conflito). Diferente do toast,
+  // não some sozinho — só some quando user volta um passo ou muda algo.
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   // Hidrata tudo no mount
   useEffect(() => {
@@ -116,9 +119,10 @@ export function BookingPublicFlow({ slug }: { slug: string }) {
 
   const handleSubmit = async () => {
     if (!clientName.trim() || !clientPhone.trim()) {
-      error('Preencha nome e WhatsApp')
+      setSubmitError('Preencha nome e WhatsApp pra continuar.')
       return
     }
+    setSubmitError(null)
     setSubmitting(true)
     try {
       const localStart = new Date(`${selectedDate}T${selectedTime}:00`)
@@ -134,12 +138,15 @@ export function BookingPublicFlow({ slug }: { slug: string }) {
         }),
       })
       const data = await res.json()
-      if (!res.ok) { error(data.error || 'Erro ao agendar'); return }
+      if (!res.ok) {
+        setSubmitError(data.error || 'Erro ao agendar')
+        return
+      }
       setConfirmed({ status: data.status, message: data.message })
       setStep('success')
       success('Agendamento enviado! 🎉')
     } catch (err) {
-      error('Erro de conexão. Tente novamente.')
+      setSubmitError('Erro de conexão. Tente novamente.')
       console.error(err)
     } finally {
       setSubmitting(false)
@@ -381,6 +388,17 @@ export function BookingPublicFlow({ slug }: { slug: string }) {
               />
             </div>
 
+            {/* Banner de erro persistente — só aparece após tentativa falha */}
+            {submitError && (
+              <div className="bg-red-50 border border-red-300 rounded-2xl p-4">
+                <p className="text-xs font-bold text-red-800 mb-1">⚠️ Não foi possível agendar</p>
+                <p className="text-sm text-red-700 leading-snug">{submitError}</p>
+                <p className="text-[10px] text-red-500 mt-2">
+                  Volte um passo e escolha outro horário ou profissional.
+                </p>
+              </div>
+            )}
+
             {/* Resumo */}
             <div className="bg-[#F0F4FF] border border-[#BFDBFE] rounded-2xl p-4 mt-2">
               <p className="text-xs font-bold text-[#1A3A6B] uppercase tracking-wide mb-2">Resumo</p>
@@ -433,6 +451,7 @@ export function BookingPublicFlow({ slug }: { slug: string }) {
           <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
             <button
               onClick={() => {
+                setSubmitError(null) // limpa erro ao voltar — user vai mexer em algo
                 if (step === 'services') return
                 if (step === 'professional') setStep('services')
                 if (step === 'datetime') setStep('professional')

@@ -33,7 +33,12 @@ interface Props {
   defaultDate?: string
   defaultTime?: string
   defaultProfessionalId?: string
-  onSave?: (appt: NewAppointmentPayload) => void
+  /**
+   * Chamado ao confirmar. Pode retornar `{ ok: false, error: '...' }` que
+   * o modal vai mostrar como banner vermelho persistente. Se retornar
+   * `{ ok: true }` ou undefined (legacy), o modal fecha sozinho.
+   */
+  onSave?: (appt: NewAppointmentPayload) => Promise<{ ok: boolean; error?: string } | void> | void
 }
 
 export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defaultProfessionalId, onSave }: Props) {
@@ -46,6 +51,10 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
   const [professional, setProfessional] = useState(defaultProfessionalId || '')
   const [date, setDate] = useState(defaultDate || new Date().toISOString().slice(0, 10))
   const [time, setTime] = useState(defaultTime || '09:00')
+  // Erro persistente do submit (ex: 409 conflito). Mantém modal aberto pro
+  // gestor ver a mensagem e ajustar o horário em vez de re-abrir tudo.
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [step, setStep] = useState<'client' | 'services' | 'schedule'>('client')
 
   // Sources das listas. Hidrata do banco via API ao montar — fonte de
@@ -148,8 +157,17 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
     setSelectedClient(null)
     setSelectedServices([])
     setClientSearch('')
+    setSubmitError(null)
+    setSubmitting(false)
     onClose()
   }
+
+  // Limpa erro quando user muda data/hora/profissional — sinal de que tá
+  // tentando outro horário pra resolver o conflito.
+  useEffect(() => {
+    if (submitError) setSubmitError(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, time, professional])
 
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && handleClose()}>
@@ -308,6 +326,19 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
             )}
           </div>
 
+          {/* Banner de erro persistente (conflito, fora do horário, etc) */}
+          {submitError && (
+            <div className="px-6 pb-3">
+              <div className="bg-red-50 border border-red-300 rounded-xl px-4 py-3">
+                <p className="text-xs font-bold text-red-800 mb-0.5">⚠️ Não foi possível agendar</p>
+                <p className="text-sm text-red-700 leading-snug">{submitError}</p>
+                <p className="text-[10px] text-red-500 mt-1">
+                  Ajuste a data, horário ou profissional pra tentar de novo.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Footer com botões */}
           <div className="px-6 py-4 border-t border-[#E8E6E2] flex justify-between">
             <button
@@ -327,37 +358,52 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
               </button>
             ) : (
               <button
-                disabled={!professional || !selectedClient || selectedServices.length === 0 || isInPast || !!scheduleWarning}
-                onClick={() => {
+                disabled={submitting || !professional || !selectedClient || selectedServices.length === 0 || isInPast || !!scheduleWarning}
+                onClick={async () => {
                   if (!selectedClient || selectedServices.length === 0 || !professional) return
                   if (isInPast) {
-                    error('Não é possível agendar no passado')
+                    setSubmitError('Não é possível agendar no passado.')
                     return
                   }
                   if (scheduleWarning) {
-                    error(scheduleWarning)
+                    setSubmitError(scheduleWarning)
                     return
                   }
                   const services = selectedServiceObjs
                   const prof = allProfessionals.find((p) => p.id === professional)
-                  onSave?.({
-                    clientId: selectedClient.id,
-                    clientName: selectedClient.name,
-                    clientPhone: selectedClient.phone,
-                    serviceIds: selectedServices,
-                    serviceLabel: services.map((s) => s.name).join(' + '),
-                    professionalId: professional,
-                    professionalName: prof?.name ?? '',
-                    date,
-                    time,
-                    price: totalPrice,
-                    duration: totalDuration,
-                  })
-                  handleClose()
+                  setSubmitError(null)
+                  setSubmitting(true)
+                  try {
+                    const result = await onSave?.({
+                      clientId: selectedClient.id,
+                      clientName: selectedClient.name,
+                      clientPhone: selectedClient.phone,
+                      serviceIds: selectedServices,
+                      serviceLabel: services.map((s) => s.name).join(' + '),
+                      professionalId: professional,
+                      professionalName: prof?.name ?? '',
+                      date,
+                      time,
+                      price: totalPrice,
+                      duration: totalDuration,
+                    })
+                    // Se onSave retornar { ok: false }, mostra banner em vez de fechar.
+                    // Se retornar undefined (legacy) ou { ok: true }, fecha modal.
+                    if (result && result.ok === false) {
+                      setSubmitError(result.error ?? 'Erro ao agendar')
+                      setSubmitting(false)
+                      return
+                    }
+                    handleClose()
+                  } catch (err) {
+                    setSubmitError('Erro de conexão. Tente novamente.')
+                    setSubmitting(false)
+                    console.error(err)
+                  }
                 }}
                 className="bg-[#1B8A5A] disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-[#156b47] transition-colors"
               >
-                ✓ Confirmar agendamento
+                {submitting ? 'Agendando...' : '✓ Confirmar agendamento'}
               </button>
             )}
           </div>

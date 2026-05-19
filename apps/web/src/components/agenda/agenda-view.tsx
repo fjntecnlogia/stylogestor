@@ -182,11 +182,8 @@ export function AgendaView() {
     }
   }
 
-  const addAppt = async (payload: NewAppointmentPayload) => {
+  const addAppt = async (payload: NewAppointmentPayload): Promise<{ ok: boolean; error?: string }> => {
     try {
-      // Calcula ISO completo no fuso LOCAL do browser → server interpreta
-      // sem ambiguidade. Antes mandávamos só date+time e o server (UTC)
-      // interpretava errado.
       const localStart = new Date(`${payload.date}T${payload.time}:00`)
       const startISO = localStart.toISOString()
       const res = await fetch('/api/appointments', {
@@ -197,18 +194,21 @@ export function AgendaView() {
           professionalId: payload.professionalId,
           serviceIds: payload.serviceIds,
           startISO,
-          // Mandar date+time também como backup (legacy fallback)
           date: payload.date,
           time: payload.time,
         }),
       })
-      const novo = await res.json()
-      if (!res.ok) { error(novo.error || 'Erro ao criar agendamento'); return }
-      setAppointments((p) => [...p, novo])
+      const data = await res.json()
+      if (!res.ok) {
+        // Não usa toast — o modal mostra banner persistente.
+        return { ok: false, error: data.error || 'Erro ao criar agendamento' }
+      }
+      setAppointments((p) => [...p, data])
       success(`Agendamento de ${payload.clientName} criado! ✅`)
+      return { ok: true }
     } catch (err) {
-      error('Erro de conexão ao criar agendamento')
       console.error(err)
+      return { ok: false, error: 'Erro de conexão. Tente novamente.' }
     }
   }
 
