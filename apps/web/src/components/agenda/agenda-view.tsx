@@ -24,9 +24,41 @@ function profInitials(name: string): string {
   return name.split(' ').slice(0, 2).map((s) => s[0]).join('').toUpperCase()
 }
 
-const HORARIOS = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30',
+/** Range default quando ainda não carregamos schedule do banco. */
+const DEFAULT_HORARIOS = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30',
   '12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30',
   '16:00','16:30','17:00','17:30','18:00','18:30','19:00']
+
+interface BusinessHour {
+  day: number; start: string; end: string; active: boolean
+}
+
+/**
+ * Gera lista de horários de 30 em 30min entre min(start) e max(end)
+ * dos dias ativos. Se nada vier do schedule, usa o default 08-19.
+ */
+function buildHorariosFromSchedule(schedules: BusinessHour[]): string[] {
+  const actives = schedules.filter((s) => s.active)
+  if (actives.length === 0) return DEFAULT_HORARIOS
+
+  const toMin = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number)
+    return h * 60 + m
+  }
+  const minStart = Math.min(...actives.map((s) => toMin(s.start)))
+  const maxEnd = Math.max(...actives.map((s) => toMin(s.end)))
+  // Estende meia hora pra cima/baixo pra dar respiro visual
+  const start = Math.max(0, minStart - 30)
+  const end = Math.min(24 * 60, maxEnd + 30)
+
+  const out: string[] = []
+  for (let m = start; m <= end; m += 30) {
+    const hh = String(Math.floor(m / 60)).padStart(2, '0')
+    const mm = String(m % 60).padStart(2, '0')
+    out.push(`${hh}:${mm}`)
+  }
+  return out
+}
 
 const STATUS_CONFIG = {
   COMPLETED:  { label: 'Concluído',  bg: '#D1FAE5', text: '#065F46', border: '#6EE7B7' },
@@ -49,24 +81,36 @@ export function AgendaView() {
   // Lista de profissionais carregada da API — substitui o array hardcoded
   // PROFISSIONAIS que tinha 2 fakes. Cada barbearia vê os seus.
   const [profissionais, setProfissionais] = useState<Array<{ id: string; name: string; color: string; initials: string }>>([])
+  // Horário de funcionamento da barbearia (vem do BusinessSchedule). Usado pra
+  // gerar a timeline dinâmica — se a barbearia abre só de manhã, mostra só
+  // horários da manhã. Se abre até tarde, estende o range.
+  const [businessHours, setBusinessHours] = useState<BusinessHour[]>([])
+  const HORARIOS = buildHorariosFromSchedule(businessHours)
 
   const { success, error } = useToast()
 
-  // Hidrata profissionais do banco (uma vez no mount)
+  // Hidrata profissionais + horário de funcionamento (uma vez no mount).
   useEffect(() => {
     let cancelled = false
-    fetch('/api/professionals')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Array<{ id: string; name: string }>) => {
-        if (cancelled || !Array.isArray(data)) return
-        setProfissionais(
-          data.map((p) => ({
-            id: p.id,
-            name: p.name,
-            color: profColor(p.id),
-            initials: profInitials(p.name),
-          })),
-        )
+    Promise.all([
+      fetch('/api/professionals').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/me/business-schedule').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([profsData, scheduleData]) => {
+        if (cancelled) return
+        if (Array.isArray(profsData)) {
+          setProfissionais(
+            profsData.map((p: { id: string; name: string }) => ({
+              id: p.id,
+              name: p.name,
+              color: profColor(p.id),
+              initials: profInitials(p.name),
+            })),
+          )
+        }
+        if (Array.isArray(scheduleData)) {
+          setBusinessHours(scheduleData)
+        }
       })
       .catch(() => { /* silencioso */ })
     return () => { cancelled = true }

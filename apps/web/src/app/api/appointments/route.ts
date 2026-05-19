@@ -203,6 +203,40 @@ export async function POST(req: NextRequest) {
     const startTime = requestedStart
     const endTime = new Date(startTime.getTime() + totalDuration * 60 * 1000)
 
+    // Validação contra horário de funcionamento (BusinessSchedule).
+    // Pega dayOfWeek e HH:mm interpretados em BRT (server pode estar UTC).
+    // BRT = UTC-3 (sem DST desde 2019). Adicionamos -3h e usamos getUTC* pra
+    // extrair valores "como visto pelo BR".
+    const BR_OFFSET = -3 * 60 * 60 * 1000
+    const startBR = new Date(startTime.getTime() + BR_OFFSET)
+    const endBR = new Date(endTime.getTime() + BR_OFFSET)
+    const dayOfWeek = startBR.getUTCDay() // 0=Dom, 6=Sáb
+    const pad2 = (n: number) => String(n).padStart(2, '0')
+    const startHHmm = `${pad2(startBR.getUTCHours())}:${pad2(startBR.getUTCMinutes())}`
+    const endHHmm = `${pad2(endBR.getUTCHours())}:${pad2(endBR.getUTCMinutes())}`
+
+    const schedule = await prisma.businessSchedule.findFirst({
+      where: { tenantId, dayOfWeek },
+    })
+    if (!schedule || !schedule.active) {
+      const dayNames = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
+      return NextResponse.json(
+        {
+          error: `A barbearia não funciona na ${dayNames[dayOfWeek]}-feira. Configure os horários em Configurações → Horários.`,
+        },
+        { status: 400 },
+      )
+    }
+    // Horários do schedule também são HH:mm — comparação lexicográfica funciona
+    if (startHHmm < schedule.startTime || endHHmm > schedule.endTime) {
+      return NextResponse.json(
+        {
+          error: `Horário fora do funcionamento. Hoje a barbearia atende das ${schedule.startTime} às ${schedule.endTime}. O agendamento começaria às ${startHHmm} e terminaria ${endHHmm}.`,
+        },
+        { status: 400 },
+      )
+    }
+
     // Detecção de conflito de horário do mesmo profissional. Inclui o
     // BUFFER configurado nas settings (ex: buffer=15min impede que outro
     // atendimento comece menos de 15min depois do anterior terminar).

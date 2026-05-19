@@ -56,6 +56,9 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
   const [novoClienteOpen, setNovoClienteOpen] = useState(false)
   const { success, error } = useToast()
 
+  // Schedule da barbearia pra mostrar warning de horário fora do funcionamento
+  const [businessHours, setBusinessHours] = useState<Array<{ day: number; start: string; end: string; active: boolean }>>([])
+
   // Hidrata as listas quando o modal abre — pega criados/editados em tempo real
   useEffect(() => {
     if (!open) return
@@ -64,12 +67,14 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
       fetch('/api/clients').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/services').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/professionals').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/me/business-schedule').then((r) => (r.ok ? r.json() : [])),
     ])
-      .then(([clients, services, professionals]) => {
+      .then(([clients, services, professionals, schedule]) => {
         if (cancelled) return
         if (Array.isArray(clients) && clients.length > 0) setAllClients(clients)
         if (Array.isArray(services) && services.length > 0) setAllServices(services.filter((s: ServiceFixture) => s.active))
         if (Array.isArray(professionals) && professionals.length > 0) setAllProfessionals(professionals.filter((p: { active: boolean }) => p.active))
+        if (Array.isArray(schedule)) setBusinessHours(schedule)
       })
       .catch(() => { /* silencioso — segue com cache */ })
     return () => { cancelled = true }
@@ -110,6 +115,23 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
   const isPastDate = date < todayStr
   const isPastTime = date === todayStr && time < minTimeForToday
   const isInPast = isPastDate || isPastTime
+
+  // Validação contra horário de funcionamento da barbearia.
+  // Pega o dia da semana da data escolhida (0=Dom, 6=Sáb) e compara HH:mm
+  // com o BusinessSchedule daquele dia. Se barbearia fechada ou fora do
+  // horário, mostra warning + bloqueia confirmar.
+  const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+  const selectedDayOfWeek = date ? new Date(`${date}T12:00:00`).getDay() : -1
+  const todaySchedule = businessHours.find((s) => s.day === selectedDayOfWeek)
+  const isClosedDay = todaySchedule && !todaySchedule.active
+  const isOutsideHours = todaySchedule && todaySchedule.active && time && (
+    time < todaySchedule.start || time >= todaySchedule.end
+  )
+  const scheduleWarning = isClosedDay
+    ? `A barbearia não funciona na ${dayNames[selectedDayOfWeek]}-feira.`
+    : isOutsideHours
+    ? `Fora do horário: na ${dayNames[selectedDayOfWeek]}-feira a barbearia atende das ${todaySchedule!.start} às ${todaySchedule!.end}.`
+    : ''
 
   const filteredClients = allClients.filter(
     (c) =>
@@ -262,6 +284,13 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
                     ⚠️ Esse horário já passou. Escolha uma data ou hora futura.
                   </div>
                 )}
+
+                {/* Aviso de horário fora do funcionamento da barbearia */}
+                {!isInPast && scheduleWarning && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-800">
+                    ⚠️ {scheduleWarning} <span className="font-semibold">Configure em /configurações → Horários se quiser ajustar.</span>
+                  </div>
+                )}
                 <div>
                   <label className="text-xs font-medium text-[#4A4A5A] block mb-1">Profissional</label>
                   <select
@@ -298,11 +327,15 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
               </button>
             ) : (
               <button
-                disabled={!professional || !selectedClient || selectedServices.length === 0 || isInPast}
+                disabled={!professional || !selectedClient || selectedServices.length === 0 || isInPast || !!scheduleWarning}
                 onClick={() => {
                   if (!selectedClient || selectedServices.length === 0 || !professional) return
                   if (isInPast) {
                     error('Não é possível agendar no passado')
+                    return
+                  }
+                  if (scheduleWarning) {
+                    error(scheduleWarning)
                     return
                   }
                   const services = selectedServiceObjs
