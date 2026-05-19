@@ -64,6 +64,12 @@ jobs:
           # apareciam durante o deploy real e quebravam o pm2 reload.
           NEXT_PUBLIC_USE_MOCKS: 'false'
 
+      - name: Build Admin (smoke)
+        run: pnpm --filter admin build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_USE_MOCKS: 'false'
+
   # ─── 2. Deploy via SSH+PM2 na VPS Hostinger ──────────────────────
   deploy:
     name: 🚀 Deploy PM2 na VPS

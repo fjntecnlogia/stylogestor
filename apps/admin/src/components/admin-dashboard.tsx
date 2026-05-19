@@ -22,7 +22,13 @@ function saveLS<T>(key: string, value: T) {
   try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
 }
 
-const TENANTS = [
+// Flag de mocks gated por env (NEXT_PUBLIC_USE_MOCKS=false em prod).
+// Em dev (true ou unset) as fixtures aparecem pra navegar a UI; em prod
+// todas as listas começam zeradas até o admin cadastrar dados reais ou
+// até a API expor os dados via /api/tenants etc.
+const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== 'false'
+
+const _TENANTS_MOCK = [
   { id: '1', name: 'Barbearia do João',    slug: 'joao-barber',   plan: 'PRO',     status: 'active',   mrr: 149, since: '01/03/2026', city: 'São Paulo',    clients: 148, appts: 312, lastLogin: '11/05/2026', email: 'joao@barbearia.com',    phone: '5511999990001' },
   { id: '2', name: 'Studio Beleza & Cia',  slug: 'studio-beleza', plan: 'PREMIUM', status: 'active',   mrr: 249, since: '15/02/2026', city: 'Curitiba',     clients: 234, appts: 521, lastLogin: '11/05/2026', email: 'contato@studiobeleza.com', phone: '5541999990002' },
   { id: '3', name: 'Barber King',          slug: 'barber-king',   plan: 'STARTER', status: 'active',   mrr: 79,  since: '10/04/2026', city: 'BH',           clients: 67,  appts: 143, lastLogin: '10/05/2026', email: 'rei@barberking.com',    phone: '5531999990003' },
@@ -30,20 +36,23 @@ const TENANTS = [
   { id: '5', name: 'Classic Barber Shop',  slug: 'classic-bs',    plan: 'PRO',     status: 'past_due', mrr: 149, since: '20/01/2026', city: 'Porto Alegre', clients: 89,  appts: 201, lastLogin: '08/05/2026', email: 'classic@barber.com',    phone: '5551999990005' },
   { id: '6', name: 'Espaço Capilar',       slug: 'espaco-cap',    plan: 'STARTER', status: 'canceled', mrr: 0,   since: '01/01/2026', city: 'Fortaleza',    clients: 45,  appts: 98,  lastLogin: '01/04/2026', email: 'espaco@capilar.com',    phone: '5585999990006' },
 ]
+const TENANTS = (USE_MOCKS ? _TENANTS_MOCK : []) as typeof _TENANTS_MOCK
 
-const TICKETS_INICIAL = [
+const _TICKETS_INICIAL_MOCK = [
   { id: '1', tenant: 'Barbearia do João',    tipo: 'suporte',    titulo: 'Agendamento duplicado',             status: 'aberto',      data: '11/05/2026', prioridade: 'alta',  resposta: '' },
   { id: '2', tenant: 'Studio Beleza & Cia',  tipo: 'elogio',     titulo: 'Suporte incrível!',                 status: 'resolvido',   data: '10/05/2026', prioridade: 'baixa', resposta: 'Obrigado pelo elogio! Fico feliz que pôde nos ajudar.' },
   { id: '3', tenant: 'Barber King',          tipo: 'reclamacao', titulo: 'WhatsApp não enviando lembretes',   status: 'andamento',   data: '09/05/2026', prioridade: 'alta',  resposta: '' },
   { id: '4', tenant: 'Salão da Maria',       tipo: 'sugestao',   titulo: 'Adicionar relatório semanal',       status: 'aberto',      data: '08/05/2026', prioridade: 'media', resposta: '' },
   { id: '5', tenant: 'Classic Barber Shop',  tipo: 'suporte',    titulo: 'Erro ao fechar caixa',              status: 'andamento',   data: '07/05/2026', prioridade: 'alta',  resposta: '' },
 ]
+const TICKETS_INICIAL = (USE_MOCKS ? _TICKETS_INICIAL_MOCK : []) as typeof _TICKETS_INICIAL_MOCK
 
-const ANALYTICS = {
+const _ANALYTICS_MOCK = {
   pageViews: [420, 380, 510, 490, 620, 580, 710, 680, 750, 820, 790, 940, 1020],
   signups: [2, 1, 3, 2, 4, 2, 3, 5, 3, 4, 6, 4, 5],
   days: ['29/04','30/04','01/05','02/05','03/05','04/05','05/05','06/05','07/05','08/05','09/05','10/05','11/05'],
 }
+const ANALYTICS = USE_MOCKS ? _ANALYTICS_MOCK : { pageViews: [], signups: [], days: [] }
 
 const STATUS_TENANT = {
   active:   { label: 'Ativo',        cls: 'bg-[#D1FAE5] text-[#065F46]' },
@@ -78,15 +87,16 @@ const NAV = [
 ]
 
 // ── DADOS DO FUNIL ──────────────────────────────────────────────
-const FUNIL_STAGES = [
+const _FUNIL_STAGES_MOCK = [
   { id: 'visitantes', label: 'Visitantes',  count: 12840, pct: 100, color: '#6B7280', icon: '👁️' },
   { id: 'leads',      label: 'Leads',       count: 1923,  pct: 15,  color: '#3B82F6', icon: '📧' },
   { id: 'trial',      label: 'Trial Ativo', count: 312,   pct: 16,  color: '#F5A623', icon: '⚡' },
   { id: 'assinante',  label: 'Assinante',   count: 87,    pct: 28,  color: '#10B981', icon: '✅' },
   { id: 'premium',    label: 'Upgrade',     count: 34,    pct: 39,  color: '#7C3AED', icon: '💎' },
 ]
+const FUNIL_STAGES = (USE_MOCKS ? _FUNIL_STAGES_MOCK : []) as typeof _FUNIL_STAGES_MOCK
 
-const LEADS = [
+const _LEADS_MOCK = [
   { id: 'L001', nome: 'Carlos Mendes',    email: 'carlos@barbearia.com', cidade: 'São Paulo, SP',     plano: 'PRO',     status: 'trial',    origem: 'Google Ads', data: '11/05/2026', score: 92 },
   { id: 'L002', nome: 'Fernanda Lima',    email: 'fe@studiocabelo.com',  cidade: 'Rio de Janeiro, RJ', plano: 'PREMIUM', status: 'quente',   origem: 'Instagram',  data: '11/05/2026', score: 87 },
   { id: 'L003', nome: 'Rafael Costa',     email: 'rc@barberking.com',    cidade: 'Belo Horizonte, MG', plano: 'PRO',     status: 'quente',   origem: 'Afiliado',   data: '10/05/2026', score: 81 },
@@ -95,8 +105,9 @@ const LEADS = [
   { id: 'L006', nome: 'Mariana Souza',    email: 'ms@estilopm.com',      cidade: 'Fortaleza, CE',      plano: 'STARTER', status: 'frio',     origem: 'Facebook',   data: '08/05/2026', score: 34 },
   { id: 'L007', nome: 'André Oliveira',   email: 'ao@barberapm.com',     cidade: 'Recife, PE',         plano: 'PRO',     status: 'perdido',  origem: 'Google Ads', data: '07/05/2026', score: 12 },
 ]
+const LEADS = (USE_MOCKS ? _LEADS_MOCK : []) as typeof _LEADS_MOCK
 
-const AUTOMACOES = [
+const _AUTOMACOES_MOCK = [
   { id: 'A1', nome: 'Boas-vindas Trial',     tipo: 'email',    status: 'ativo',    enviados: 312, abertos: 218, cliques: 89,  conversoes: 34, descricao: 'Email D+0 após cadastro no trial' },
   { id: 'A2', nome: 'Sequência Nurturing',   tipo: 'email',    status: 'ativo',    enviados: 289, abertos: 156, cliques: 67,  conversoes: 28, descricao: 'D+3, D+7, D+10 com dicas de uso' },
   { id: 'A3', nome: 'Urgência Trial D+12',   tipo: 'email',    status: 'ativo',    enviados: 201, abertos: 134, cliques: 78,  conversoes: 41, descricao: 'Email de urgência antes do trial expirar' },
@@ -105,15 +116,17 @@ const AUTOMACOES = [
   { id: 'A6', nome: 'Recuperação Churn',     tipo: 'email',    status: 'pausado',  enviados: 45,  abertos: 23,  cliques: 8,   conversoes: 3,  descricao: 'Email para cancelamentos recentes' },
   { id: 'A7', nome: 'Upsell PRO→PREMIUM',    tipo: 'email',    status: 'rascunho', enviados: 0,   abertos: 0,   cliques: 0,   conversoes: 0,  descricao: 'Oferta de upgrade para clientes PRO' },
 ]
+const AUTOMACOES = (USE_MOCKS ? _AUTOMACOES_MOCK : []) as typeof _AUTOMACOES_MOCK
 
-const AFILIADOS = [
+const _AFILIADOS_MOCK = [
   { id: 'AF1', nome: 'João Barber SP',    codigo: 'JOAO10',  comissao: 20, cliques: 342, cadastros: 28, ativos: 18, mrr: 2682, pago: 536.40, pendente: 268.20 },
   { id: 'AF2', nome: 'BarbeirosBR',       codigo: 'BRB15',   comissao: 15, cliques: 891, cadastros: 67, ativos: 41, mrr: 5159, pago: 773.85, pendente: 386.93 },
   { id: 'AF3', nome: 'Estilo Digital',    codigo: 'ESTILO20',comissao: 20, cliques: 234, cadastros: 19, ativos: 12, mrr: 1788, pago: 357.60, pendente: 178.80 },
   { id: 'AF4', nome: 'Rafael Mentor',     codigo: 'RAF10',   comissao: 10, cliques: 156, cadastros: 11, ativos: 7,  mrr: 1043, pago: 104.30, pendente: 52.15 },
 ]
+const AFILIADOS = (USE_MOCKS ? _AFILIADOS_MOCK : []) as typeof _AFILIADOS_MOCK
 
-const ESTADOS_BR = [
+const _ESTADOS_BR_MOCK = [
   { uf: 'SP', nome: 'São Paulo',          clientes: 23, mrr: 3427, cor: '#1A3A6B' },
   { uf: 'RJ', nome: 'Rio de Janeiro',     clientes: 14, mrr: 2086, cor: '#1A3A6B' },
   { uf: 'MG', nome: 'Minas Gerais',       clientes: 12, mrr: 1788, cor: '#1A3A6B' },
@@ -125,13 +138,15 @@ const ESTADOS_BR = [
   { uf: 'GO', nome: 'Goiás',              clientes: 3,  mrr: 447,  cor: '#9CA3AF' },
   { uf: 'SC', nome: 'Santa Catarina',     clientes: 3,  mrr: 447,  cor: '#9CA3AF' },
 ]
+const ESTADOS_BR = (USE_MOCKS ? _ESTADOS_BR_MOCK : []) as typeof _ESTADOS_BR_MOCK
 
-const CAMPANHAS_INICIAL = [
+const _CAMPANHAS_INICIAL_MOCK = [
   { id: 'C1', nome: 'Google Ads — Barbearia Sistema', canal: 'google', gasto: 1240, cliques: 3420, leads: 312, custo_lead: 3.97, conversoes: 28, cac: 44.28, status: 'ativo' },
   { id: 'C2', nome: 'Meta Ads — Donos de Salão',      canal: 'meta',   gasto: 890,  cliques: 2180, leads: 198, custo_lead: 4.49, conversoes: 19, cac: 46.84, status: 'ativo' },
   { id: 'C3', nome: 'Instagram — Vídeo Depoimento',   canal: 'insta',  gasto: 340,  cliques: 1890, leads: 87,  custo_lead: 3.91, conversoes: 11, cac: 30.91, status: 'ativo' },
   { id: 'C4', nome: 'YouTube — Tutorial Gestão',      canal: 'yt',     gasto: 180,  cliques: 890,  leads: 43,  custo_lead: 4.19, conversoes: 6,  cac: 30.00, status: 'pausado' },
 ]
+const CAMPANHAS_INICIAL = (USE_MOCKS ? _CAMPANHAS_INICIAL_MOCK : []) as typeof _CAMPANHAS_INICIAL_MOCK
 
 const CANAIS_OPCOES = [
   { value: 'google', label: '🔵 Google Ads' },
@@ -383,19 +398,38 @@ export function AdminDashboard() {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setNovaCampanhaOpen(true)} className="bg-[#F5A623] text-[#1A3A6B] font-bold text-sm px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">+ Nova Campanha</button>
-                  <button onClick={() => { const d='Visitantes,Leads,Trials,Assinantes\n12840,1923,312,87'; const b=new Blob([d],{type:'text/csv'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='funil.csv'; a.click() }} className="bg-white/10 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-white/15 transition-colors">📤 Exportar CSV</button>
+                  <button
+                    onClick={() => {
+                      // CSV deriva dos stages atuais (vazio em prod até existir analytics real)
+                      const header = 'Visitantes,Leads,Trials,Assinantes'
+                      const v = FUNIL_STAGES.find((s) => s.id === 'visitantes')?.count ?? 0
+                      const l = FUNIL_STAGES.find((s) => s.id === 'leads')?.count ?? 0
+                      const t = FUNIL_STAGES.find((s) => s.id === 'trial')?.count ?? trials.length
+                      const a = FUNIL_STAGES.find((s) => s.id === 'assinante')?.count ?? active.length
+                      const d = `${header}\n${v},${l},${t},${a}`
+                      const b = new Blob([d], { type: 'text/csv' })
+                      const u = URL.createObjectURL(b)
+                      const link = document.createElement('a')
+                      link.href = u; link.download = 'funil.csv'; link.click()
+                    }}
+                    className="bg-white/10 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-white/15 transition-colors"
+                  >
+                    📤 Exportar CSV
+                  </button>
                 </div>
               </div>
 
-              {/* KPIs do Funil */}
+              {/* KPIs do Funil — em modo demo usa nros fakes pra preview; em prod
+                  deriva dos dados reais (tenants/leads) ou mostra "—" pra quem
+                  ainda não tem analytics plugado. */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {[
-                  { label: 'Visitantes/mês',   value: '12.840', sub: '▲ 34%', color: '#6B7280', icon: '👁️' },
-                  { label: 'Leads capturados', value: '1.923',  sub: '▲ 28%', color: '#3B82F6', icon: '📧' },
-                  { label: 'Trials ativos',    value: '312',    sub: '▲ 21%', color: '#F5A623', icon: '⚡' },
-                  { label: 'Assinantes',       value: '87',     sub: '▲ 15%', color: '#10B981', icon: '✅' },
-                  { label: 'CAC médio',        value: 'R$41',   sub: 'meta R$50', color: '#A78BFA', icon: '🎯' },
-                  { label: 'LTV estimado',     value: 'R$2.1k', sub: '14 meses', color: '#F59E0B', icon: '💎' },
+                  { label: 'Visitantes/mês',   value: USE_MOCKS ? '12.840' : '—',                              sub: USE_MOCKS ? '▲ 34%' : 'sem dados', color: '#6B7280', icon: '👁️' },
+                  { label: 'Leads capturados', value: USE_MOCKS ? '1.923'  : String(LEADS.length),             sub: USE_MOCKS ? '▲ 28%' : 'capturados',  color: '#3B82F6', icon: '📧' },
+                  { label: 'Trials ativos',    value: USE_MOCKS ? '312'    : String(trials.length),            sub: USE_MOCKS ? '▲ 21%' : 'em trial',    color: '#F5A623', icon: '⚡' },
+                  { label: 'Assinantes',       value: USE_MOCKS ? '87'     : String(active.length),            sub: USE_MOCKS ? '▲ 15%' : 'ativos',      color: '#10B981', icon: '✅' },
+                  { label: 'CAC médio',        value: USE_MOCKS ? 'R$41'   : '—',                              sub: USE_MOCKS ? 'meta R$50' : 'sem dados', color: '#A78BFA', icon: '🎯' },
+                  { label: 'LTV estimado',     value: USE_MOCKS ? 'R$2.1k' : '—',                              sub: USE_MOCKS ? '14 meses' : 'sem dados',  color: '#F59E0B', icon: '💎' },
                 ].map((k) => (
                   <div key={k.label} className="bg-white/5 border border-white/10 rounded-2xl p-4">
                     <div className="text-xl mb-2">{k.icon}</div>
@@ -409,6 +443,15 @@ export function AdminDashboard() {
               {/* Funil Visual */}
               <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
                 <h3 className="font-sora font-bold text-white mb-6">📊 Funil de Conversão</h3>
+                {FUNIL_STAGES.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <p className="text-5xl mb-3">📊</p>
+                    <p className="font-sora font-bold text-white">Sem dados de funil ainda</p>
+                    <p className="text-xs text-white/40 mt-1">
+                      Quando a integração de analytics chegar (Google/Meta), o funil vai aparecer aqui.
+                    </p>
+                  </div>
+                ) : (
                 <div className="space-y-3">
                   {FUNIL_STAGES.map((stage, i) => {
                     const prev = i > 0 ? FUNIL_STAGES[i-1] : null
@@ -440,11 +483,14 @@ export function AdminDashboard() {
                     )
                   })}
                 </div>
-                <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-3 gap-4 text-center">
-                  <div><p className="text-xs text-white/40">Conversão Total</p><p className="font-sora font-bold text-white text-lg">0,68%</p></div>
-                  <div><p className="text-xs text-white/40">Taxa Trial→Pago</p><p className="font-sora font-bold text-[#10B981] text-lg">27,9%</p></div>
-                  <div><p className="text-xs text-white/40">Tempo médio trial</p><p className="font-sora font-bold text-[#F5A623] text-lg">9,3 dias</p></div>
-                </div>
+                )}
+                {FUNIL_STAGES.length > 0 && (
+                  <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-3 gap-4 text-center">
+                    <div><p className="text-xs text-white/40">Conversão Total</p><p className="font-sora font-bold text-white text-lg">{USE_MOCKS ? '0,68%' : '—'}</p></div>
+                    <div><p className="text-xs text-white/40">Taxa Trial→Pago</p><p className="font-sora font-bold text-[#10B981] text-lg">{USE_MOCKS ? '27,9%' : '—'}</p></div>
+                    <div><p className="text-xs text-white/40">Tempo médio trial</p><p className="font-sora font-bold text-[#F5A623] text-lg">{USE_MOCKS ? '9,3 dias' : '—'}</p></div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -454,6 +500,13 @@ export function AdminDashboard() {
                     <h3 className="font-sora font-bold text-white">🔥 Leads Recentes</h3>
                     <span className="text-xs text-white/40">{LEADS.length} leads ativos</span>
                   </div>
+                  {LEADS.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-4xl mb-2">🔥</p>
+                      <p className="font-sora font-bold text-white text-sm">Nenhum lead capturado ainda</p>
+                      <p className="text-[10px] text-white/40 mt-1">Quando o módulo de leads/marketing estiver plugado, eles aparecem aqui.</p>
+                    </div>
+                  ) : (
                   <div className="space-y-2">
                     {LEADS.map((l) => {
                       const statusCor: Record<string, string> = { quente: '#EF4444', morno: '#F59E0B', frio: '#6B7280', trial: '#3B82F6', perdido: '#374151' }
@@ -475,6 +528,7 @@ export function AdminDashboard() {
                       )
                     })}
                   </div>
+                  )}
                 </div>
 
                 {/* Performance por estado */}
@@ -483,23 +537,36 @@ export function AdminDashboard() {
                     <h3 className="font-sora font-bold text-white">🗺️ Brasil — Por Estado</h3>
                     <span className="text-xs text-white/40">Top 10 estados</span>
                   </div>
+                  {ESTADOS_BR.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-4xl mb-2">🗺️</p>
+                      <p className="font-sora font-bold text-white text-sm">Sem distribuição geográfica ainda</p>
+                      <p className="text-[10px] text-white/40 mt-1">Aparece conforme as barbearias cadastram cidade.</p>
+                    </div>
+                  ) : (
+                  <>
                   <div className="space-y-2">
-                    {ESTADOS_BR.map((e, i) => (
+                    {ESTADOS_BR.map((e, i) => {
+                      const maxClientes = Math.max(...ESTADOS_BR.map((s) => s.clientes), 1)
+                      return (
                       <div key={e.uf} className="flex items-center gap-3">
                         <span className="text-xs font-bold text-white/30 w-4 text-right">{i+1}</span>
                         <span className="font-bold text-white text-sm w-8">{e.uf}</span>
                         <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${e.clientes / 23 * 100}%`, background: '#1A3A6B' }} />
+                          <div className="h-full rounded-full" style={{ width: `${e.clientes / maxClientes * 100}%`, background: '#1A3A6B' }} />
                         </div>
                         <span className="text-xs text-white/60 w-6 text-right font-semibold">{e.clientes}</span>
                         <span className="text-xs font-bold text-[#10B981] w-20 text-right">R${e.mrr.toLocaleString()}</span>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div className="mt-4 pt-3 border-t border-white/5 flex justify-between text-xs text-white/40">
-                    <span>87 clientes em 10 estados</span>
-                    <span className="font-bold text-[#10B981]">MRR Total: R$12.957</span>
+                    <span>{ESTADOS_BR.reduce((s, e) => s + e.clientes, 0)} clientes em {ESTADOS_BR.length} estados</span>
+                    <span className="font-bold text-[#10B981]">MRR Total: R${ESTADOS_BR.reduce((s, e) => s + e.mrr, 0).toLocaleString()}</span>
                   </div>
+                  </>
+                  )}
                 </div>
               </div>
 
@@ -575,6 +642,13 @@ export function AdminDashboard() {
                     <h3 className="font-sora font-bold text-white">📣 Campanhas Pagas</h3>
                     <span className="text-xs text-white/40">Gasto total: R${campanhas.reduce((s,c)=>s+c.gasto,0).toLocaleString()}</span>
                   </div>
+                  {campanhas.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-4xl mb-2">📣</p>
+                      <p className="font-sora font-bold text-white text-sm">Nenhuma campanha rodando</p>
+                      <p className="text-[10px] text-white/40 mt-1">Clique em <span className="font-semibold text-[#F5A623]">+ Nova Campanha</span> pra criar a primeira.</p>
+                    </div>
+                  ) : (
                   <div className="space-y-3">
                     {campanhas.map((c) => {
                       const canais: Record<string, string> = { google: '🔵', meta: '🟦', insta: '🩷', yt: '🔴' }
@@ -599,6 +673,7 @@ export function AdminDashboard() {
                       )
                     })}
                   </div>
+                  )}
                 </div>
 
                 {/* Afiliados */}
@@ -607,6 +682,14 @@ export function AdminDashboard() {
                     <h3 className="font-sora font-bold text-white">🤝 Programa de Afiliados</h3>
                     <button onClick={() => setNovoAfiliadoOpen(true)} className="text-xs bg-[#F5A623] text-[#1A3A6B] font-bold px-3 py-1.5 rounded-lg hover:opacity-90">+ Novo afiliado</button>
                   </div>
+                  {afiliados.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-4xl mb-2">🤝</p>
+                      <p className="font-sora font-bold text-white text-sm">Nenhum afiliado cadastrado</p>
+                      <p className="text-[10px] text-white/40 mt-1">Clique em <span className="font-semibold text-[#F5A623]">+ Novo afiliado</span> pra criar um link rastreável.</p>
+                    </div>
+                  ) : (
+                  <>
                   <div className="space-y-3">
                     {afiliados.map((a) => (
                       <div key={a.id} onClick={() => setSelectedAfiliado(a)} className="bg-white/5 rounded-xl p-3 cursor-pointer hover:bg-white/10 transition-colors border border-transparent hover:border-[#F5A623]/20">
@@ -633,6 +716,8 @@ export function AdminDashboard() {
                     <div><p className="text-white/30">Total pago afiliados</p><p className="font-bold text-[#10B981] text-base">R${afiliados.reduce((s,a)=>s+a.pago,0).toFixed(0)}</p></div>
                     <div><p className="text-white/30">MRR gerado afiliados</p><p className="font-bold text-[#F5A623] text-base">R${afiliados.reduce((s,a)=>s+a.mrr,0).toLocaleString()}</p></div>
                   </div>
+                  </>
+                  )}
                 </div>
               </div>
 
@@ -674,6 +759,13 @@ export function AdminDashboard() {
                     <h3 className="font-sora font-bold text-white">🎧 Tickets recentes</h3>
                     <button onClick={() => setPage('tickets')} className="text-xs text-[#F5A623] hover:underline">Ver todos →</button>
                   </div>
+                  {tickets.filter((t) => t.status !== 'resolvido').length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-4xl mb-2">🎧</p>
+                      <p className="font-sora font-bold text-white text-sm">Sem tickets abertos</p>
+                      <p className="text-[10px] text-white/40 mt-1">Tudo em dia — nenhum chamado pendente.</p>
+                    </div>
+                  ) : (
                   <div className="space-y-3">
                     {tickets.filter(t => t.status !== 'resolvido').slice(0,4).map((t) => {
                       const tipo = TIPO_TICKET[t.tipo as keyof typeof TIPO_TICKET]
@@ -690,6 +782,7 @@ export function AdminDashboard() {
                       )
                     })}
                   </div>
+                  )}
                 </div>
 
                 {/* Últimos cadastros */}
@@ -698,6 +791,13 @@ export function AdminDashboard() {
                     <h3 className="font-sora font-bold text-white">✂️ Últimos cadastros</h3>
                     <button onClick={() => setPage('tenants')} className="text-xs text-[#F5A623] hover:underline">Ver todos →</button>
                   </div>
+                  {tenants.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-4xl mb-2">✂️</p>
+                      <p className="font-sora font-bold text-white text-sm">Nenhuma barbearia ainda</p>
+                      <p className="text-[10px] text-white/40 mt-1">As barbearias aparecem aqui conforme criam conta no sistema.</p>
+                    </div>
+                  ) : (
                   <div className="space-y-3">
                     {tenants.slice(0,5).map((t) => {
                       const st = STATUS_TENANT[t.status as keyof typeof STATUS_TENANT]
@@ -715,6 +815,7 @@ export function AdminDashboard() {
                       )
                     })}
                   </div>
+                  )}
                 </div>
               </div>
             </>

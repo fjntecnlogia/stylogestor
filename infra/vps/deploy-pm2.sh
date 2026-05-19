@@ -58,15 +58,17 @@ echo "🛡️  [4.5/6] Garantindo flags de build (mocks OFF em prod)..."
 # NEXT_PUBLIC_USE_MOCKS é lido em build-time pelo Next (inline no bundle
 # client). Em prod, queremos OFF — fixtures retornam [] e dashboard mostra
 # empty state ao invés de dados fake. Idempotente: adiciona se faltar,
-# substitui se presente.
-WEB_ENV="$APP_DIR/apps/web/.env.production.local"
-touch "$WEB_ENV"
-if grep -q "^NEXT_PUBLIC_USE_MOCKS=" "$WEB_ENV"; then
-  sed -i 's/^NEXT_PUBLIC_USE_MOCKS=.*/NEXT_PUBLIC_USE_MOCKS=false/' "$WEB_ENV"
-else
-  echo "NEXT_PUBLIC_USE_MOCKS=false" >> "$WEB_ENV"
-fi
-echo "   ✓ $WEB_ENV — NEXT_PUBLIC_USE_MOCKS=false"
+# substitui se presente. Aplicado em web (gestor/barbeiro) e admin (SaaS).
+for app in apps/web apps/admin; do
+  ENV_FILE="$APP_DIR/$app/.env.production.local"
+  touch "$ENV_FILE"
+  if grep -q "^NEXT_PUBLIC_USE_MOCKS=" "$ENV_FILE"; then
+    sed -i 's/^NEXT_PUBLIC_USE_MOCKS=.*/NEXT_PUBLIC_USE_MOCKS=false/' "$ENV_FILE"
+  else
+    echo "NEXT_PUBLIC_USE_MOCKS=false" >> "$ENV_FILE"
+  fi
+  echo "   ✓ $ENV_FILE — NEXT_PUBLIC_USE_MOCKS=false"
+done
 
 echo ""
 echo "🔨 [5/6] Buildando apps..."
