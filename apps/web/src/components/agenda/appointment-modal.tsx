@@ -45,11 +45,19 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
   // Estes useState pegam os defaults só no mount. O pai deve usar
   // `key` que muda quando o slot clicado muda (ou montar condicionalmente
   // com `open && <AppointmentModal />`) para que esses defaults sejam respeitados.
+  // Data padrão = HOJE em LOCAL (não UTC!). À noite no Brasil,
+  // toISOString().slice(0,10) retorna AMANHÃ (data UTC) — o gestor abria
+  // o modal pensando hoje e o agendamento sumia (criado pro dia seguinte).
+  const localToday = (() => {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  })()
   const [clientSearch, setClientSearch] = useState('')
   const [selectedClient, setSelectedClient] = useState<ClientFixture | null>(null)
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [professional, setProfessional] = useState(defaultProfessionalId || '')
-  const [date, setDate] = useState(defaultDate || new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(defaultDate || localToday)
   const [time, setTime] = useState(defaultTime || '09:00')
   // Erro persistente do submit (ex: 409 conflito). Mantém modal aberto pro
   // gestor ver a mensagem e ajustar o horário em vez de re-abrir tudo.

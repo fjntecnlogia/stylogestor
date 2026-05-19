@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { UserButton, Show } from '@clerk/nextjs'
-import { AppointmentModal } from '../agenda/appointment-modal'
+import { AppointmentModal, type NewAppointmentPayload } from '../agenda/appointment-modal'
 import { TrialBadge } from './trial-badge'
 
 interface Props {
@@ -10,10 +11,43 @@ interface Props {
 }
 
 export function Topbar({ onMenuToggle }: Props) {
+  const router = useRouter()
   const [agendamentoOpen, setAgendamentoOpen] = useState(false)
 
   const now = new Date()
   const date = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  // onSave do topbar: faz POST real e redireciona pra /agenda do dia
+  // criado. Antes o modal abria sem callback, user confirmava, modal
+  // fechava e NADA persistia.
+  const handleSave = async (payload: NewAppointmentPayload): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const localStart = new Date(`${payload.date}T${payload.time}:00`)
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: payload.clientId,
+          professionalId: payload.professionalId,
+          serviceIds: payload.serviceIds,
+          startISO: localStart.toISOString(),
+          date: payload.date,
+          time: payload.time,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        return { ok: false, error: data.error || 'Erro ao criar agendamento' }
+      }
+      // Redireciona pra /agenda com query da data — o agenda-view lê e
+      // já abre no dia certo, mostrando o agendamento recém-criado.
+      router.push(`/agenda?date=${payload.date}`)
+      return { ok: true }
+    } catch (err) {
+      console.error(err)
+      return { ok: false, error: 'Erro de conexão. Tente novamente.' }
+    }
+  }
 
   return (
     <>
@@ -50,9 +84,10 @@ export function Topbar({ onMenuToggle }: Props) {
       </header>
 
       <AppointmentModal
+        key={agendamentoOpen ? 'topbar-open' : 'topbar-closed'}
         open={agendamentoOpen}
         onClose={() => setAgendamentoOpen(false)}
-        defaultDate=""
+        onSave={handleSave}
       />
     </>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { format, addDays, subDays, startOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { AppointmentModal, type NewAppointmentPayload } from './appointment-modal'
@@ -71,8 +72,15 @@ const STATUS_CONFIG = {
 
 
 export function AgendaView() {
+  // ?date=YYYY-MM-DD na URL pra abrir agenda direto numa data (vindo do
+  // topbar após criar agendamento, ou de um link compartilhado).
+  const searchParams = useSearchParams()
+  const dateFromUrl = searchParams.get('date')
+  const initialDate = dateFromUrl
+    ? new Date(`${dateFromUrl}T12:00:00`)
+    : new Date()
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'professional'>('professional')
-  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState(initialDate)
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [fechamentoOpen, setFechamentoOpen] = useState(false)
@@ -200,11 +208,29 @@ export function AgendaView() {
       })
       const data = await res.json()
       if (!res.ok) {
-        // Não usa toast — o modal mostra banner persistente.
         return { ok: false, error: data.error || 'Erro ao criar agendamento' }
       }
-      setAppointments((p) => [...p, data])
-      success(`Agendamento de ${payload.clientName} criado! ✅`)
+
+      // Verifica se o agendamento criado é em data diferente da que tá
+      // sendo visualizada na agenda. Se for, NAVEGA pra data correta —
+      // assim o agendamento aparece imediatamente no grid e o gestor não
+      // pensa "criou mas sumiu".
+      const currentViewDate = format(selectedDate, 'yyyy-MM-dd')
+      const apptDate = payload.date
+      const dateLabel = new Date(`${apptDate}T12:00:00`).toLocaleDateString('pt-BR', {
+        day: '2-digit', month: '2-digit',
+      })
+
+      if (apptDate !== currentViewDate) {
+        // Navega — useEffect vai re-buscar appointments do novo dia
+        const targetDate = new Date(`${apptDate}T12:00:00`)
+        setSelectedDate(targetDate)
+        success(`Agendamento criado pra ${dateLabel} às ${payload.time} ✅`)
+      } else {
+        // Mesma data — adiciona direto ao state pra aparecer sem refetch
+        setAppointments((p) => [...p, data])
+        success(`${payload.clientName} agendado às ${payload.time} ✅`)
+      }
       return { ok: true }
     } catch (err) {
       console.error(err)
