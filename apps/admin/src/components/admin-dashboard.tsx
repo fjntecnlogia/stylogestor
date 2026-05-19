@@ -234,7 +234,25 @@ export function AdminDashboard() {
       .then(r => r.json())
       .then(s => { if (!s.error) setDbStats(s) })
       .catch(() => {})
+
+    // Carregar settings do SaaS
+    fetch('/api/saas-settings/trial-days')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((d: { days?: number }) => {
+        if (typeof d?.days === 'number') {
+          setDefaultTrialDays(d.days)
+          setTrialDaysDraft(String(d.days))
+        }
+      })
+      .catch(() => {})
+    fetch('/api/saas-settings/promo-codes')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((codes) => Array.isArray(codes) && setPromoCodes(codes))
+      .catch(() => {})
   }, [])
+
+  // Handlers de settings/promo/trial declarados mais abaixo (depois dos
+  // states que eles dependem — TS exige declaração antes de uso).
 
   // ── Estados de UI (não precisam persistir) ───────────────────────
   const [novaCampanhaOpen, setNovaCampanhaOpen] = useState(false)
@@ -266,6 +284,152 @@ export function AdminDashboard() {
   const [excluindoLoading, setExcluindoLoading] = useState(false)
   // Estado de carregamento do cancelar (PATCH soft delete)
   const [cancelandoLoading, setCancelandoLoading] = useState<string | null>(null)
+  // ── Configurações SaaS (vindas do banco via /api/saas-settings/*) ──
+  // trial-days: dias padrão de trial pra novos tenants
+  const [defaultTrialDays, setDefaultTrialDays] = useState<number>(14)
+  const [trialDaysDraft, setTrialDaysDraft] = useState<string>('14')
+  const [savingTrialDays, setSavingTrialDays] = useState(false)
+  // promo-codes: lista + form de criar
+  interface PromoCode {
+    id: string; code: string; description: string; trialDays: number
+    active: boolean; usageLimit: number | null; usedCount: number; expiresAt: string | null
+  }
+  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([])
+  const [novoPromoForm, setNovoPromoForm] = useState({ code: '', description: '', trialDays: 30, usageLimit: '' })
+  const [creatingPromo, setCreatingPromo] = useState(false)
+  // Modal de estender trial / aplicar código (no detalhe do tenant)
+  const [trialModalTenant, setTrialModalTenant] = useState<typeof tenants[0] | null>(null)
+  const [trialModalTab, setTrialModalTab] = useState<'days' | 'date' | 'code'>('days')
+  const [trialExtendDays, setTrialExtendDays] = useState<string>('15')
+  const [trialNewDate, setTrialNewDate] = useState<string>('')
+  const [trialPromoCode, setTrialPromoCode] = useState<string>('')
+  const [trialModalLoading, setTrialModalLoading] = useState(false)
+
+  // ── Handlers de settings/promo/trial (depois dos states) ──────────
+
+  // Salvar trial-days global
+  const handleSaveTrialDays = useCallback(async () => {
+    const n = Number(trialDaysDraft)
+    if (!Number.isFinite(n) || n < 0 || n > 365) {
+      alert('Digite um número entre 0 e 365.')
+      return
+    }
+    setSavingTrialDays(true)
+    try {
+      const res = await fetch('/api/saas-settings/trial-days', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: n }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(`Erro: ${data.error ?? res.statusText}`); return }
+      setDefaultTrialDays(data.days)
+    } catch (err) {
+      alert('Erro de rede ao salvar.')
+      console.error(err)
+    } finally {
+      setSavingTrialDays(false)
+    }
+  }, [trialDaysDraft])
+
+  // Criar novo código promocional
+  const handleCreatePromo = useCallback(async () => {
+    if (!novoPromoForm.code.trim() || novoPromoForm.trialDays <= 0) {
+      alert('Código e dias de trial são obrigatórios.')
+      return
+    }
+    setCreatingPromo(true)
+    try {
+      const res = await fetch('/api/saas-settings/promo-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: novoPromoForm.code,
+          description: novoPromoForm.description || undefined,
+          trialDays: novoPromoForm.trialDays,
+          usageLimit: novoPromoForm.usageLimit ? Number(novoPromoForm.usageLimit) : null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(`Erro: ${data.error ?? res.statusText}`); return }
+      setPromoCodes((prev) => [data, ...prev])
+      setNovoPromoForm({ code: '', description: '', trialDays: 30, usageLimit: '' })
+    } catch (err) {
+      alert('Erro de rede.')
+      console.error(err)
+    } finally {
+      setCreatingPromo(false)
+    }
+  }, [novoPromoForm])
+
+  // Desativar/ativar código promocional
+  const handleTogglePromo = useCallback(async (id: string, active: boolean) => {
+    try {
+      const res = await fetch(`/api/saas-settings/promo-codes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(`Erro: ${data.error ?? res.statusText}`); return }
+      setPromoCodes((prev) => prev.map((p) => (p.id === id ? { ...p, active: data.active } : p)))
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
+
+  // Deletar código promocional
+  const handleDeletePromo = useCallback(async (id: string, code: string) => {
+    if (!confirm(`Excluir o código "${code}"?`)) return
+    try {
+      const res = await fetch(`/api/saas-settings/promo-codes/${id}`, { method: 'DELETE' })
+      if (!res.ok) { alert('Erro ao excluir código'); return }
+      setPromoCodes((prev) => prev.filter((p) => p.id !== id))
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
+
+  // Aplicar mudança de trial no tenant (a partir do modal)
+  const handleApplyTrialChange = useCallback(async () => {
+    if (!trialModalTenant) return
+    setTrialModalLoading(true)
+    try {
+      let body: Record<string, unknown> = {}
+      if (trialModalTab === 'days') {
+        body = { action: 'extendTrialDays', days: Number(trialExtendDays) }
+      } else if (trialModalTab === 'date') {
+        if (!trialNewDate) { alert('Escolha uma data.'); setTrialModalLoading(false); return }
+        body = { action: 'setTrialEndsAt', date: trialNewDate }
+      } else {
+        if (!trialPromoCode.trim()) { alert('Digite o código.'); setTrialModalLoading(false); return }
+        body = { action: 'applyPromoCode', code: trialPromoCode }
+      }
+
+      const res = await fetch(`/api/tenants/${trialModalTenant.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(`Erro: ${data.error ?? res.statusText}`); return }
+
+      // Mensagem de sucesso variável
+      const msg = trialModalTab === 'code'
+        ? `Código ${data.code} aplicado! +${data.trialDaysAdded} dias.`
+        : `Trial atualizado. Novo fim: ${new Date(data.trialEndsAt).toLocaleDateString('pt-BR')}`
+      alert(msg)
+      setTrialModalTenant(null)
+      setTrialExtendDays('15')
+      setTrialNewDate('')
+      setTrialPromoCode('')
+    } catch (err) {
+      alert('Erro de rede.')
+      console.error(err)
+    } finally {
+      setTrialModalLoading(false)
+    }
+  }, [trialModalTenant, trialModalTab, trialExtendDays, trialNewDate, trialPromoCode])
 
   // Helper de label do limite de profissionais por plano
   const planLimitLabel = (n: number) =>
@@ -1158,6 +1322,12 @@ export function AdminDashboard() {
                     {isSuspended && (
                       <button onClick={() => setTenantsSuspended(p => p.filter(i => i !== t.id))} className="text-xs bg-[#1B8A5A] text-white px-3 py-2 rounded-xl hover:bg-[#156b47] font-bold">🔄 Reativar suspensão</button>
                     )}
+                    <button
+                      onClick={() => { setTrialModalTenant(t); setTrialModalTab('days') }}
+                      className="text-xs bg-[#3B82F6]/20 text-[#93C5FD] px-3 py-2 rounded-xl hover:bg-[#3B82F6]/30 font-bold"
+                    >
+                      ⏱️ Estender trial
+                    </button>
                     {t.status !== 'canceled' ? (
                       <button
                         onClick={() => handleCancelarTenant(t.id, t.name)}
@@ -1937,6 +2107,141 @@ export function AdminDashboard() {
                     </div>
                   ))}
                 </div>
+
+                {/* ── Trial padrão ──────────────────────────────────── */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+                  <div>
+                    <h3 className="font-sora font-bold text-white">⏱️ Trial padrão</h3>
+                    <p className="text-xs text-white/40 mt-0.5">
+                      Quantos dias de teste cada nova barbearia recebe automaticamente ao se cadastrar.
+                      Atual: <span className="font-semibold text-[#F5A623]">{defaultTrialDays} dias</span>.
+                    </p>
+                  </div>
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-white/50 font-semibold uppercase tracking-wide block mb-1.5">
+                        Dias
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={365}
+                        value={trialDaysDraft}
+                        onChange={(e) => setTrialDaysDraft(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                      />
+                    </div>
+                    <button
+                      onClick={handleSaveTrialDays}
+                      disabled={savingTrialDays || Number(trialDaysDraft) === defaultTrialDays}
+                      className="bg-[#F5A623] disabled:opacity-40 text-[#1A3A6B] font-bold text-sm px-5 py-2.5 rounded-xl hover:opacity-90"
+                    >
+                      {savingTrialDays ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── Códigos promocionais ──────────────────────────── */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+                  <div>
+                    <h3 className="font-sora font-bold text-white">🎟️ Códigos promocionais</h3>
+                    <p className="text-xs text-white/40 mt-0.5">
+                      Códigos como &quot;INFLUENCER&quot; ou &quot;VIP60&quot; que você aplica em barbearias específicas
+                      para dar tempo extra de trial.
+                    </p>
+                  </div>
+
+                  {/* Form criar */}
+                  <div className="bg-white/5 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-semibold text-white/70">+ Novo código</p>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <input
+                        type="text"
+                        placeholder="CÓDIGO"
+                        value={novoPromoForm.code}
+                        onChange={(e) => setNovoPromoForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                        className="bg-white/5 border border-white/10 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50 font-mono"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Dias trial"
+                        min={1}
+                        max={365}
+                        value={novoPromoForm.trialDays}
+                        onChange={(e) => setNovoPromoForm((f) => ({ ...f, trialDays: Number(e.target.value) }))}
+                        className="bg-white/5 border border-white/10 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Limite usos (vazio = ∞)"
+                        min={0}
+                        value={novoPromoForm.usageLimit}
+                        onChange={(e) => setNovoPromoForm((f) => ({ ...f, usageLimit: e.target.value }))}
+                        className="bg-white/5 border border-white/10 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                      />
+                      <button
+                        onClick={handleCreatePromo}
+                        disabled={creatingPromo || !novoPromoForm.code.trim()}
+                        className="bg-[#F5A623] disabled:opacity-40 text-[#1A3A6B] font-bold text-sm rounded-xl hover:opacity-90"
+                      >
+                        {creatingPromo ? '...' : '+ Criar'}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Descrição (opcional — pra que serve esse código)"
+                      value={novoPromoForm.description}
+                      onChange={(e) => setNovoPromoForm((f) => ({ ...f, description: e.target.value }))}
+                      className="w-full bg-white/5 border border-white/10 text-white text-xs rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                    />
+                  </div>
+
+                  {/* Lista */}
+                  {promoCodes.length === 0 ? (
+                    <div className="py-6 text-center">
+                      <p className="text-3xl mb-2">🎟️</p>
+                      <p className="text-sm text-white/40">Nenhum código criado ainda</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-white/5">
+                      {promoCodes.map((p) => (
+                        <div key={p.id} className="flex items-center gap-3 py-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-bold text-[#F5A623]">{p.code}</span>
+                              <span className="text-[10px] font-bold bg-white/10 text-white/70 px-2 py-0.5 rounded-full">
+                                +{p.trialDays} dias
+                              </span>
+                              {!p.active && (
+                                <span className="text-[10px] font-bold bg-red-900/30 text-red-400 px-2 py-0.5 rounded-full">
+                                  inativo
+                                </span>
+                              )}
+                            </div>
+                            {p.description && (
+                              <p className="text-xs text-white/40 mt-0.5 truncate">{p.description}</p>
+                            )}
+                            <p className="text-[10px] text-white/30 mt-0.5">
+                              Usados: {p.usedCount}{p.usageLimit ? ` / ${p.usageLimit}` : ' / ∞'}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleTogglePromo(p.id, !p.active)}
+                            className="text-xs bg-white/5 hover:bg-white/10 text-white/70 px-3 py-1.5 rounded-lg"
+                          >
+                            {p.active ? 'Desativar' : 'Reativar'}
+                          </button>
+                          <button
+                            onClick={() => handleDeletePromo(p.id, p.code)}
+                            className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 px-3 py-1.5 rounded-lg font-semibold"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
@@ -2574,6 +2879,146 @@ export function AdminDashboard() {
                 disabled={!formTenant.name.trim() || !formTenant.email.trim()}
                 className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity">
                 ✓ Cadastrar barbearia
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL ESTENDER TRIAL (3 abas: +dias / data exata / código) ── */}
+      {trialModalTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => !trialModalLoading && setTrialModalTenant(null)}
+          />
+          <div className="relative bg-[#1C2333] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+              <div>
+                <h3 className="font-sora font-bold text-white">⏱️ Estender trial</h3>
+                <p className="text-xs text-white/40 mt-0.5">{trialModalTenant.name}</p>
+              </div>
+              <button
+                onClick={() => !trialModalLoading && setTrialModalTenant(null)}
+                className="text-white/40 hover:text-white text-2xl"
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="px-6 pt-4 flex gap-1 border-b border-white/5">
+              {([
+                { id: 'days', label: '+ Dias' },
+                { id: 'date', label: 'Data exata' },
+                { id: 'code', label: 'Código' },
+              ] as const).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTrialModalTab(t.id)}
+                  className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-colors ${
+                    trialModalTab === t.id
+                      ? 'bg-white/10 text-[#F5A623]'
+                      : 'text-white/40 hover:text-white/70'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {trialModalTab === 'days' && (
+                <>
+                  <label className="text-xs text-white/60 font-semibold uppercase tracking-wide block">
+                    Adicionar dias ao trial atual
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={trialExtendDays}
+                      onChange={(e) => setTrialExtendDays(e.target.value)}
+                      className="flex-1 bg-[#0F172A] border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                    />
+                    <span className="text-sm text-white/60">dias</span>
+                  </div>
+                  <p className="text-[10px] text-white/40">
+                    Soma à data atual de expiração (ou hoje, o que for maior).
+                  </p>
+                </>
+              )}
+
+              {trialModalTab === 'date' && (
+                <>
+                  <label className="text-xs text-white/60 font-semibold uppercase tracking-wide block">
+                    Nova data fim do trial
+                  </label>
+                  <input
+                    type="date"
+                    value={trialNewDate}
+                    onChange={(e) => setTrialNewDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full bg-[#0F172A] border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50 [color-scheme:dark]"
+                  />
+                  <p className="text-[10px] text-white/40">
+                    Substitui a data atual de expiração pela escolhida.
+                  </p>
+                </>
+              )}
+
+              {trialModalTab === 'code' && (
+                <>
+                  <label className="text-xs text-white/60 font-semibold uppercase tracking-wide block">
+                    Código promocional
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="EX: INFLUENCER, VIP60"
+                    value={trialPromoCode}
+                    onChange={(e) => setTrialPromoCode(e.target.value.toUpperCase())}
+                    className="w-full bg-[#0F172A] border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50 font-mono"
+                  />
+                  <p className="text-[10px] text-white/40">
+                    Aplica os dias configurados no código. Códigos disponíveis em
+                    <span className="font-semibold text-[#F5A623]"> Configurações → Códigos promocionais</span>.
+                  </p>
+                  {promoCodes.filter((p) => p.active).length > 0 && (
+                    <div className="bg-white/5 rounded-xl p-3">
+                      <p className="text-[10px] font-semibold text-white/40 mb-2">Códigos ativos:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {promoCodes.filter((p) => p.active).map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => setTrialPromoCode(p.code)}
+                            className="text-[10px] font-mono font-bold bg-[#F5A623]/20 hover:bg-[#F5A623]/30 text-[#F5A623] px-2 py-1 rounded-lg"
+                          >
+                            {p.code} (+{p.trialDays}d)
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-white/10 flex gap-3">
+              <button
+                onClick={() => setTrialModalTenant(null)}
+                disabled={trialModalLoading}
+                className="flex-1 border border-white/10 text-white/60 text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleApplyTrialChange}
+                disabled={trialModalLoading}
+                className="flex-1 bg-[#F5A623] text-[#1A3A6B] text-sm font-bold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40"
+              >
+                {trialModalLoading ? 'Aplicando...' : '✓ Aplicar'}
               </button>
             </div>
           </div>

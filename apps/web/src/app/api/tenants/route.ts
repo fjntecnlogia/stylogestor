@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
-import { prisma } from '@stylogestor/database'
+import { prisma, getSetting, SETTING_KEYS } from '@stylogestor/database'
 
 // POST /api/tenants — criar tenant no onboarding
 export async function POST(req: NextRequest) {
@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
       slug = `${baseSlug}-${attempt}`
     }
 
+    // Dias de trial — lê do SystemSetting (gerenciado pelo admin) com
+    // fallback de 14 dias se não houver setting salvo.
+    const trialDays = await getSetting<number>(SETTING_KEYS.DEFAULT_TRIAL_DAYS, 14)
+
     // Criar tenant
     const tenant = await prisma.tenant.create({
       data: {
@@ -38,7 +42,7 @@ export async function POST(req: NextRequest) {
         phone,
         email: undefined,
         plan: (plan as 'FREE' | 'STARTER' | 'PRO' | 'PREMIUM') ?? 'FREE',
-        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 dias
+        trialEndsAt: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000),
         active: true,
         address: city ? { city } : undefined,
       },

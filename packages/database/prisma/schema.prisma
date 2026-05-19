@@ -438,3 +438,58 @@ model WebhookEvent {
   @@index([provider, processedAt])
   @@map("webhook_events")
 }
+
+// ============================================================
+// SYSTEM SETTING — Configurações globais do SaaS
+// ============================================================
+// Key-value flexível, editável pelo admin via UI. Exemplos:
+//   - "default_trial_days" → 14
+//   - "feature_x_enabled" → true
+// O web lê via getSetting() na hora de criar tenant.
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+// ============================================================
+// PROMO CODE — Códigos promocionais (extensão de trial)
+// ============================================================
+// Admin cria códigos como "INFLUENCER", "VIP30", "BLACK60" que dão
+// X dias de trial ao serem aplicados num tenant. Pode ter limite
+// de uso e data de validade.
+
+model PromoCode {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String    @unique // ex.: "INFLUENCER", "VIP30"
+  description String?            // pra que serve (visível só admin)
+  trialDays   Int                // quantos dias de trial dá
+  active      Boolean   @default(true)
+  usageLimit  Int?               // null = sem limite
+  usedCount   Int       @default(0)
+  expiresAt   DateTime?          // null = não expira
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  redemptions PromoCodeRedemption[]
+
+  @@map("promo_codes")
+}
+
+// Histórico de uso dos códigos — qual tenant resgatou qual código quando.
+model PromoCodeRedemption {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  promoCodeId String   @db.Uuid
+  tenantId    String   @db.Uuid
+  appliedAt   DateTime @default(now())
+  trialDays   Int      // snapshot do trialDays do code no momento do resgate
+
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([promoCodeId])
+  @@map("promo_code_redemptions")
+}
