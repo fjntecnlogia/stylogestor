@@ -10,12 +10,15 @@ import { NextResponse, type NextRequest } from 'next/server'
  *
  * Sem nenhuma das duas → mostra página "Acesso negado". Mesmo logado.
  *
- * As rotas /sign-in e /sign-up são públicas (auth do Clerk). Tudo o
+ * As rotas /login e /sign-up são públicas (auth do Clerk). Tudo o
  * mais (UI + /api/*) exige super_admin.
  */
 
 const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
+  // O Clerk Dashboard (organização) está configurado com sign-in URL = /login
+  // — mesma rota que o web usa. Sem incluir aqui, auth.protect() entra em
+  // loop infinito de redirect e o browser estoura HTTP 431.
+  '/login(.*)',
   '/sign-up(.*)',
   '/acesso-negado(.*)',
 ])

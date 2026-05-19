@@ -94,6 +94,20 @@ copy_if_missing "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
 copy_if_missing "CLERK_SECRET_KEY"
 copy_if_missing "DATABASE_URL"
 
+# Fixar a rota de sign-in pra /login (mesma do web). Sem essa env var,
+# Clerk fallbacks pro default da org no Dashboard — se descasar da
+# rota real no app, vira loop infinito de redirect + HTTP 431.
+set_var() {
+  local var=$1; local val=$2
+  if grep -q "^${var}=" "$ADMIN_ENV"; then
+    sed -i "s|^${var}=.*|${var}=${val}|" "$ADMIN_ENV"
+  else
+    echo "${var}=${val}" >> "$ADMIN_ENV"
+  fi
+}
+set_var "NEXT_PUBLIC_CLERK_SIGN_IN_URL" "/login"
+set_var "NEXT_PUBLIC_CLERK_SIGN_UP_URL" "/login"
+
 # ADMIN_EMAILS controla quem pode entrar no admin. Sem isso (e sem o
 # usuário ter publicMetadata.role=super_admin no Clerk), TODO login
 # cai em /acesso-negado. Não criamos default — segurança > conveniência.

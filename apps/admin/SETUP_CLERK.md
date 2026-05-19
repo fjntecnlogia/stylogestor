@@ -54,7 +54,7 @@ Vantagem: persiste entre máquinas, não precisa SSH.
 ## Como saber que funcionou?
 
 1. Abra `admin.stylogestor.com.br`
-2. Cai em `/sign-in` → login com Clerk
+2. Cai em `/login` → login com Clerk
 3. Após login deve ir direto pra `/` (dashboard admin)
 4. Se cair em `/acesso-negado`, o passo 2 não foi feito → leia a mensagem
    da própria página, ela explica.

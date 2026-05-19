@@ -1,6 +1,6 @@
 import { SignIn } from '@clerk/nextjs'
 
-export default function SignInPage() {
+export default function LoginPage() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 py-10 bg-[#0F172A]">
       <div className="mb-6 text-center">
@@ -12,8 +12,8 @@ export default function SignInPage() {
       </div>
       <SignIn
         routing="path"
-        path="/sign-in"
-        signUpUrl="/sign-up"
+        path="/login"
+        signUpUrl="/login"
         forceRedirectUrl="/"
         fallbackRedirectUrl="/"
       />
