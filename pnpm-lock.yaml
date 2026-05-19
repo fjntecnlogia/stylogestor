@@ -26,6 +26,9 @@ importers:
       '@clerk/nextjs':
         specifier: ^7.3.3
         version: 7.3.3(next@16.2.6(@opentelemetry/api@1.9.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@clerk/themes':
+        specifier: ^2.4.60
+        version: 2.4.60(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@stylogestor/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -1135,6 +1138,10 @@ packages:
         optional: true
       react-dom:
         optional: true
+
+  '@clerk/themes@2.4.60':
+    resolution: {integrity: sha512-b10U9W0p+d3LKZaFa8kczNEDHZtDMxPqktfToQO2vSt6feR25jY9MvWOIa0MKcyNCMYUAzAkLk7FrKUETW8zqA==}
+    engines: {node: '>=18.17.0'}
 
   '@clerk/types@4.101.20':
     resolution: {integrity: sha512-MHvr1tGL5lwxD6zdzzixkHICbbZz/S1LChONKR52Qeu0yRGChZomPknsgqBMG9J3yNeyhaj0SWa5phQgQUk0lg==}
@@ -9331,6 +9338,14 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
+  '@clerk/themes@2.4.60(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      '@clerk/shared': 3.47.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - react
+      - react-dom
+
   '@clerk/types@4.101.20(react-dom@19.2.4(react@19.1.0))(react@19.1.0)':
     dependencies:
       '@clerk/shared': 3.47.5(react-dom@19.2.4(react@19.1.0))(react@19.1.0)
@@ -11378,7 +11393,7 @@ snapshots:
       debug: 4.4.3
       invariant: 2.2.4
       metro: 0.83.7(bufferutil@4.1.0)
-      metro-config: 0.83.7(bufferutil@4.1.0)
+      metro-config: 0.83.7(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       metro-core: 0.83.7
       semver: 7.8.0
     transitivePeerDependencies:
@@ -16099,21 +16114,6 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  metro-config@0.83.7(bufferutil@4.1.0):
-    dependencies:
-      connect: 3.7.0
-      flow-enums-runtime: 0.0.6
-      jest-validate: 29.7.0
-      metro: 0.83.7(bufferutil@4.1.0)
-      metro-cache: 0.83.7
-      metro-core: 0.83.7
-      metro-runtime: 0.83.7
-      yaml: 2.8.4
-    transitivePeerDependencies:
-      - bufferutil
-      - supports-color
-      - utf-8-validate
-
   metro-config@0.83.7(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       connect: 3.7.0
@@ -16469,7 +16469,7 @@ snapshots:
       metro-babel-transformer: 0.83.7
       metro-cache: 0.83.7
       metro-cache-key: 0.83.7
-      metro-config: 0.83.7(bufferutil@4.1.0)
+      metro-config: 0.83.7(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       metro-core: 0.83.7
       metro-file-map: 0.83.7
       metro-resolver: 0.83.7
