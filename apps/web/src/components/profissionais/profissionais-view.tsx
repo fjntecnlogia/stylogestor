@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useToast } from '@/components/ui/toast'
+import { useTenantPersistedState } from '@/lib/tenant-storage'
 import { getInitialProfessionals, type ProfessionalFixture } from './__fixtures__/professionals'
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
@@ -9,7 +10,13 @@ const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
 interface NovoProfForm { name: string; role: string; phone: string; commission: number; email: string }
 
 export function ProfissionaisView() {
-  const [professionals, setProfessionals] = useState<ProfessionalFixture[]>(() => getInitialProfessionals())
+  // Persistido por tenant — barbeiros cadastrados no onboarding OU aqui ficam no mesmo storage
+  // ('professionals' é a chave compartilhada entre onboarding-flow e profissionais-view).
+  // Quando packages/api expor o módulo de profissionais, trocar por fetch.
+  const [professionals, setProfessionals] = useTenantPersistedState<ProfessionalFixture[]>(
+    'professionals',
+    getInitialProfessionals(),
+  )
   const [selected, setSelected] = useState<ProfessionalFixture | null>(professionals[0] ?? null)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(false)

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useUser } from '@clerk/nextjs'
+import { saveToTenantStorage } from '@/lib/tenant-storage'
 
 type Step = 1 | 2 | 3 | 4
 
@@ -31,6 +33,7 @@ const labelCls = 'text-sm font-semibold text-[#111827] block mb-1.5'
 
 export function OnboardingFlow() {
   const router = useRouter()
+  const { user } = useUser()
   const [step, setStep] = useState<Step>(1)
   const [name, setName] = useState('')
   const [type, setType] = useState('barbershop')
@@ -70,6 +73,50 @@ export function OnboardingFlow() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Erro ao salvar')
+
+      // Backend acabou de criar tenant + setar publicMetadata.tenantSlug do user.
+      // Salva profissionais e serviços no localStorage por tenant — pra que as
+      // telas /profissionais e /servicos os mostrem (essas telas ainda leem do
+      // localStorage até o backend ter endpoints de listagem plugados).
+      const slug = data?.tenant?.slug
+      if (slug) {
+        const professionalsToStore = (data.professionals ?? []).map((p: { id: string; name: string; role: string; commission: number; active: boolean }, idx: number) => ({
+          id: String(idx + 1),
+          name: p.name,
+          role: p.role,
+          phone: '',
+          commission: Number(p.commission),
+          active: p.active,
+          schedules: [
+            { day: 1, start: '09:00', end: '18:00' }, { day: 2, start: '09:00', end: '18:00' },
+            { day: 3, start: '09:00', end: '18:00' }, { day: 4, start: '09:00', end: '18:00' },
+            { day: 5, start: '09:00', end: '18:00' }, { day: 6, start: '09:00', end: '14:00' },
+          ],
+          stats: { month: 0, revenue: 0, commission: 0 },
+        }))
+        saveToTenantStorage('professionals', slug, professionalsToStore)
+
+        const servicesToStore = (data.services ?? []).map((s: { id: string; name: string; price: number; duration: number; active: boolean }, idx: number) => ({
+          id: String(idx + 1),
+          name: s.name,
+          price: Number(s.price),
+          duration: Number(s.duration),
+          category: 'Corte',
+          active: s.active,
+          count: 0,
+        }))
+        saveToTenantStorage('services', slug, servicesToStore)
+      }
+
+      // Força refresh do JWT pra incluir o novo publicMetadata.tenantSlug
+      // (setado pela API). Sem isso, a próxima request ainda usa JWT antigo
+      // sem o slug — e useTenantPersistedState retorna fallback.
+      try {
+        await user?.reload()
+      } catch {
+        // Reload não-bloqueante: se falhar, o JWT atualiza no próximo refresh natural
+      }
+
       router.push('/dashboard')
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Erro ao salvar configurações')

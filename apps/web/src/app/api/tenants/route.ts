@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { prisma } from '@stylogestor/database'
 
 // POST /api/tenants — criar tenant no onboarding
@@ -115,7 +115,43 @@ export async function POST(req: NextRequest) {
       update: {},
     })
 
-    return NextResponse.json({ ok: true, tenant: { id: tenant.id, slug, name } })
+    // Persiste o tenantSlug + role 'gestor' no publicMetadata do Clerk user.
+    // Isso é o que o middleware lê pra:
+    //   - definir tenantSlug usado pelo localStorage scoped por tenant
+    //   - definir role (gestor por default; barbeiros recebem role via /api/professionals/invite)
+    try {
+      const client = await clerkClient()
+      const existing = await client.users.getUser(userId)
+      const existingMetadata = (existing.publicMetadata as Record<string, unknown>) ?? {}
+      await client.users.updateUserMetadata(userId, {
+        publicMetadata: {
+          ...existingMetadata,
+          tenantSlug: slug,
+          role: existingMetadata.role ?? 'gestor',
+        },
+      })
+    } catch (metaErr) {
+      console.error('[TENANT_SET_METADATA_ERROR]', metaErr)
+      // Não bloqueia: tenant foi criado, só o metadata falhou.
+      // Usuário pode setar manualmente no Clerk depois se necessário.
+    }
+
+    // Retorna os profissionais e serviços já criados — usados pelo frontend
+    // pra popular o localStorage scoped por tenant (até o módulo packages/api
+    // de profissionais/serviços estar plugado).
+    const createdProfessionals = professionals?.length
+      ? await prisma.professional.findMany({ where: { tenantId: tenant.id } })
+      : []
+    const createdServices = services?.length
+      ? await prisma.service.findMany({ where: { tenantId: tenant.id } })
+      : []
+
+    return NextResponse.json({
+      ok: true,
+      tenant: { id: tenant.id, slug, name },
+      professionals: createdProfessionals,
+      services: createdServices,
+    })
   } catch (error) {
     console.error('[TENANT_CREATE_ERROR]', error)
     return NextResponse.json({ error: 'Erro ao criar barbearia' }, { status: 500 })
