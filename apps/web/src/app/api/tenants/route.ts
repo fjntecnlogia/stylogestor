@@ -115,10 +115,10 @@ export async function POST(req: NextRequest) {
       update: {},
     })
 
-    // Persiste o tenantSlug + role 'gestor' no publicMetadata do Clerk user.
-    // Isso é o que o middleware lê pra:
-    //   - definir tenantSlug usado pelo localStorage scoped por tenant
-    //   - definir role (gestor por default; barbeiros recebem role via /api/professionals/invite)
+    // Persiste no publicMetadata do Clerk user:
+    //   - tenantSlug + tenantName: usados pelo frontend pra mostrar nome da
+    //     barbearia no header e pra scoped localStorage
+    //   - role 'gestor': lido pelo middleware (barbeiros recebem via invite)
     try {
       const client = await clerkClient()
       const existing = await client.users.getUser(userId)
@@ -127,6 +127,7 @@ export async function POST(req: NextRequest) {
         publicMetadata: {
           ...existingMetadata,
           tenantSlug: slug,
+          tenantName: name,
           role: existingMetadata.role ?? 'gestor',
         },
       })

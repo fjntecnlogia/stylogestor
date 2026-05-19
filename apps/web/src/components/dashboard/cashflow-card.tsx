@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { getInitialEntries, getInitialWeek } from './__fixtures__/cashflow'
+import { useTenantPersistedState } from '@/lib/tenant-storage'
+import { getInitialAppointments, type AppointmentFixture } from '../agenda/__fixtures__/appointments'
+import { getInitialWeek } from './__fixtures__/cashflow'
 
 const METHOD_COLORS: Record<string, string> = {
   PIX:      '#1B8A5A',
@@ -10,14 +12,35 @@ const METHOD_COLORS: Record<string, string> = {
   Cartão:   '#1A3A6B',
 }
 
+/**
+ * Card de fluxo de caixa.
+ * - "Hoje": deriva dos atendimentos COMPLETED do storage do tenant.
+ * - "Semana": gráfico semanal — ainda dependente de fixture até existir
+ *   histórico real de atendimentos por dia.
+ */
 export function CashflowCard() {
   const [view, setView] = useState<'hoje' | 'semana'>('hoje')
-  // Carregado uma vez no mount; quando a API existir trocar por fetch.
-  const [entries] = useState(() => getInitialEntries())
+  const [appointments] = useTenantPersistedState<AppointmentFixture[]>(
+    'agenda:appointments',
+    getInitialAppointments(),
+  )
   const [week] = useState(() => getInitialWeek())
 
+  const entries = useMemo(
+    () =>
+      appointments
+        .filter((a) => a.status === 'COMPLETED')
+        .map((a) => ({
+          label: `${a.service} — ${a.client.split(' ')[0]}`,
+          value: a.price - a.discount,
+          type: 'in' as const,
+          method: a.payMethod || 'PIX',
+        })),
+    [appointments],
+  )
+
   const totalIn  = entries.filter(e => e.type === 'in').reduce((s, e) => s + e.value, 0)
-  const totalOut = entries.filter(e => e.type === 'out').reduce((s, e) => s + e.value, 0)
+  const totalOut = 0 // saídas serão plugadas quando módulo de despesas existir
   const net      = totalIn - totalOut
   const maxWeek  = week.length > 0 ? Math.max(...week.map(d => d.v)) : 1
 
@@ -57,64 +80,87 @@ export function CashflowCard() {
             </div>
           </div>
 
-          {/* Lançamentos */}
-          <div className="divide-y divide-[#F3F4F6]">
-            {entries.map((e, i) => (
-              <div key={i} className="flex items-center justify-between px-5 py-2.5 hover:bg-[#F8F6F2] transition-colors">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ background: METHOD_COLORS[e.method] ?? '#9CA3AF' }} />
-                  <span className="text-sm text-[#4A4A5A]">{e.label}</span>
-                  <span className="text-[10px] text-[#9CA3AF] bg-[#F3F4F6] px-1.5 py-0.5 rounded">{e.method}</span>
-                </div>
-                <span className={`text-sm font-semibold ${e.type === 'in' ? 'text-[#1B8A5A]' : 'text-red-500'}`}>
-                  {e.type === 'in' ? '+' : '-'}R${e.value}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Total + botão */}
-          <div className="px-5 py-4 bg-[#F8F6F2] border-t border-[#E8E6E2]">
-            <div className="flex justify-between items-center mb-3">
-              <span className="font-semibold text-[#1C1C2E]">Total do dia</span>
-              <span className="font-sora font-bold text-xl text-[#1B8A5A]">R$ {net}</span>
+          {entries.length === 0 ? (
+            // Empty state — sem entradas hoje
+            <div className="px-5 py-10 text-center">
+              <p className="text-4xl mb-2">💸</p>
+              <p className="font-sora font-bold text-[#111827] text-sm">Nenhuma entrada hoje</p>
+              <p className="text-xs text-[#6B7280] mt-1">
+                Conclua atendimentos na <Link href="/agenda" className="text-[#1A3A6B] font-semibold hover:underline">agenda</Link> e eles aparecem aqui.
+              </p>
             </div>
-            <Link
-              href="/agenda"
-              className="w-full bg-[#1A3A6B] text-white text-sm font-bold py-3 rounded-xl hover:bg-[#142d55] transition-colors flex items-center justify-center gap-2"
-            >
-              🔒 Fechar caixa do dia →
-            </Link>
-          </div>
+          ) : (
+            <>
+              {/* Lançamentos */}
+              <div className="divide-y divide-[#F3F4F6]">
+                {entries.map((e, i) => (
+                  <div key={i} className="flex items-center justify-between px-5 py-2.5 hover:bg-[#F8F6F2] transition-colors">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: METHOD_COLORS[e.method] ?? '#9CA3AF' }} />
+                      <span className="text-sm text-[#4A4A5A] truncate">{e.label}</span>
+                      <span className="text-[10px] text-[#9CA3AF] bg-[#F3F4F6] px-1.5 py-0.5 rounded shrink-0">{e.method}</span>
+                    </div>
+                    <span className={`text-sm font-semibold shrink-0 ${e.type === 'in' ? 'text-[#1B8A5A]' : 'text-red-500'}`}>
+                      {e.type === 'in' ? '+' : '-'}R${e.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total + botão */}
+              <div className="px-5 py-4 bg-[#F8F6F2] border-t border-[#E8E6E2]">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="font-semibold text-[#1C1C2E]">Total do dia</span>
+                  <span className="font-sora font-bold text-xl text-[#1B8A5A]">R$ {net}</span>
+                </div>
+                <Link
+                  href="/agenda"
+                  className="w-full bg-[#1A3A6B] text-white text-sm font-bold py-3 rounded-xl hover:bg-[#142d55] transition-colors flex items-center justify-center gap-2"
+                >
+                  🔒 Fechar caixa do dia →
+                </Link>
+              </div>
+            </>
+          )}
         </>
       ) : (
         <>
-          {/* Gráfico de barras semanal */}
-          <div className="px-5 py-5">
-            <p className="text-xs text-[#9CA3AF] mb-4">Faturamento — últimos 7 dias</p>
-            <div className="flex items-end gap-2 h-32">
-              {week.map((d) => (
-                <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-[9px] text-[#9CA3AF] font-semibold">
-                    R${d.v >= 1000 ? (d.v/1000).toFixed(1)+'k' : d.v}
-                  </span>
-                  <div className="w-full rounded-t-lg transition-all hover:opacity-80"
-                    style={{
-                      height: `${(d.v / maxWeek) * 96}px`,
-                      background: d.day === 'Sab' ? '#1A3A6B' : '#DBEAFE',
-                    }}
-                  />
-                  <span className="text-[10px] text-[#6B7280] font-medium">{d.day}</span>
-                </div>
-              ))}
+          {week.length === 0 ? (
+            // Empty state — sem histórico semanal
+            <div className="px-5 py-10 text-center">
+              <p className="text-4xl mb-2">📊</p>
+              <p className="font-sora font-bold text-[#111827] text-sm">Sem histórico ainda</p>
+              <p className="text-xs text-[#6B7280] mt-1">
+                Conforme você atender clientes, o gráfico semanal vai aparecer aqui.
+              </p>
             </div>
-            <div className="mt-4 pt-4 border-t border-[#E8E6E2] flex justify-between items-center">
-              <span className="text-sm text-[#4A4A5A]">Total da semana</span>
-              <span className="font-sora font-bold text-[#1A3A6B]">
-                R$ {week.reduce((s, d) => s + d.v, 0).toLocaleString()}
-              </span>
+          ) : (
+            <div className="px-5 py-5">
+              <p className="text-xs text-[#9CA3AF] mb-4">Faturamento — últimos 7 dias</p>
+              <div className="flex items-end gap-2 h-32">
+                {week.map((d) => (
+                  <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
+                    <span className="text-[9px] text-[#9CA3AF] font-semibold">
+                      R${d.v >= 1000 ? (d.v/1000).toFixed(1)+'k' : d.v}
+                    </span>
+                    <div className="w-full rounded-t-lg transition-all hover:opacity-80"
+                      style={{
+                        height: `${(d.v / maxWeek) * 96}px`,
+                        background: d.day === 'Sab' ? '#1A3A6B' : '#DBEAFE',
+                      }}
+                    />
+                    <span className="text-[10px] text-[#6B7280] font-medium">{d.day}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t border-[#E8E6E2] flex justify-between items-center">
+                <span className="text-sm text-[#4A4A5A]">Total da semana</span>
+                <span className="font-sora font-bold text-[#1A3A6B]">
+                  R$ {week.reduce((s, d) => s + d.v, 0).toLocaleString()}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
     </div>

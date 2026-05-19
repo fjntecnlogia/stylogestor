@@ -1,82 +1,75 @@
 'use client'
 
-const STATS = [
-  {
-    label: 'Hoje no caixa',
-    value: 'R$ 1.240',
-    sub: '▲ 18% vs ontem',
-    color: '#1B8A5A',
-    bg: '#ECFDF5',
-    icon: '💰',
-    trend: '+18%',
-    trendUp: true,
-    sparkline: [40, 55, 45, 70, 60, 80, 100],
-  },
-  {
-    label: 'Agendamentos hoje',
-    value: '12',
-    sub: '3 pendentes confirmação',
-    color: '#1A3A6B',
-    bg: '#EFF6FF',
-    icon: '📅',
-    trend: '3 pendentes',
-    trendUp: null,
-    sparkline: [3, 5, 4, 8, 6, 9, 12],
-  },
-  {
-    label: 'Ticket médio',
-    value: 'R$ 85',
-    sub: '▲ 5% este mês',
-    color: '#F5A623',
-    bg: '#FFF7ED',
-    icon: '🎯',
-    trend: '+5%',
-    trendUp: true,
-    sparkline: [70, 75, 72, 80, 78, 82, 85],
-  },
-  {
-    label: 'Clientes este mês',
-    value: '148',
-    sub: '12 novos clientes',
-    color: '#7C3AED',
-    bg: '#F5F3FF',
-    icon: '👥',
-    trend: '+12 novos',
-    trendUp: true,
-    sparkline: [80, 95, 100, 110, 120, 135, 148],
-  },
-]
+import { useMemo } from 'react'
+import { useTenantPersistedState } from '@/lib/tenant-storage'
+import { getInitialClients, type ClientFixture } from '../clientes/__fixtures__/clients'
+import { getInitialAppointments, type AppointmentFixture } from '../agenda/__fixtures__/appointments'
 
-function MiniSparkline({ data, color }: { data: number[]; color: string }) {
-  const max = Math.max(...data)
-  const min = Math.min(...data)
-  const range = max - min || 1
-  const w = 80
-  const h = 30
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w
-    const y = h - ((v - min) / range) * h
-    return `${x},${y}`
-  }).join(' ')
-
-  return (
-    <svg width={w} height={h} className="opacity-60">
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
+/**
+ * KPIs do dashboard derivados do storage local por tenant.
+ * Em prod (NEXT_PUBLIC_USE_MOCKS=false), começa com 0 — gestor preenche
+ * conforme cadastra clientes e agendamentos. Em dev (=true), usa fixtures.
+ */
 export function StatsGrid() {
+  const [clients] = useTenantPersistedState<ClientFixture[]>('clients', getInitialClients())
+  const [appointments] = useTenantPersistedState<AppointmentFixture[]>(
+    'agenda:appointments',
+    getInitialAppointments(),
+  )
+
+  const stats = useMemo(() => {
+    const concluidos = appointments.filter((a) => a.status === 'COMPLETED')
+    const pendentes = appointments.filter((a) => ['SCHEDULED', 'CONFIRMED'].includes(a.status))
+    const totalDia = concluidos.reduce((s, a) => s + a.price - a.discount, 0)
+    const ticketMedio = concluidos.length ? Math.round(totalDia / concluidos.length) : 0
+
+    return [
+      {
+        label: 'Hoje no caixa',
+        value: totalDia > 0 ? `R$ ${totalDia}` : 'R$ 0',
+        sub: concluidos.length > 0 ? `${concluidos.length} atendimentos` : 'nenhum atendimento',
+        color: '#1B8A5A',
+        bg: '#ECFDF5',
+        icon: '💰',
+        trend: concluidos.length > 0 ? `${concluidos.length} hoje` : '—',
+        trendUp: concluidos.length > 0 ? true : null,
+      },
+      {
+        label: 'Agendamentos hoje',
+        value: String(appointments.length),
+        sub: pendentes.length > 0 ? `${pendentes.length} pendentes` : 'sem agendamentos',
+        color: '#1A3A6B',
+        bg: '#EFF6FF',
+        icon: '📅',
+        trend: pendentes.length > 0 ? `${pendentes.length} pendentes` : '—',
+        trendUp: null,
+      },
+      {
+        label: 'Ticket médio',
+        value: ticketMedio > 0 ? `R$ ${ticketMedio}` : 'R$ 0',
+        sub: 'por atendimento',
+        color: '#F5A623',
+        bg: '#FFF7ED',
+        icon: '🎯',
+        trend: '—',
+        trendUp: null,
+      },
+      {
+        label: 'Clientes este mês',
+        value: String(clients.length),
+        sub: clients.length > 0 ? `${clients.length} cadastrados` : 'sem clientes ainda',
+        color: '#7C3AED',
+        bg: '#F5F3FF',
+        icon: '👥',
+        trend: clients.length > 0 ? `${clients.length}` : '—',
+        trendUp: clients.length > 0 ? true : null,
+      },
+    ]
+  }, [appointments, clients])
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {STATS.map((s) => (
+      {stats.map((s) => (
         <div
           key={s.label}
           className="bg-white rounded-2xl p-5 border border-[#E8E6E2] shadow-sm hover:shadow-md transition-shadow group cursor-default"
@@ -88,7 +81,6 @@ export function StatsGrid() {
             >
               {s.icon}
             </div>
-            <MiniSparkline data={s.sparkline} color={s.color} />
           </div>
           <p className="font-sora font-extrabold text-2xl text-[#1C1C2E] mb-0.5">{s.value}</p>
           <p className="text-xs text-[#4A4A5A] mb-2">{s.label}</p>
@@ -98,9 +90,7 @@ export function StatsGrid() {
                 {s.trendUp ? '▲' : '▼'}
               </span>
             )}
-            <span className="text-xs font-semibold" style={{ color: s.color }}>
-              {s.trend}
-            </span>
+            <span className="text-xs font-semibold text-[#9CA3AF]">{s.sub}</span>
           </div>
         </div>
       ))}

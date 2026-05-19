@@ -1,50 +1,78 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useTenantPersistedState } from '@/lib/tenant-storage'
+import { getInitialClients, type ClientFixture } from '../clientes/__fixtures__/clients'
+import { getInitialProducts, type ProductFixture } from '../estoque/__fixtures__/products'
 
-const ALERTS = [
-  {
-    id: '1',
-    type: 'warning',
-    icon: '👻',
-    title: '3 clientes sem visitar há +30 dias',
-    desc: 'Carlos, Rafael e Pedro não aparecem desde abril. Hora de um WhatsApp!',
-    action: 'Enviar mensagem',
-    href: '/clientes?segment=inativo',
-    color: '#F5A623',
-    bg: '#FFF7ED',
-    border: '#FED7AA',
-  },
-  {
-    id: '2',
-    type: 'info',
-    icon: '🎂',
-    title: '2 aniversariantes esta semana',
-    desc: 'Lucas Ferreira (amanhã) e André Lima (sex). Que tal um desconto especial?',
-    action: 'Ver clientes',
-    href: '/clientes',
-    color: '#1A3A6B',
-    bg: '#EFF6FF',
-    border: '#BFDBFE',
-  },
-  {
-    id: '3',
-    type: 'success',
-    icon: '📦',
-    title: 'Estoque: Pomada Capilar baixo',
-    desc: 'Restam apenas 2 unidades. Peça mais antes de acabar.',
-    action: 'Ver estoque',
-    href: '/estoque',
-    color: '#1B8A5A',
-    bg: '#ECFDF5',
-    border: '#A7F3D0',
-  },
-]
+interface Alert {
+  id: string
+  icon: string
+  title: string
+  desc: string
+  action: string
+  href: string
+  color: string
+  bg: string
+  border: string
+}
 
+/**
+ * Alertas derivados do storage real do tenant.
+ * Em prod vazio: nenhum cliente cadastrado, nenhum alerta. Conforme o
+ * gestor preenche dados, os alertas começam a aparecer.
+ */
 export function AlertsPanel() {
+  const [clients] = useTenantPersistedState<ClientFixture[]>('clients', getInitialClients())
+  const [products] = useTenantPersistedState<ProductFixture[]>('products', getInitialProducts())
   const [dismissed, setDismissed] = useState<string[]>([])
-  const visible = ALERTS.filter(a => !dismissed.includes(a.id))
+
+  const alerts = useMemo<Alert[]>(() => {
+    const out: Alert[] = []
+
+    // Clientes inativos (último visitou há +30 dias)
+    const inativos = clients.filter((c) => c.segment === 'inativo')
+    if (inativos.length > 0) {
+      const names = inativos.slice(0, 3).map((c) => c.name.split(' ')[0]).join(', ')
+      out.push({
+        id: 'inativos',
+        icon: '👻',
+        title: `${inativos.length} ${inativos.length === 1 ? 'cliente sem visitar' : 'clientes sem visitar'} há +30 dias`,
+        desc: `${names}${inativos.length > 3 ? ' e outros' : ''} não aparecem há tempo. Hora de um WhatsApp!`,
+        action: 'Enviar mensagem',
+        href: '/clientes?segment=inativo',
+        color: '#F5A623',
+        bg: '#FFF7ED',
+        border: '#FED7AA',
+      })
+    }
+
+    // Estoque baixo
+    const estoqueBaixo = products.filter((p) => p.stock <= p.minStock)
+    if (estoqueBaixo.length > 0) {
+      const first = estoqueBaixo[0]
+      out.push({
+        id: 'estoque-baixo',
+        icon: '📦',
+        title: estoqueBaixo.length === 1
+          ? `Estoque: ${first.name} baixo`
+          : `${estoqueBaixo.length} produtos com estoque baixo`,
+        desc: estoqueBaixo.length === 1
+          ? `Restam ${first.stock} ${first.stock === 1 ? 'unidade' : 'unidades'}. Peça mais antes de acabar.`
+          : `${first.name} e outros estão com estoque baixo.`,
+        action: 'Ver estoque',
+        href: '/estoque',
+        color: '#1B8A5A',
+        bg: '#ECFDF5',
+        border: '#A7F3D0',
+      })
+    }
+
+    return out
+  }, [clients, products])
+
+  const visible = alerts.filter((a) => !dismissed.includes(a.id))
 
   if (visible.length === 0) return null
 
@@ -70,7 +98,7 @@ export function AlertsPanel() {
               {a.action}
             </Link>
             <button
-              onClick={() => setDismissed(p => [...p, a.id])}
+              onClick={() => setDismissed((p) => [...p, a.id])}
               aria-label="Dispensar alerta"
               className="text-[#9CA3AF] hover:text-[#4A4A5A] text-lg leading-none transition-colors"
             >
