@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { auth, currentUser } from '@clerk/nextjs/server'
 import { getStripe, PLANS } from '@/lib/stripe'
 
+/**
+ * POST /api/checkout
+ *
+ * Checkout cartão/boleto — assinatura recorrente (mode subscription).
+ *
+ * Diferenças vs /api/checkout/pix:
+ *   - mode: subscription (recorrência automática)
+ *   - 14 dias de trial via subscription_data
+ *   - aceita card + boleto (PIX só no endpoint /pix)
+ *
+ * Customizações compartilhadas (mantidas em sync com /pix):
+ *   - email pré-preenchido (Clerk)
+ *   - telefone obrigatório
+ *   - tax_id (CPF/CNPJ) opcional
+ *   - cupom de desconto habilitado
+ *   - description com bullets das features do plano
+ *   - billing_address pra emissão de NF
+ */
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth()
@@ -16,10 +34,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Plano não encontrado' }, { status: 404 })
     }
 
+    const user = await currentUser()
+    const email =
+      user?.primaryEmailAddress?.emailAddress ??
+      user?.emailAddresses?.[0]?.emailAddress ??
+      undefined
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
     const isAnual = ciclo === 'anual'
     const unitAmount = isAnual ? plan.priceAnnual : plan.priceMonthly
     const interval = isAnual ? 'year' : 'month'
+
+    // Bullets de features — mesma estética do checkout PIX
+    const featuresBullets = plan.features.map((f) => `✓ ${f}`).join('\n')
+    const cicloLabel = isAnual ? '2 meses grátis no plano anual' : 'Cobrança mensal'
+    const description = [
+      `${plan.subdesc} · ${plan.description}`,
+      '',
+      featuresBullets,
+      '',
+      `🎁 14 dias grátis · ${cicloLabel} · cancele a qualquer momento`,
+    ].join('\n')
 
     const stripe = getStripe()
     const session = await stripe.checkout.sessions.create({
@@ -31,7 +66,7 @@ export async function POST(req: NextRequest) {
             currency: plan.currency,
             product_data: {
               name: `STYLOGESTOR ${plan.name}${isAnual ? ' (Anual)' : ''}`,
-              description: plan.description,
+              description,
             },
             unit_amount: unitAmount,
             recurring: { interval },
@@ -44,11 +79,26 @@ export async function POST(req: NextRequest) {
         trial_period_days: 14,
         metadata: { userId, planId: plan.id },
       },
+      // Pré-preenche email do usuário logado
+      ...(email ? { customer_email: email } : {}),
+      // Telefone do gestor — usamos pra WhatsApp depois
+      phone_number_collection: { enabled: true },
+      // CPF/CNPJ opcional — útil pra NF
+      tax_id_collection: { enabled: true },
+      // Cupons promocionais ativados
+      allow_promotion_codes: true,
+      // Endereço de cobrança opcional (auto = só se necessário)
+      billing_address_collection: 'auto',
+      // Texto motivacional acima do botão "Pagar"
+      custom_text: {
+        submit: {
+          message:
+            'Você não é cobrado hoje. Os 14 dias grátis começam após o cadastro do cartão. Cancele a qualquer momento.',
+        },
+      },
       success_url: `${appUrl}/sucesso?session_id={CHECKOUT_SESSION_ID}&plan=${plan.id}&ciclo=${ciclo}`,
       cancel_url: `${appUrl}/planos?canceled=1`,
       locale: 'pt-BR',
-      allow_promotion_codes: true,
-      billing_address_collection: 'auto',
     })
 
     return NextResponse.json({ url: session.url })
