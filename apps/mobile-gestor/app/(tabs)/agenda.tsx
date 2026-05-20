@@ -1,21 +1,9 @@
 import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from 'react-native'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-
-// Datas formatadas dd/MM em ordem para casar com o carrossel.
-// Computado uma vez no carregamento do módulo.
-const _today = new Date()
-const D = (offset: number) => format(addDays(_today, offset), 'dd/MM')
-
-const INITIAL_APPOINTMENTS = [
-  { id: '1', date: D(0), time: '09:00', client: 'Carlos Oliveira',  service: 'Corte + Barba', prof: 'João',  status: 'COMPLETED',   price: 60 },
-  { id: '2', date: D(0), time: '10:00', client: 'Rafael Santos',    service: 'Corte',          prof: 'João',  status: 'COMPLETED',   price: 40 },
-  { id: '3', date: D(0), time: '11:00', client: 'Pedro Alves',      service: 'Barba',          prof: 'Pedro', status: 'IN_PROGRESS', price: 30 },
-  { id: '4', date: D(0), time: '14:00', client: 'Lucas Ferreira',   service: 'Corte',          prof: 'João',  status: 'SCHEDULED',   price: 40 },
-  { id: '5', date: D(1), time: '15:00', client: 'André Lima',       service: 'Corte + Barba',  prof: 'Pedro', status: 'SCHEDULED',   price: 60 },
-  { id: '6', date: D(2), time: '16:30', client: 'Bruno Carvalho',   service: 'Corte',          prof: 'João',  status: 'SCHEDULED',   price: 40 },
-]
+import { useRouter, useFocusEffect } from 'expo-router'
+import { listAgendamentos, updateAgendamentoStatus, type Agendamento } from '../../lib/agendamentos'
 
 const STATUS = {
   COMPLETED:   { label: 'Concluído',   color: '#065F46', bg: '#D1FAE5' },
@@ -26,16 +14,24 @@ const STATUS = {
 }
 
 export default function AgendaScreen() {
+  const router = useRouter()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedApt, setSelectedApt] = useState<string | null>(null)
-  const [appointments, setAppointments] = useState(INITIAL_APPOINTMENTS)
+  const [appointments, setAppointments] = useState<Agendamento[]>([])
+
+  // Recarrega da storage toda vez que a tab ganha foco (apos novo agendamento, etc.)
+  const reload = useCallback(() => {
+    listAgendamentos().then(setAppointments)
+  }, [])
+  useFocusEffect(useCallback(() => { reload() }, [reload]))
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i))
   const selectedDateStr = format(selectedDate, 'dd/MM')
   const dayAppointments = appointments.filter(a => a.date === selectedDateStr)
 
-  const updateStatus = (id: string, status: string) => {
-    setAppointments(prev => prev.map(a => (a.id === id ? { ...a, status } : a)))
+  const updateStatus = async (id: string, status: Agendamento['status']) => {
+    await updateAgendamentoStatus(id, status)
+    reload()
   }
   const confirmCancel = (id: string, client: string) => {
     Alert.alert(`Cancelar agendamento de ${client}?`, 'Esta ação não pode ser desfeita.', [
@@ -49,10 +45,7 @@ export default function AgendaScreen() {
       {/* Header */}
       <View style={s.header}>
         <Text style={s.title}>Agenda</Text>
-        <TouchableOpacity
-          style={s.addBtn}
-          onPress={() => Alert.alert('Novo agendamento', 'Tela de novo agendamento em desenvolvimento. Use o painel web por ora.')}
-        >
+        <TouchableOpacity style={s.addBtn} onPress={() => router.push('/novo-agendamento')}>
           <Text style={s.addBtnText}>+ Agendar</Text>
         </TouchableOpacity>
       </View>
@@ -112,8 +105,8 @@ export default function AgendaScreen() {
               </View>
 
               <View style={s.infoCol}>
-                <Text style={s.clientName}>{apt.client}</Text>
-                <Text style={s.serviceText}>{apt.service} • {apt.prof}</Text>
+                <Text style={s.clientName}>{apt.clienteNome}</Text>
+                <Text style={s.serviceText}>{apt.servicoNomes} • {apt.profissionalNome}</Text>
                 {isSelected && (
                   <View style={s.actions}>
                     <TouchableOpacity
@@ -124,13 +117,13 @@ export default function AgendaScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[s.actionBtn, { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#1A3A6B' }]}
-                      onPress={() => Alert.alert('Editar agendamento', 'Edição completa em desenvolvimento. Use o painel web por ora.')}
+                      onPress={() => Alert.alert('Editar agendamento', 'Edição completa em desenvolvimento. Cancele e crie um novo se precisar.')}
                     >
                       <Text style={[s.actionBtnText, { color: '#1A3A6B' }]}>✏️ Editar</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[s.actionBtn, { backgroundColor: '#FEE2E2' }]}
-                      onPress={() => confirmCancel(apt.id, apt.client)}
+                      onPress={() => confirmCancel(apt.id, apt.clienteNome)}
                     >
                       <Text style={[s.actionBtnText, { color: '#991B1B' }]}>✕ Cancelar</Text>
                     </TouchableOpacity>

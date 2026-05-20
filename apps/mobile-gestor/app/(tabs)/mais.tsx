@@ -50,6 +50,11 @@ const IMPLEMENTED_ROUTES = new Set<string>([
   '/configuracoes',
   '/servicos',
   '/profissionais',
+  '/estoque',
+  '/fidelidade',
+  '/planos',
+  '/ajuda',
+  '/suporte',
 ])
 
 export default function MaisScreen() {
@@ -67,7 +72,7 @@ export default function MaisScreen() {
         </View>
         <TouchableOpacity
           style={s.editBtn}
-          onPress={() => Alert.alert('Editar perfil', 'Em desenvolvimento. Use o painel web por ora.')}
+          onPress={() => router.push('/editar-perfil' as never)}
         >
           <Text style={s.editBtnText}>Editar</Text>
         </TouchableOpacity>
