@@ -39,18 +39,12 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
     const stripe = getStripe()
 
-    // Description com bullets das features do plano. \n vira quebra de
-    // linha no Stripe Checkout. Usamos checkoutFeatures (subset de 4
-    // bullets curtos) ao invés de features completo — Stripe trunca
-    // após ~2 linhas e fica feio com "...".
-    const featuresBullets = plan.checkoutFeatures.map((f) => `✓ ${f}`).join('\n')
-    const description = [
-      `${plan.subdesc} · ${plan.description}`,
-      '',
-      featuresBullets,
-      '',
-      '🎁 14 dias grátis incluídos · cobrança recorrente no cartão a partir do 2º mês',
-    ].join('\n')
+    // Description vira bullets numa linha única — Stripe colapsa \n e
+    // trunca após ~2 linhas visuais. Por isso evitamos quebras: linha
+    // única com separador "  " entre os checks cabe sem truncar e
+    // mantém leitura visual. O "14 dias grátis" e o gancho de cancela-
+    // mento já estão no custom_text.submit.message acima do botão.
+    const description = plan.checkoutFeatures.map((f) => `✓ ${f}`).join('  ')
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['pix'],

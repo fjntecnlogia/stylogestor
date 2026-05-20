@@ -45,17 +45,11 @@ export async function POST(req: NextRequest) {
     const unitAmount = isAnual ? plan.priceAnnual : plan.priceMonthly
     const interval = isAnual ? 'year' : 'month'
 
-    // Bullets de features — usa checkoutFeatures (subset enxuto) pra
-    // não truncar no Stripe. Lista completa fica só na página /planos.
-    const featuresBullets = plan.checkoutFeatures.map((f) => `✓ ${f}`).join('\n')
-    const cicloLabel = isAnual ? '2 meses grátis no plano anual' : 'Cobrança mensal'
-    const description = [
-      `${plan.subdesc} · ${plan.description}`,
-      '',
-      featuresBullets,
-      '',
-      `🎁 14 dias grátis · ${cicloLabel} · cancele a qualquer momento`,
-    ].join('\n')
+    // Description em linha única — Stripe colapsa \n e trunca após
+    // ~2 linhas visuais. Mantemos só os bullets; ciclo (anual/mensal)
+    // já está no nome do produto e o gancho de trial/cancelamento
+    // já vai pelo custom_text.submit.message acima do botão.
+    const description = plan.checkoutFeatures.map((f) => `✓ ${f}`).join('  ')
 
     const stripe = getStripe()
     const session = await stripe.checkout.sessions.create({
