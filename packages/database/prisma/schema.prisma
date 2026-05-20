@@ -545,6 +545,35 @@ model CashClosure {
   @@map("cash_closures")
 }
 
+// ============================================================
+// SYSTEM LOG — Log centralizado da aplicação
+// ============================================================
+// Eventos importantes (criação de tenant, resgate de código, deleção,
+// erros em crons, etc) gravados num único lugar pra visualização
+// no painel admin. Substitui parcialmente o console.log + grep
+// manual em logs do PM2.
+//
+// level: 'info' | 'warn' | 'error' | 'debug'
+// source: identificador curto de onde veio (ex.: 'api/tenants',
+//         'cron/reminders', 'webhook/clerk')
+// message: descrição humana curta
+// context: payload arbitrário (Json) com IDs, payload, stack, etc
+
+model SystemLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  level     String
+  source    String
+  message   String
+  context   Json?
+  tenantId  String?  @db.Uuid
+  createdAt DateTime @default(now())
+
+  @@index([level, createdAt])
+  @@index([source, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("system_logs")
+}
+
 // Histórico de uso dos códigos — qual tenant resgatou qual código quando.
 model PromoCodeRedemption {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

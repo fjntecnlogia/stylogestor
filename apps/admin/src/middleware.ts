@@ -30,6 +30,9 @@ const isPublicRoute = createRouteMatcher([
   '/login(.*)',
   '/sign-up(.*)',
   '/acesso-negado(.*)',
+  // /api/health é pingado pelo próprio painel admin (self) e por outros
+  // monitoramentos externos. Sem auth.
+  '/api/health',
 ])
 
 function isAllowlisted(email: string | null | undefined) {

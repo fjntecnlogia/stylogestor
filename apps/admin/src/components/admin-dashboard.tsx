@@ -85,6 +85,8 @@ const NAV = [
   { id: 'tenants',    label: 'Barbearias',   icon: '✂️' },
   { id: 'tickets',    label: 'Suporte',      icon: '🎧' },
   { id: 'revenue',    label: 'Receita',      icon: '💰' },
+  { id: 'logs',       label: 'Logs',         icon: '📜' },
+  { id: 'system',     label: 'Sistema',      icon: '🩺' },
   { id: 'settings',   label: 'Configurações',icon: '⚙️' },
 ]
 
@@ -315,6 +317,50 @@ export function AdminDashboard() {
   const [redemptions, setRedemptions] = useState<Redemption[]>([])
   const [redemptionsLoading, setRedemptionsLoading] = useState(false)
 
+  // ── LOGS (aba 'logs') ─────────────────────────────────────────────
+  interface SystemLogItem {
+    id: string
+    level: 'info' | 'warn' | 'error' | 'debug'
+    source: string
+    message: string
+    context: unknown
+    tenantId: string | null
+    createdAt: string
+  }
+  const [logs, setLogs] = useState<SystemLogItem[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [logFilterLevel, setLogFilterLevel] = useState<'' | 'info' | 'warn' | 'error' | 'debug'>('')
+  const [logFilterSource, setLogFilterSource] = useState<string>('')
+  const [logExpanded, setLogExpanded] = useState<string | null>(null)
+  const [logNextCursor, setLogNextCursor] = useState<string | null>(null)
+  const [logCleanupBusy, setLogCleanupBusy] = useState(false)
+
+  // ── SISTEMA (aba 'system') ────────────────────────────────────────
+  // Estado por app. Apps são fixos no front; o backend de cada um expõe /api/health
+  // retornando { ok, version, buildTime, name }.
+  interface AppHealth {
+    name: string
+    url: string         // URL base do app (sem /api/health)
+    ok: boolean | null  // null = ainda não checado, false = erro
+    version?: string
+    buildTime?: string
+    httpStatus?: number
+    error?: string
+    latencyMs?: number
+  }
+  // Apps que expõem /api/health pra esse painel pingar.
+  // Mobile não tem URL pública (é app nativo) — fica de fora.
+  const APPS_TO_MONITOR: { name: string; url: string }[] = [
+    { name: 'Web (gestor)',  url: 'https://app.stylogestor.com.br' },
+    { name: 'Site público',  url: 'https://stylogestor.com.br' },
+    { name: 'Booking',       url: 'https://book.stylogestor.com.br' },
+    { name: 'Admin (este)',  url: 'https://admin.stylogestor.com.br' },
+  ]
+  const [appsHealth, setAppsHealth] = useState<AppHealth[]>(
+    APPS_TO_MONITOR.map((a) => ({ ...a, ok: null })),
+  )
+  const [healthLoading, setHealthLoading] = useState(false)
+
   // ── Handlers de settings/promo/trial (depois dos states) ──────────
 
   // Salvar trial-days global
@@ -467,6 +513,119 @@ export function AdminDashboard() {
       setTrialModalLoading(false)
     }
   }, [trialModalTenant, trialModalTab, trialExtendDays, trialNewDate, trialPromoCode, toastSuccess, toastError, toastWarning])
+
+  // ── Logs: buscar com filtros + paginação ───────────────────────────
+  const fetchLogs = useCallback(async (opts?: { append?: boolean }) => {
+    setLogsLoading(true)
+    try {
+      const qs = new URLSearchParams()
+      if (logFilterLevel) qs.set('level', logFilterLevel)
+      if (logFilterSource.trim()) qs.set('source', logFilterSource.trim())
+      qs.set('limit', '100')
+      if (opts?.append && logNextCursor) qs.set('cursor', logNextCursor)
+      const res = await fetch(`/api/logs?${qs.toString()}`)
+      const data = await res.json()
+      if (!res.ok) {
+        toastError(data.error || 'Erro ao buscar logs')
+        return
+      }
+      const items: SystemLogItem[] = Array.isArray(data.items) ? data.items : []
+      setLogs((prev) => (opts?.append ? [...prev, ...items] : items))
+      setLogNextCursor(data.nextCursor ?? null)
+    } catch (err) {
+      toastError('Erro de rede ao buscar logs')
+      console.error(err)
+    } finally {
+      setLogsLoading(false)
+    }
+  }, [logFilterLevel, logFilterSource, logNextCursor, toastError])
+
+  // Limpar logs antigos (botão "Limpar > 30 dias")
+  const handleCleanupLogs = useCallback(async () => {
+    if (!confirm('Apagar logs com mais de 30 dias? Essa ação não pode ser desfeita.')) return
+    setLogCleanupBusy(true)
+    try {
+      const res = await fetch('/api/logs?olderThanDays=30', { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) { toastError(data.error || 'Erro ao limpar'); return }
+      toastSuccess(`${data.deleted ?? 0} log(s) apagado(s)`)
+      // recarrega lista zerando cursor
+      setLogNextCursor(null)
+      await fetchLogs()
+    } catch (err) {
+      toastError('Erro de rede')
+      console.error(err)
+    } finally {
+      setLogCleanupBusy(false)
+    }
+  }, [fetchLogs, toastError, toastSuccess])
+
+  // Carrega logs ao trocar pra aba logs ou mudar filtro
+  useEffect(() => {
+    if (page !== 'logs') return
+    // setState dentro de effect é necessário aqui — não é cascading render,
+    // é resposta a mudança de filtro (input externo do usuário).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLogNextCursor(null)
+    fetchLogs()
+    // fetchLogs intencionalmente fora — queremos refetch só ao trocar filtro
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, logFilterLevel, logFilterSource])
+
+  // ── Sistema: pingar health de cada app ─────────────────────────────
+  const refreshHealth = useCallback(async () => {
+    setHealthLoading(true)
+    try {
+      const results = await Promise.all(
+        APPS_TO_MONITOR.map(async ({ name, url }) => {
+          const started = performance.now()
+          try {
+            const res = await fetch(`${url}/api/health`, {
+              method: 'GET',
+              cache: 'no-store',
+              headers: { Accept: 'application/json' },
+            })
+            const latency = Math.round(performance.now() - started)
+            if (!res.ok) {
+              return { name, url, ok: false, httpStatus: res.status, latencyMs: latency } as AppHealth
+            }
+            const data: { version?: string; buildTime?: string } = await res.json().catch(() => ({}))
+            return {
+              name,
+              url,
+              ok: true,
+              version: data.version,
+              buildTime: data.buildTime,
+              httpStatus: res.status,
+              latencyMs: latency,
+            } as AppHealth
+          } catch (err) {
+            return {
+              name,
+              url,
+              ok: false,
+              error: err instanceof Error ? err.message : 'erro de rede',
+              latencyMs: Math.round(performance.now() - started),
+            } as AppHealth
+          }
+        }),
+      )
+      setAppsHealth(results)
+    } finally {
+      setHealthLoading(false)
+    }
+  // APPS_TO_MONITOR é constante por render — referencia mas não muda
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Auto-refresh ao abrir aba sistema
+  useEffect(() => {
+    if (page !== 'system') return
+    // refreshHealth interno faz setAppsHealth — é cascading benéfico
+    // (ping inicial ao abrir a aba). Sem effect, a aba abriria sem dados.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    refreshHealth()
+  }, [page, refreshHealth])
 
   // Helper de label do limite de profissionais por plano
   const planLimitLabel = (n: number) =>
@@ -2114,6 +2273,235 @@ export function AdminDashboard() {
                     {s.valor > 0 && <p className="text-xs text-white/30 mt-0.5">R$ {s.valor}/mês em risco</p>}
                   </div>
                 ))}
+              </div>
+            </>
+          )}
+
+          {/* ── LOGS ── */}
+          {page === 'logs' && (
+            <>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h1 className="font-sora font-bold text-2xl text-white">📜 Logs do sistema</h1>
+                  <p className="text-xs text-white/40 mt-0.5">
+                    Eventos importantes registrados pelos apps (criações, erros, crons).
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => fetchLogs()}
+                    disabled={logsLoading}
+                    className="text-xs bg-white/10 hover:bg-white/20 disabled:opacity-40 text-white px-3 py-2 rounded-lg font-semibold"
+                  >
+                    {logsLoading ? '⏳ Carregando...' : '🔄 Atualizar'}
+                  </button>
+                  <button
+                    onClick={handleCleanupLogs}
+                    disabled={logCleanupBusy}
+                    className="text-xs bg-red-500/20 hover:bg-red-500/30 disabled:opacity-40 text-red-300 px-3 py-2 rounded-lg font-semibold"
+                  >
+                    {logCleanupBusy ? '...' : '🗑️ Limpar > 30 dias'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Filtros */}
+              <div className="flex flex-wrap items-end gap-2 bg-white/5 border border-white/10 rounded-xl p-3">
+                <div className="flex-1 min-w-[140px]">
+                  <label className="text-[10px] text-white/50 font-semibold uppercase tracking-wide block mb-1">
+                    Nível
+                  </label>
+                  <select
+                    value={logFilterLevel}
+                    onChange={(e) => setLogFilterLevel(e.target.value as typeof logFilterLevel)}
+                    className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50"
+                  >
+                    <option value="" className="bg-[#1C2333]">Todos</option>
+                    <option value="error" className="bg-[#1C2333]">Erro</option>
+                    <option value="warn" className="bg-[#1C2333]">Aviso</option>
+                    <option value="info" className="bg-[#1C2333]">Info</option>
+                    <option value="debug" className="bg-[#1C2333]">Debug</option>
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="text-[10px] text-white/50 font-semibold uppercase tracking-wide block mb-1">
+                    Source (prefixo)
+                  </label>
+                  <input
+                    type="text"
+                    value={logFilterSource}
+                    placeholder="ex.: api/tenants, cron/"
+                    onChange={(e) => setLogFilterSource(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F5A623]/50 font-mono"
+                  />
+                </div>
+                {(logFilterLevel || logFilterSource) && (
+                  <button
+                    onClick={() => { setLogFilterLevel(''); setLogFilterSource('') }}
+                    className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg"
+                  >
+                    Limpar filtros
+                  </button>
+                )}
+              </div>
+
+              {/* Lista */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                {logsLoading && logs.length === 0 ? (
+                  <div className="py-12 text-center text-white/40 text-sm">Carregando logs...</div>
+                ) : logs.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <p className="text-3xl mb-2">🔇</p>
+                    <p className="text-sm text-white/40">Nenhum log encontrado</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/5">
+                    {logs.map((log) => {
+                      const levelColor =
+                        log.level === 'error' ? 'bg-red-500/20 text-red-300 border-red-500/30'
+                        : log.level === 'warn' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        : log.level === 'info' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                        : 'bg-white/10 text-white/60 border-white/10'
+                      const dt = new Date(log.createdAt)
+                      const dtLabel = dt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+                      const expanded = logExpanded === log.id
+                      return (
+                        <div key={log.id} className="px-4 py-3 hover:bg-white/5">
+                          <div
+                            className="flex items-start gap-3 cursor-pointer"
+                            onClick={() => setLogExpanded(expanded ? null : log.id)}
+                          >
+                            <span className={`text-[10px] font-bold uppercase border rounded-md px-2 py-0.5 shrink-0 ${levelColor}`}>
+                              {log.level}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono text-xs text-white/60">{log.source}</span>
+                                <span className="text-[10px] text-white/40">·</span>
+                                <span className="text-[10px] text-white/40">{dtLabel}</span>
+                                {log.tenantId && (
+                                  <span className="text-[10px] text-[#F5A623]/80 font-mono" title={log.tenantId}>
+                                    tenant: {log.tenantId.slice(0, 8)}…
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-white mt-0.5 break-words">{log.message}</p>
+                            </div>
+                            {log.context !== null && log.context !== undefined && (
+                              <span className="text-white/40 text-xs shrink-0">{expanded ? '▾' : '▸'}</span>
+                            )}
+                          </div>
+                          {expanded && log.context !== null && log.context !== undefined && (
+                            <pre className="mt-2 ml-12 text-[11px] bg-black/30 border border-white/5 rounded-lg p-3 overflow-x-auto text-white/70 font-mono whitespace-pre-wrap break-words">
+                              {JSON.stringify(log.context, null, 2)}
+                            </pre>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {logNextCursor && (
+                  <div className="border-t border-white/10 p-3 text-center">
+                    <button
+                      onClick={() => fetchLogs({ append: true })}
+                      disabled={logsLoading}
+                      className="text-xs bg-white/10 hover:bg-white/20 disabled:opacity-40 text-white px-4 py-2 rounded-lg font-semibold"
+                    >
+                      {logsLoading ? 'Carregando...' : 'Carregar mais'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── SISTEMA / HEALTH ── */}
+          {page === 'system' && (
+            <>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h1 className="font-sora font-bold text-2xl text-white">🩺 Status do sistema</h1>
+                  <p className="text-xs text-white/40 mt-0.5">
+                    Health check ao vivo de cada app — versão (commit), data do build, latência.
+                  </p>
+                </div>
+                <button
+                  onClick={refreshHealth}
+                  disabled={healthLoading}
+                  className="text-xs bg-white/10 hover:bg-white/20 disabled:opacity-40 text-white px-3 py-2 rounded-lg font-semibold"
+                >
+                  {healthLoading ? '⏳ Verificando...' : '🔄 Verificar agora'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {appsHealth.map((app) => {
+                  const dotColor =
+                    app.ok === null ? 'bg-white/20' :
+                    app.ok ? 'bg-emerald-400' : 'bg-red-500'
+                  const dotPulse = app.ok === null ? '' : app.ok ? 'animate-pulse' : ''
+                  const statusLabel =
+                    app.ok === null ? 'Verificando…' :
+                    app.ok ? 'Online' :
+                    `Offline (${app.httpStatus ?? app.error ?? 'sem resposta'})`
+                  return (
+                    <div key={app.url} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                      <div className="flex items-center gap-3">
+                        <span className={`w-2.5 h-2.5 rounded-full ${dotColor} ${dotPulse}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-white">{app.name}</p>
+                          <a
+                            href={app.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-white/40 hover:text-white/70 font-mono break-all"
+                          >
+                            {app.url}
+                          </a>
+                        </div>
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${app.ok ? 'bg-emerald-500/20 text-emerald-300' : app.ok === false ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-white/50'}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mt-3 text-[11px]">
+                        <div className="bg-white/5 rounded-lg px-2 py-1.5">
+                          <p className="text-white/40 uppercase text-[9px] font-semibold">Commit</p>
+                          <p className="text-white font-mono truncate" title={app.version || ''}>
+                            {app.version ? app.version.slice(0, 7) : '—'}
+                          </p>
+                        </div>
+                        <div className="bg-white/5 rounded-lg px-2 py-1.5">
+                          <p className="text-white/40 uppercase text-[9px] font-semibold">Build</p>
+                          <p className="text-white">
+                            {app.buildTime
+                              ? new Date(app.buildTime).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })
+                              : '—'}
+                          </p>
+                        </div>
+                        <div className="bg-white/5 rounded-lg px-2 py-1.5">
+                          <p className="text-white/40 uppercase text-[9px] font-semibold">Latência</p>
+                          <p className="text-white">
+                            {typeof app.latencyMs === 'number' ? `${app.latencyMs} ms` : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      {app.ok === false && app.error && (
+                        <p className="text-[10px] text-red-300/80 mt-2 font-mono break-words">{app.error}</p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs text-white/50">
+                <p className="font-semibold text-white/70 mb-1">ℹ️ Como funciona</p>
+                <p>
+                  Cada app expõe <code className="font-mono text-[#F5A623]">/api/health</code> retornando
+                  versão (commit SHA), data de build e nome. Esse painel pinga todos em paralelo
+                  diretamente do navegador — se algum estiver fora do ar, aparece offline aqui.
+                </p>
               </div>
             </>
           )}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
 import { clerkClient } from '@clerk/nextjs/server'
 import { sendTrialExpiringEmail } from '@/lib/resend'
+import { log } from '@/lib/logger'
 
 /**
  * GET /api/cron/trial-warnings
@@ -83,6 +84,15 @@ export async function GET(req: NextRequest) {
     }
 
     results.push({ daysLeft: window.daysLeft, count: tenants.length, sent, failed })
+  }
+
+  // Loga só se realmente tentou enviar algo
+  const totalSent = results.reduce((s, r) => s + r.sent, 0)
+  const totalFailed = results.reduce((s, r) => s + r.failed, 0)
+  if (totalSent + totalFailed > 0) {
+    void log.info('cron/trial-warnings', `Trial warnings processados: ${totalSent} enviados, ${totalFailed} falhas`, {
+      results,
+    })
   }
 
   return NextResponse.json({

@@ -83,6 +83,7 @@ LEGACY_APPLIED_MIGRATIONS="
 20260517_add_webhook_events
 20260519_add_system_settings_and_promo_codes
 20260519_add_cash_closures
+20260519_add_professional_blocks
 "
 for mig in $LEGACY_APPLIED_MIGRATIONS; do
   if [ -n "$mig" ]; then
@@ -170,6 +171,27 @@ else
     echo "   ✓ ADMIN_EMAILS já configurado (não sobrescrevo)"
   fi
 fi
+
+echo ""
+echo "🔖 [4.7/6] Gravando GIT_SHA + BUILD_TIME no env de cada app..."
+# /api/health (de cada app) lê NEXT_PUBLIC_GIT_SHA e NEXT_PUBLIC_BUILD_TIME
+# pra reportar versão no painel admin > Sistema. Idempotente — substitui
+# se presente, adiciona se não.
+GIT_SHA_VAL=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME_VAL=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+for app in apps/web apps/admin apps/site apps/booking; do
+  ENV_FILE="$APP_DIR/$app/.env.production.local"
+  touch "$ENV_FILE"
+  for kv in "NEXT_PUBLIC_GIT_SHA=$GIT_SHA_VAL" "NEXT_PUBLIC_BUILD_TIME=$BUILD_TIME_VAL"; do
+    key="${kv%%=*}"
+    if grep -q "^${key}=" "$ENV_FILE"; then
+      sed -i "s|^${key}=.*|${kv}|" "$ENV_FILE"
+    else
+      echo "$kv" >> "$ENV_FILE"
+    fi
+  done
+done
+echo "   ✓ GIT_SHA=${GIT_SHA_VAL:0:7}  BUILD_TIME=$BUILD_TIME_VAL"
 
 echo ""
 echo "🔨 [5/6] Buildando apps..."

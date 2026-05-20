@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
 import { requireAdmin } from '@/lib/require-admin'
+import { log } from '@/lib/logger'
 
 function shape(p: {
   id: string; code: string; description: string | null
@@ -68,6 +69,11 @@ export async function POST(req: NextRequest) {
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         active: true,
       },
+    })
+    void log.info('api/admin/promo-codes', `Código promocional criado: ${codeNorm}`, {
+      code: codeNorm,
+      trialDays: created.trialDays,
+      usageLimit: created.usageLimit,
     })
     return NextResponse.json(shape(created))
   } catch (err: unknown) {

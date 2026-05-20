@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
 import { sendWhatsApp, msgLembreteAgendamento } from '@/lib/whatsapp'
+import { log } from '@/lib/logger'
 
 /**
  * GET /api/cron/appointment-reminders
@@ -85,6 +86,16 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Loga só se realmente fez algo (evita ruído quando candidates=0)
+    if (appointments.length > 0 || failed > 0) {
+      void log.info('cron/appointment-reminders', `WhatsApp lembretes processados: ${sent} enviados, ${failed} falhas, ${skipped} pulados`, {
+        candidates: appointments.length,
+        sent,
+        failed,
+        skipped,
+      })
+    }
+
     return NextResponse.json({
       ok: true,
       timestamp: new Date(now).toISOString(),
@@ -96,6 +107,9 @@ export async function GET(req: NextRequest) {
     })
   } catch (err) {
     console.error('[APT_REMINDER_CRON_ERROR]', err)
+    void log.error('cron/appointment-reminders', 'Erro no cron de lembretes', {
+      error: err instanceof Error ? err.message : String(err),
+    })
     return NextResponse.json({ error: 'Erro no cron' }, { status: 500 })
   }
 }

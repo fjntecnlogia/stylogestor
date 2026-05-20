@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
 import { requireAdmin } from '@/lib/require-admin'
+import { log } from '@/lib/logger'
 
 /**
  * PATCH /api/tenants/[id]
@@ -36,6 +37,7 @@ export async function PATCH(
           data: { status: 'canceled' },
         }),
       ])
+      void log.warn('api/admin/tenants', 'Tenant cancelado (soft delete)', { tenantId: id }, id)
       return NextResponse.json({ ok: true, action })
     }
 
@@ -47,6 +49,7 @@ export async function PATCH(
           data: { status: 'active' },
         }),
       ])
+      void log.info('api/admin/tenants', 'Tenant reativado', { tenantId: id }, id)
       return NextResponse.json({ ok: true, action })
     }
 
@@ -122,6 +125,12 @@ export async function PATCH(
           data: { usedCount: { increment: 1 } },
         }),
       ])
+      void log.info('api/admin/tenants', `Código promocional aplicado: ${code}`, {
+        tenantId: id,
+        code,
+        trialDays: promo.trialDays,
+        newEnd: newEnd.toISOString(),
+      }, id)
       return NextResponse.json({
         ok: true, action, code,
         trialDaysAdded: promo.trialDays,
@@ -186,9 +195,17 @@ export async function DELETE(
       prisma.tenant.delete({ where: { id } }),
     ])
 
+    void log.warn('api/admin/tenants', `Tenant excluído (hard delete): ${tenant.name}`, {
+      tenantId: id,
+      name: tenant.name,
+    })
     return NextResponse.json({ ok: true, deleted: tenant.name })
   } catch (err) {
     console.error('[ADMIN_TENANT_DELETE_ERROR]', err)
+    void log.error('api/admin/tenants', 'Falha ao excluir tenant', {
+      tenantId: id,
+      error: err instanceof Error ? err.message : String(err),
+    })
     return NextResponse.json({ error: 'Erro ao excluir barbearia' }, { status: 500 })
   }
 }
