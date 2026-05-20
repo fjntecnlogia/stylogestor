@@ -44,6 +44,14 @@ const MENU: { title: string; items: MenuItem[] }[] = [
   },
 ]
 
+// Rotas ja implementadas; o resto ainda mostra Alert "em desenvolvimento".
+// Adicionar aqui conforme novas telas forem criadas em app/.
+const IMPLEMENTED_ROUTES = new Set<string>([
+  '/configuracoes',
+  '/servicos',
+  '/profissionais',
+])
+
 export default function MaisScreen() {
   const router = useRouter()
   const { signOut } = useAuth()
@@ -79,6 +87,10 @@ export default function MaisScreen() {
                       Linking.openURL(item.url).catch(() =>
                         Alert.alert(item.label, 'Não foi possível abrir o link.'),
                       )
+                      return
+                    }
+                    if (item.route && IMPLEMENTED_ROUTES.has(item.route)) {
+                      router.push(item.route as never)
                       return
                     }
                     Alert.alert(
