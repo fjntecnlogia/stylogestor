@@ -8,9 +8,18 @@ export const PLANS = [
     highlight: false,
     description: 'Para quem está começando',
     subdesc: '1 profissional',
+    // Lista completa — aparece na página /planos (pode ter quantos itens)
     features: [
       'Agenda completa',
       'Agendamento online',
+      'Clientes ilimitados',
+      'Financeiro básico',
+      'Suporte por e-mail',
+    ],
+    // Subset enxuto pro checkout do Stripe — máx 4 bullets curtos pra
+    // tudo caber sem truncar atrás do "...". Usado em /api/checkout(/pix).
+    checkoutFeatures: [
+      'Agenda + agendamento online',
       'Clientes ilimitados',
       'Financeiro básico',
       'Suporte por e-mail',
@@ -35,6 +44,12 @@ export const PLANS = [
       'Relatórios básicos',
       'Suporte via chat',
     ],
+    checkoutFeatures: [
+      'Agenda + agendamento online',
+      'WhatsApp automático',
+      'Comissões + Financeiro completo',
+      'Suporte via chat',
+    ],
   },
   {
     id: 'premium',
@@ -53,6 +68,12 @@ export const PLANS = [
       'Relatórios avançados',
       'Multi-unidade',
       'API de integração',
+      'Suporte prioritário 24h',
+    ],
+    checkoutFeatures: [
+      'Tudo do Pro + profissionais ilimitados',
+      'Estoque + CRM avançado',
+      'Multi-unidade + API',
       'Suporte prioritário 24h',
     ],
   },

@@ -45,8 +45,9 @@ export async function POST(req: NextRequest) {
     const unitAmount = isAnual ? plan.priceAnnual : plan.priceMonthly
     const interval = isAnual ? 'year' : 'month'
 
-    // Bullets de features — mesma estética do checkout PIX
-    const featuresBullets = plan.features.map((f) => `✓ ${f}`).join('\n')
+    // Bullets de features — usa checkoutFeatures (subset enxuto) pra
+    // não truncar no Stripe. Lista completa fica só na página /planos.
+    const featuresBullets = plan.checkoutFeatures.map((f) => `✓ ${f}`).join('\n')
     const cicloLabel = isAnual ? '2 meses grátis no plano anual' : 'Cobrança mensal'
     const description = [
       `${plan.subdesc} · ${plan.description}`,

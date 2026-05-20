@@ -40,8 +40,10 @@ export async function POST(req: NextRequest) {
     const stripe = getStripe()
 
     // Description com bullets das features do plano. \n vira quebra de
-    // linha no Stripe Checkout — vira lista visual no painel.
-    const featuresBullets = plan.features.map((f) => `✓ ${f}`).join('\n')
+    // linha no Stripe Checkout. Usamos checkoutFeatures (subset de 4
+    // bullets curtos) ao invés de features completo — Stripe trunca
+    // após ~2 linhas e fica feio com "...".
+    const featuresBullets = plan.checkoutFeatures.map((f) => `✓ ${f}`).join('\n')
     const description = [
       `${plan.subdesc} · ${plan.description}`,
       '',
