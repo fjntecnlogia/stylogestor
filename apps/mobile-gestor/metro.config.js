@@ -3,10 +3,8 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// Adiciona polyfill que corrige console.error non-writable ANTES do @expo/metro-runtime.
-// Sem isto: Invariant Violation "Module not registered as callable" -> app crasha
-// na inicializacao com so AppRegistry registrado (JSTimers, RCTDeviceEventEmitter
-// falham porque setUpBatchedBridge depende de console.error writable).
+// Polyfill que corrige console.error non-writable ANTES do @expo/metro-runtime.
+// Sem isto: setUpBatchedBridge falha -> JSTimers nao registrado -> black screen.
 config.serializer = {
   ...config.serializer,
   polyfillModuleNames: [
@@ -15,51 +13,23 @@ config.serializer = {
   ],
 };
 
-// PATCH: força UMA copia de react e react-native no bundle.
-// pnpm cria multiplas copias com peer deps diferentes que causam
-// "Cannot read property 'useMemo' of null" (multiplas instancias do React).
-const reactNativeRoot = path.join(__dirname, 'node_modules', 'react-native');
-const reactRoot = path.join(__dirname, 'node_modules', 'react');
-const reactDomRoot = path.join(__dirname, 'node_modules', 'react-dom');
-
+// Exclui artefatos volateis de outros apps Next.js do file map.
+// Sem isto, .next/static/* (hot-reload do Next.js no monorepo) causa
+// ENOENT no FallbackWatcher do Windows.
 config.resolver = {
   ...config.resolver,
-  resolveRequest: (context, moduleName, platform) => {
-    if (moduleName === 'react' || moduleName.startsWith('react/')) {
-      const suffix = moduleName === 'react' ? '' : moduleName.slice('react'.length);
-      return { filePath: require.resolve(path.join(reactRoot, suffix)), type: 'sourceFile' };
-    }
-    if (moduleName === 'react-dom' || moduleName.startsWith('react-dom/')) {
-      const suffix = moduleName === 'react-dom' ? '' : moduleName.slice('react-dom'.length);
-      try {
-        return { filePath: require.resolve(path.join(reactDomRoot, suffix)), type: 'sourceFile' };
-      } catch (e) {
-        return context.resolveRequest(context, moduleName, platform);
-      }
-    }
-    if (moduleName === 'react-native' || moduleName.startsWith('react-native/')) {
-      const suffix = moduleName === 'react-native' ? '' : moduleName.slice('react-native'.length);
-      try {
-        return { filePath: require.resolve(path.join(reactNativeRoot, suffix)), type: 'sourceFile' };
-      } catch (e) {
-        return context.resolveRequest(context, moduleName, platform);
-      }
-    }
-    return context.resolveRequest(context, moduleName, platform);
-  },
+  blockList: [
+    /[\\\/]\.next[\\\/].*/,
+    /[\\\/]\.turbo[\\\/].*/,
+    /[\\\/]apps[\\\/]web[\\\/]\.next[\\\/].*/,
+    /[\\\/]apps[\\\/]admin[\\\/]\.next[\\\/].*/,
+    /[\\\/]apps[\\\/]booking[\\\/]\.next[\\\/].*/,
+    /[\\\/]apps[\\\/]site[\\\/]\.next[\\\/].*/,
+    /[\\\/]apps[\\\/]mobile-cliente[\\\/].*/,
+  ],
 };
 
-// Excluir artefatos volateis dos outros apps Next.js do file map do Metro.
-// Sem isto, .next/static/* (gerado/destruido em hot-reload pelo Next.js)
-// causa ENOENT no FallbackWatcher do Windows.
-config.resolver.blockList = [
-  /[\\\/]\.next[\\\/].*/,
-  /[\\\/]\.turbo[\\\/].*/,
-  /[\\\/]apps[\\\/]web[\\\/]\.next[\\\/].*/,
-  /[\\\/]apps[\\\/]admin[\\\/]\.next[\\\/].*/,
-  /[\\\/]apps[\\\/]booking[\\\/]\.next[\\\/].*/,
-  /[\\\/]apps[\\\/]site[\\\/]\.next[\\\/].*/,
-  /[\\\/]apps[\\\/]mobile-cliente[\\\/].*/,
-];
+// Sem dedup resolver custom: layout flat (.npmrc node-linker=hoisted)
+// ja garante que cada app tem suas deps no proprio node_modules direto.
 
 module.exports = config;

@@ -18,6 +18,13 @@ google-services-key.json
 **/google-services-key.json
 *-service-account*.json
 
+# Upload keystores (Play Store / iOS App Store) - NUNCA commitar
+# Mantemos debug.keystore (gerado pelo Expo, comum a todos os devs)
+upload-keystore.jks
+release.keystore
+*-upload.jks
+**/keystore.properties
+
 # prisma
 prisma/dev.db
 prisma/dev.db-journal
