@@ -1,10 +1,19 @@
 # Crontab da VPS — Jobs agendados do STYLOGESTOR
 
-Pra configurar os jobs cron no servidor, edite o crontab do `root`:
+**Configuração automática.** O `deploy-pm2.sh` agora gerencia o crontab a
+cada deploy via marcadores `# STYLOGESTOR_CRON_{START,END}`. Você NÃO
+precisa editar manualmente. Ele:
+
+1. Gera `CRON_SECRET` aleatório na primeira execução (salva em
+   `apps/web/.env.production.local` e reinicia o stylo-web)
+2. Substitui o bloco no crontab do `root` com as linhas atualizadas
+3. Garante que `/var/log/stylogestor-cron.log` existe
+
+Pra ver o que está rodando:
 
 ```bash
 ssh root@82.25.65.201
-crontab -e
+crontab -l
 ```
 
 ## Jobs ativos

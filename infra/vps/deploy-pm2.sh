@@ -206,6 +206,43 @@ pm2 startOrReload "$ECOSYSTEM_FILE" --update-env
 
 pm2 save > /dev/null
 
+# ─── [7/7] Crontab — lembrete trial + lembrete agendamento 24h ─────────
+# Idempotente via markers # STYLOGESTOR_CRON_{START,END}. A cada deploy:
+#   1. Garante que CRON_SECRET existe no apps/web/.env.production.local
+#      (gera string aleatória de 64 chars na primeira execução)
+#   2. Reescreve o bloco entre os markers no crontab do root
+# Resultado: cron 100% configurado sem precisar SSH manual.
+echo ""
+echo "⏰ [7/7] Configurando crontab de lembretes..."
+
+WEB_ENV="$APP_DIR/apps/web/.env.production.local"
+if ! grep -q "^CRON_SECRET=" "$WEB_ENV"; then
+  NEW_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | base64 | tr -d '/+=' | head -c 64)
+  echo "CRON_SECRET=${NEW_SECRET}" >> "$WEB_ENV"
+  echo "   ✓ CRON_SECRET gerado (primeira vez) e salvo em $WEB_ENV"
+  # Reinicia web pra carregar o novo env var
+  pm2 restart stylo-web --update-env > /dev/null 2>&1 || true
+fi
+CRON_SECRET_VALUE=$(grep "^CRON_SECRET=" "$WEB_ENV" | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+
+# Atualiza crontab — preserva linhas existentes, troca só o bloco STYLOGESTOR_CRON
+CRON_TMP=$(mktemp)
+crontab -l 2>/dev/null | sed '/# STYLOGESTOR_CRON_START/,/# STYLOGESTOR_CRON_END/d' > "$CRON_TMP" || true
+cat >> "$CRON_TMP" <<EOF
+# STYLOGESTOR_CRON_START — managed by deploy-pm2.sh, do NOT edit manually
+# Trial expirando (3d / 1d / hoje) — roda 09:00 BRT diariamente
+0 9 * * * curl -fsS -H "X-Cron-Secret: ${CRON_SECRET_VALUE}" https://app.stylogestor.com.br/api/cron/trial-warnings >> /var/log/stylogestor-cron.log 2>&1
+# Lembrete WhatsApp 24h antes do agendamento — roda de hora em hora
+0 * * * * curl -fsS -H "X-Cron-Secret: ${CRON_SECRET_VALUE}" https://app.stylogestor.com.br/api/cron/appointment-reminders >> /var/log/stylogestor-cron.log 2>&1
+# STYLOGESTOR_CRON_END
+EOF
+crontab "$CRON_TMP"
+rm -f "$CRON_TMP"
+
+# Garante que o log file existe e o cron consegue escrever
+touch /var/log/stylogestor-cron.log 2>/dev/null || true
+echo "   ✓ Crontab atualizado (2 jobs: trial-warnings 09h diário · appointment-reminders por hora)"
+
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ Deploy concluído: $(date '+%Y-%m-%d %H:%M:%S')"
