@@ -84,6 +84,7 @@ LEGACY_APPLIED_MIGRATIONS="
 20260519_add_system_settings_and_promo_codes
 20260519_add_cash_closures
 20260519_add_professional_blocks
+20260520_add_system_logs
 "
 for mig in $LEGACY_APPLIED_MIGRATIONS; do
   if [ -n "$mig" ]; then
