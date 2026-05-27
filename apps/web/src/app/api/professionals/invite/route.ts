@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
+import { prisma } from '@stylogestor/database'
 
 /**
  * POST /api/professionals/invite
@@ -72,6 +73,18 @@ export async function POST(req: NextRequest) {
       },
       // notify: true (default) → Clerk envia email automaticamente
     })
+
+    // Persiste o email no Professional. Sem isso, recursos que precisam
+    // achar o Clerk user (como /reset-password) não conseguem fazer
+    // o join professional → conta. updateMany ignora se o id não existir.
+    try {
+      await prisma.professional.updateMany({
+        where: { id: professionalId },
+        data: { email },
+      })
+    } catch (persistErr) {
+      console.warn('[INVITE] convite enviado mas falhou ao gravar email no Professional', persistErr)
+    }
 
     return NextResponse.json({
       invitationId: invitation.id,

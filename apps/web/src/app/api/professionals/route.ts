@@ -27,6 +27,7 @@ export async function GET() {
       phone: p.phone ?? '',
       commission: Number(p.commission ?? 40),
       active: p.active,
+      email: p.email ?? '',
       schedules: [
         { day: 1, start: '09:00', end: '18:00' }, { day: 2, start: '09:00', end: '18:00' },
         { day: 3, start: '09:00', end: '18:00' }, { day: 4, start: '09:00', end: '18:00' },
@@ -57,11 +58,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, role, phone, commission } = body as {
+    const { name, role, phone, commission, email } = body as {
       name?: string
       role?: string
       phone?: string
       commission?: number
+      email?: string
     }
 
     if (!name || !name.trim()) {
@@ -74,6 +76,7 @@ export async function POST(req: NextRequest) {
         name: name.trim(),
         role: role ?? 'Barbeiro',
         phone: phone ?? null,
+        email: email?.trim() || null,
         commission: Number(commission ?? 40),
         commissionType: 'percentage',
         active: true,
@@ -85,6 +88,7 @@ export async function POST(req: NextRequest) {
       name: professional.name,
       role: professional.role,
       phone: professional.phone ?? '',
+      email: professional.email ?? '',
       commission: Number(professional.commission),
       active: professional.active,
       schedules: [

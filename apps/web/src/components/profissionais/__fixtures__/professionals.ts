@@ -23,6 +23,8 @@ export interface ProfessionalFixture {
   phone: string
   commission: number
   active: boolean
+  /** Setado quando o convite Clerk é enviado. Vazio = sem conta de login ainda. */
+  email?: string
   schedules: ProfessionalSchedule[]
   stats: ProfessionalStats
 }

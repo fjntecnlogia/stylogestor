@@ -26,6 +26,8 @@ export function ProfissionaisView() {
   const [editForm, setEditForm] = useState({ name: '', role: '', phone: '', commission: 0 })
   const [invitingId, setInvitingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // Modal de troca de senha do profissional (gestor reseta direto pelo painel)
+  const [resetPwdFor, setResetPwdFor] = useState<ProfessionalFixture | null>(null)
   const { success, error } = useToast()
 
   // Hidrata do banco no mount (fonte de verdade)
@@ -204,6 +206,7 @@ export function ProfissionaisView() {
   }
 
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Lista */}
       <div className="space-y-3">
@@ -287,6 +290,20 @@ export function ProfissionaisView() {
                 onInvite={(email) => sendInvite(selected.id, selected.name, email, selected.phone)}
                 loading={invitingId === selected.id}
               />
+
+              {/* Trocar senha — só faz sentido depois que o profissional
+                  aceitou o convite e tem conta. Sem email cadastrado,
+                  desabilita (não há como achar a conta Clerk dele). */}
+              <div className="pt-3 border-t border-[#E8E6E2]">
+                <button
+                  onClick={() => setResetPwdFor(selected)}
+                  className="text-sm font-semibold text-[#1A3A6B] hover:underline flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+                  disabled={!selected.email}
+                  title={selected.email ? 'Definir nova senha de acesso' : 'Profissional precisa ter email pra trocar senha'}
+                >
+                  🔐 Trocar senha do profissional
+                </button>
+              </div>
             </>
           )}
 
@@ -308,6 +325,21 @@ export function ProfissionaisView() {
         </div>
       </div>
     </div>
+
+    {/* Modal de troca de senha — renderiza no nível do root pra não
+        ficar dentro do grid e quebrar o layout */}
+    {resetPwdFor && (
+      <ResetPasswordModal
+        professional={resetPwdFor}
+        onClose={() => setResetPwdFor(null)}
+        onSuccess={() => {
+          setResetPwdFor(null)
+          success(`Senha de ${resetPwdFor.name} atualizada! Avise o profissional.`)
+        }}
+        onError={(msg) => error(msg)}
+      />
+    )}
+    </>
   )
 }
 
@@ -364,6 +396,158 @@ function InviteAccessBox({ onInvite, loading }: { onInvite: (email: string) => v
         >
           Cancelar
         </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Gera uma senha forte mas legível — sem caracteres ambíguos (0/O, 1/l/I)
+ * porque o gestor vai ditar/copiar pro profissional na hora.
+ */
+function generateStrongPassword(length = 12): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$%&*'
+  const crypto = typeof window !== 'undefined' ? window.crypto : undefined
+  if (crypto?.getRandomValues) {
+    const arr = new Uint32Array(length)
+    crypto.getRandomValues(arr)
+    return Array.from(arr, (n) => alphabet[n % alphabet.length]).join('')
+  }
+  // Fallback (não deveria rodar — só pra SSR não estourar)
+  return Array.from({ length }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('')
+}
+
+/**
+ * Modal de troca de senha do profissional.
+ *
+ * UX:
+ *   - Input visível (não escondido) porque o gestor precisa LER pra passar
+ *     pro funcionário na hora — não faz sentido esconder
+ *   - Botão "Gerar segura" sorteia uma senha de 12 chars sem ambíguos
+ *   - Botão "Copiar" usa navigator.clipboard
+ *   - Submit faz POST e fecha em sucesso
+ */
+function ResetPasswordModal({
+  professional,
+  onClose,
+  onSuccess,
+  onError,
+}: {
+  professional: ProfessionalFixture
+  onClose: () => void
+  onSuccess: () => void
+  onError: (msg: string) => void
+}) {
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const handleGenerate = () => {
+    setPassword(generateStrongPassword(12))
+    setCopied(false)
+  }
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(password)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      // Fallback silencioso — usuário ainda pode selecionar/copiar manualmente
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (password.trim().length < 8) {
+      onError('A senha precisa ter pelo menos 8 caracteres')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/professionals/${professional.id}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        onError(data.error || 'Erro ao trocar senha')
+        return
+      }
+      onSuccess()
+    } catch {
+      onError('Erro de conexão. Tente de novo.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="px-6 py-4 border-b border-[#E8E6E2]">
+          <h3 className="font-sora font-bold text-[#1C1C2E]">🔐 Trocar senha</h3>
+          <p className="text-xs text-[#6B7280] mt-0.5">
+            Definindo nova senha para <span className="font-semibold text-[#1A3A6B]">{professional.name}</span>
+            {professional.email ? ` (${professional.email})` : ''}
+          </p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-[#4A4A5A] uppercase tracking-wide block mb-1.5">
+              Nova senha
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setCopied(false) }}
+                placeholder="Digite ou gere uma senha"
+                className="flex-1 border border-[#E8E6E2] rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1A3A6B]"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleCopy}
+                disabled={!password}
+                className="px-3 border border-[#E8E6E2] text-[#4A4A5A] text-xs font-semibold py-2.5 rounded-xl hover:bg-[#F8F6F2] disabled:opacity-40"
+                title="Copiar senha"
+              >
+                {copied ? '✓ Copiado' : '📋 Copiar'}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              className="text-xs text-[#1A3A6B] font-semibold hover:underline mt-2"
+            >
+              🎲 Gerar senha segura
+            </button>
+            <p className="text-[10px] text-[#6B7280] mt-2 leading-snug">
+              Mínimo 8 caracteres. A nova senha entra em vigor imediatamente —
+              <strong> avise o profissional</strong> antes dele tentar fazer login.
+            </p>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || password.trim().length < 8}
+              className="flex-1 bg-[#1A3A6B] disabled:opacity-50 text-white text-sm font-bold py-2.5 rounded-xl hover:bg-[#142d55]"
+            >
+              {submitting ? 'Salvando...' : 'Trocar senha'}
+            </button>
+            <button
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 border border-[#E8E6E2] text-[#4A4A5A] text-sm py-2.5 rounded-xl hover:bg-[#F8F6F2]"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
