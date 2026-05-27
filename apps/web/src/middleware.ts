@@ -25,6 +25,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/v1/booking(.*)',         // Booking público — cliente final agenda sem login
   '/b/(.*)',                     // Landing pública de agendamento
   '/api/health',                 // Health check pro painel admin pingar
+  '/reset-conta(.*)',            // Página de recuperação (tenant fantasma)
 ])
 
 // Rotas permitidas mesmo sem assinatura ativa
