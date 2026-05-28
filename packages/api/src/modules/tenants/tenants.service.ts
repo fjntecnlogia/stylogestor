@@ -1,7 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
+import { PlanType } from '@prisma/client'
 import { CacheService } from '../../common/cache/cache.service'
 import { PrismaService } from '../../common/prisma/prisma.service'
 import { UpdateTenantDto } from './dto/update-tenant.dto'
+import { CreateTenantDto } from './dto/create-tenant.dto'
+
+// Trial padrão (dias) quando o tenant é criado no onboarding. O web lê isso de
+// um SystemSetting; aqui usamos um fixo pra não acoplar a API ao módulo de
+// settings. Mudar exige redeploy — aceitável (onboarding mobile é raro mudar).
+const DEFAULT_TRIAL_DAYS = 14
 
 // Cache de 5 min pra resolução slug→tenant.
 // Trade-off: se tenant for desativado ou renomeado, mudança demora até 5min
@@ -84,6 +91,139 @@ export class TenantsService {
     // Invalidar cache do slug (se houver) — mudou logo/name/plan visíveis
     await this.cache.del(this.slugCacheKey(fresh.slug))
     return fresh
+  }
+
+  /**
+   * Lista as barbearias (tenants) das quais o usuário é membro ATIVO.
+   * Usado no bootstrap do mobile (pós-login Supabase) pra descobrir qual
+   * `x-tenant-slug` usar — ou se precisa passar pelo onboarding (lista vazia).
+   *
+   * NÃO depende do TenantGuard (usuário pode ainda não ter tenant).
+   */
+  async getMyMemberships(userId: string) {
+    const memberships = await this.prisma.tenantUser.findMany({
+      where: { userId, active: true },
+      select: {
+        role: true,
+        tenant: {
+          select: { id: true, slug: true, name: true, logo: true, plan: true, active: true },
+        },
+      },
+      orderBy: { joinedAt: 'asc' },
+    })
+
+    return memberships
+      .filter((m) => m.tenant.active)
+      .map((m) => ({
+        id: m.tenant.id,
+        slug: m.tenant.slug,
+        name: m.tenant.name,
+        logo: m.tenant.logo,
+        plan: m.tenant.plan,
+        role: m.role,
+      }))
+  }
+
+  /**
+   * Onboarding: cria a barbearia e vincula o usuário autenticado como `owner`.
+   * Espelha o fluxo web (Next /api/tenants), mas sem o sync de metadata do Clerk
+   * (não se aplica a usuários Supabase). Tudo numa transação pra ser atômico.
+   */
+  async createForUser(userId: string, dto: CreateTenantDto) {
+    // Slug único: normaliza o nome e adiciona sufixo numérico em caso de colisão.
+    const baseSlug =
+      dto.name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .slice(0, 30) || 'barbearia'
+
+    let slug = baseSlug
+    let attempt = 0
+    while (
+      await this.prisma.tenant.findUnique({ where: { slug }, select: { id: true } })
+    ) {
+      attempt++
+      slug = `${baseSlug}-${attempt}`
+    }
+
+    const now = new Date()
+    const trialEnd = new Date(now.getTime() + DEFAULT_TRIAL_DAYS * 24 * 60 * 60 * 1000)
+    const plan = (dto.plan ?? 'FREE') as PlanType
+
+    const tenant = await this.prisma.$transaction(async (tx) => {
+      const t = await tx.tenant.create({
+        data: {
+          slug,
+          name: dto.name,
+          type: dto.type ?? 'barbershop',
+          phone: dto.phone,
+          plan,
+          trialEndsAt: trialEnd,
+          active: true,
+          address: dto.city ? { city: dto.city } : undefined,
+        },
+        select: { id: true, slug: true, name: true },
+      })
+
+      await tx.tenantUser.create({
+        data: { tenantId: t.id, userId, role: 'owner' },
+      })
+
+      if (dto.schedules?.length) {
+        await tx.businessSchedule.createMany({
+          data: dto.schedules.map((s) => ({
+            tenantId: t.id,
+            dayOfWeek: s.day,
+            startTime: s.start,
+            endTime: s.end,
+            active: s.active ?? true,
+          })),
+        })
+      }
+
+      if (dto.professionals?.length) {
+        await tx.professional.createMany({
+          data: dto.professionals.map((p) => ({
+            tenantId: t.id,
+            name: p.name,
+            role: p.role ?? 'Barbeiro',
+            commission: Number(p.commission ?? 40),
+            commissionType: 'percentage',
+            active: true,
+          })),
+        })
+      }
+
+      if (dto.services?.length) {
+        await tx.service.createMany({
+          data: dto.services.map((sv) => ({
+            tenantId: t.id,
+            name: sv.name,
+            price: sv.price,
+            duration: sv.duration,
+            active: true,
+          })),
+        })
+      }
+
+      // Subscription em trial (mesma lógica do web).
+      await tx.subscription.create({
+        data: {
+          tenantId: t.id,
+          plan: 'FREE',
+          status: 'trial',
+          currentPeriodStart: now,
+          currentPeriodEnd: trialEnd,
+        },
+      })
+
+      return t
+    })
+
+    return { ok: true, tenant }
   }
 
   async getDashboardStats(tenantId: string) {

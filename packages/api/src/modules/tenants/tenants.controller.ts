@@ -6,22 +6,46 @@ import {
   Headers,
   Param,
   Patch,
+  Post,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { TenantsService } from './tenants.service'
 import { UpdateTenantDto } from './dto/update-tenant.dto'
+import { CreateTenantDto } from './dto/create-tenant.dto'
 import { TenantGuard } from '../../common/guards/tenant.guard'
 import { TenantThrottleGuard } from '../../common/guards/tenant-throttle.guard'
 import { TenantContextInterceptor } from '../../common/interceptors/tenant-context.interceptor'
 import { Public } from '../../common/decorators/public.decorator'
 import { CurrentTenant, TenantPayload } from '../../common/decorators/current-tenant.decorator'
+import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator'
 
 @ApiTags('Tenants')
 @Controller('tenants')
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
+
+  /**
+   * Bootstrap do app (pós-login): lista as barbearias do usuário autenticado.
+   * SEM TenantGuard — funciona pra usuário ainda sem tenant (retorna []).
+   * Mobile usa o `slug` retornado como header `x-tenant-slug` nas demais rotas.
+   */
+  @ApiBearerAuth()
+  @Get('mine')
+  getMine(@CurrentUser() user: AuthUser) {
+    return this.tenantsService.getMyMemberships(user.id)
+  }
+
+  /**
+   * Onboarding: cria a barbearia e vincula o usuário como `owner`.
+   * SEM TenantGuard — é justamente o passo que dá um tenant ao usuário.
+   */
+  @ApiBearerAuth()
+  @Post()
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateTenantDto) {
+    return this.tenantsService.createForUser(user.id, dto)
+  }
 
   @ApiBearerAuth()
   @UseGuards(TenantGuard, TenantThrottleGuard)
