@@ -199,6 +199,16 @@ export type CreateTransactionInput = {
   notes?: string
 }
 
+export type CreateServiceInput = {
+  name: string
+  price: number
+  duration: number // minutos
+  description?: string
+  category?: string
+  color?: string
+  image?: string
+}
+
 // Os tipos de RESPOSTA das rotas de CRUD (appointment/client/transaction) são
 // genéricos de propósito: o time Mobile refina conforme for ligando cada tela
 // (a forma exata vem do service layer da API). Use `as` ou defina interfaces
@@ -282,6 +292,25 @@ export const clientsApi = {
 
   update: (id: string, patch: Partial<CreateClientInput>) =>
     apiFetch<ApiObject>(`/clients/${id}`, { method: 'PATCH', body: patch }),
+}
+
+export const professionalsApi = {
+  list: () => apiFetch<ApiObject[]>('/professionals'),
+  get: (id: string) => apiFetch<ApiObject>(`/professionals/${id}`),
+  create: (input: ApiObject) =>
+    apiFetch<ApiObject>('/professionals', { method: 'POST', body: input }),
+  update: (id: string, patch: ApiObject) =>
+    apiFetch<ApiObject>(`/professionals/${id}`, { method: 'PATCH', body: patch }),
+}
+
+export const servicesApi = {
+  list: () => apiFetch<ApiObject[]>('/services'),
+  get: (id: string) => apiFetch<ApiObject>(`/services/${id}`),
+  create: (input: CreateServiceInput) =>
+    apiFetch<ApiObject>('/services', { method: 'POST', body: input }),
+  update: (id: string, patch: Partial<CreateServiceInput>) =>
+    apiFetch<ApiObject>(`/services/${id}`, { method: 'PATCH', body: patch }),
+  remove: (id: string) => apiFetch<void>(`/services/${id}`, { method: 'DELETE' }),
 }
 
 export const financialApi = {

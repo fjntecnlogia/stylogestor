@@ -8,6 +8,7 @@ import { HealthModule } from './modules/health/health.module'
 import { TenantsModule } from './modules/tenants/tenants.module'
 import { AppointmentsModule } from './modules/appointments/appointments.module'
 import { ClientsModule } from './modules/clients/clients.module'
+import { ServicesModule } from './modules/services/services.module'
 import { ProfessionalsModule } from './modules/professionals/professionals.module'
 import { FinancialModule } from './modules/financial/financial.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
@@ -49,6 +50,7 @@ import { MultiAuthGuard } from './common/guards/multi-auth.guard'
     TenantsModule,
     AppointmentsModule,
     ClientsModule,
+    ServicesModule,
     ProfessionalsModule,
     FinancialModule,
     NotificationsModule,
