@@ -6,7 +6,8 @@
     "build": "node scripts/build.js",
     "build:raw": "nest build",
     "dev": "nest start --watch",
-    "start": "node dist/main"
+    "start": "node dist/main",
+    "migrate:clerk-supabase": "ts-node --transpile-only --project scripts/tsconfig.migration.json scripts/migrate-clerk-to-supabase.ts"
   },
   "dependencies": {
     "@clerk/backend": "^1.21.0",

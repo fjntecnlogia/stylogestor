@@ -29,6 +29,16 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator'
 export class MultiAuthGuard implements CanActivate {
   private readonly logger = new Logger(MultiAuthGuard.name)
 
+  /**
+   * Modo de autenticação (env `AUTH_MODE`):
+   *  - `federated` (default): aceita Clerk (web) + Supabase (mobile).
+   *  - `supabase-only`: rejeita JWT Clerk. Usado no fim da migração (Fase 3/4),
+   *    quando o web já autentica no Supabase. Permite o cutover (e o rollback)
+   *    por variável de ambiente, sem redeploy de código.
+   */
+  private readonly authMode: 'federated' | 'supabase-only' =
+    process.env.AUTH_MODE === 'supabase-only' ? 'supabase-only' : 'federated'
+
   constructor(
     private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
@@ -52,6 +62,13 @@ export class MultiAuthGuard implements CanActivate {
     // Roteia pro provider olhando o `iss` (sem verificar — só decode do payload)
     const issuer = this.peekIssuer(token)
     const isSupabase = issuer.includes('supabase') || issuer.includes('/auth/v1')
+
+    // Cutover Fase 3/4: com AUTH_MODE=supabase-only, JWT Clerk é recusado.
+    if (this.authMode === 'supabase-only' && !isSupabase) {
+      throw new UnauthorizedException(
+        'Autenticação via Clerk desativada (AUTH_MODE=supabase-only)',
+      )
+    }
 
     const user = isSupabase
       ? await this.resolveSupabase(token)

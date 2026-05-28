@@ -109,13 +109,24 @@ Todas pedem `Authorization: Bearer <jwt Supabase>` **e** `x-tenant-slug: <slug>`
 - Next routes viram thin proxies ou somem
 
 ### Fase 3 — Web migra Clerk → Supabase (reduz custo)
-- Substituir Clerk no web por Supabase Auth (`@supabase/ssr`)
+
+#### ✅ Backend / enablers (CONCLUÍDO 28/05/2026)
+- **`AUTH_MODE`** (env) no `MultiAuthGuard`: `federated` (default, aceita
+  Clerk+Supabase) → `supabase-only` (recusa Clerk no cutover). Rollback por env.
+- **Script de migração** `pnpm --filter @stylogestor/api run migrate:clerk-supabase`
+  (`packages/api/scripts/migrate-clerk-to-supabase.ts`): cria as contas Supabase
+  dos usuários Clerk (`email_confirm`, sem senha), linka `User.supabaseId` por
+  email. Idempotente, com `--dry-run`. Requer `SUPABASE_SERVICE_ROLE_KEY`.
+- **Handoff do web** em `docs/WEB_FASE3_HANDOFF.md` (checklist dos ~39 arquivos).
+
+#### ⏳ Web (PRÓXIMO — time Web)
+- Substituir Clerk no web por Supabase Auth (`@supabase/ssr`) — ver handoff.
 - **Migração de usuários** (login email+senha):
   - Senhas Clerk não exportam em texto. Estratégia no cutover:
     a) Forçar reset de senha (email "redefina sua senha") no primeiro login, OU
     b) Importar usuários no Supabase com flag de reset obrigatório
-  - Linkar por email (User.email já é a chave)
-- API NestJS: remover suporte Clerk do MultiAuthGuard (fica só Supabase)
+  - Linkar por email (User.email já é a chave) — feito pelo script acima.
+- API NestJS: no fim, `AUTH_MODE=supabase-only` e remover Clerk do guard.
 
 ### Fase 4 — Limpeza
 - Remover `@clerk/*` de tudo (web + api)
