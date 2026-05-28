@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -81,6 +82,22 @@ export class AppointmentsService {
           throw new ConflictException('Horário já ocupado para este profissional')
         }
 
+        // Snapshot de preço/duração POR serviço: grava o valor vigente no
+        // momento do agendamento (preço histórico), não 0. Buscar dentro da
+        // transação garante consistência e valida que cada serviceId pertence
+        // ao tenant e está ativo (impede agendar serviço de outra barbearia).
+        const services = await tx.service.findMany({
+          where: { id: { in: dto.serviceIds }, tenantId, active: true },
+          select: { id: true, price: true, duration: true },
+        })
+        const serviceMap = new Map(services.map((s) => [s.id, s]))
+        const invalid = dto.serviceIds.filter((sid) => !serviceMap.has(sid))
+        if (invalid.length > 0) {
+          throw new BadRequestException(
+            `Serviço(s) inválido(s) ou inativo(s): ${invalid.join(', ')}`,
+          )
+        }
+
         return tx.appointment.create({
           data: {
             tenantId,
@@ -94,11 +111,10 @@ export class AppointmentsService {
             notes: dto.notes,
             source: dto.source ?? 'manual',
             services: {
-              create: dto.serviceIds.map((sid) => ({
-                serviceId: sid,
-                price: 0, // atualizado após buscar serviços
-                duration: 0,
-              })),
+              create: dto.serviceIds.map((sid) => {
+                const svc = serviceMap.get(sid)!
+                return { serviceId: sid, price: svc.price, duration: svc.duration }
+              }),
             },
           },
           include: { services: true },
