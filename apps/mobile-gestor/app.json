@@ -50,6 +50,7 @@
     "extra": {
       "router": {},
       "apiUrl": "https://app.stylogestor.com.br",
+      "nestApiUrl": "https://api.stylogestor.com.br",
       "privacyPolicyUrl": "https://stylogestor.com.br/privacidade",
       "termsOfServiceUrl": "https://stylogestor.com.br/termos",
       "eas": {
