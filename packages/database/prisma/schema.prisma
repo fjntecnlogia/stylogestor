@@ -88,13 +88,18 @@ model Tenant {
 
 model User {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clerkId   String   @unique
-  email     String   @unique
-  name      String
-  phone     String?
-  avatar    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Identidade federada: web usa Clerk, mobile usa Supabase Auth.
+  // `email` é a chave de unificação (mesma pessoa = mesmo email = mesmo User).
+  // Ambos os IDs são nullable porque um user pode existir em só um provider
+  // (até a migração Clerk→Supabase completar — ver docs/AUTH_UNIFICATION.md).
+  clerkId    String?  @unique
+  supabaseId String?  @unique
+  email      String   @unique
+  name       String
+  phone      String?
+  avatar     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   tenants TenantUser[]
 

@@ -14,8 +14,9 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module'
 import { CacheModule } from './common/cache/cache.module'
 import { ClerkModule } from './common/clerk/clerk.module'
+import { AuthCommonModule } from './common/auth/auth-common.module'
 import { PrismaModule } from './common/prisma/prisma.module'
-import { ClerkAuthGuard } from './common/guards/clerk-auth.guard'
+import { MultiAuthGuard } from './common/guards/multi-auth.guard'
 
 @Module({
   imports: [
@@ -37,6 +38,9 @@ import { ClerkAuthGuard } from './common/guards/clerk-auth.guard'
     // Clerk Backend (atualiza publicMetadata pra middleware Next ler)
     ClerkModule,
 
+    // Auth federada (Supabase) — provê SupabaseAuthService pro MultiAuthGuard
+    AuthCommonModule,
+
     // Health check (monitoria externa) — primeiro pra registrar rota antes dos outros
     HealthModule,
 
@@ -53,8 +57,8 @@ import { ClerkAuthGuard } from './common/guards/clerk-auth.guard'
   providers: [
     // 1. Rate limit em TODAS as rotas (rotas @Public também — protege webhooks de abuso)
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    // 2. Auth Clerk em TODAS as rotas exceto @Public()
-    { provide: APP_GUARD, useClass: ClerkAuthGuard },
+    // 2. Auth FEDERADA (Clerk web + Supabase mobile) em todas as rotas exceto @Public()
+    { provide: APP_GUARD, useClass: MultiAuthGuard },
     // 3. Sentry global exception filter — captura erros não-handled antes do
     //    NestJS reportar 500. Precisa ser o PRIMEIRO filter (APP_FILTER ordem
     //    reversa, então o último na lista é o primeiro a rodar).
