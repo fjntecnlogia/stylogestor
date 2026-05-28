@@ -7,9 +7,13 @@ import { UpdateServiceDto } from './dto/update-service.dto'
 export class ServicesService {
   constructor(private prisma: PrismaService) {}
 
-  findAll(tenantId: string) {
+  /**
+   * Lista serviços do tenant. Por padrão só os ativos (consumo público / cliente);
+   * `includeInactive=true` traz todos (tela do gestor, pra ligar/desligar/reativar).
+   */
+  findAll(tenantId: string, includeInactive = false) {
     return this.prisma.service.findMany({
-      where: { tenantId, active: true },
+      where: { tenantId, ...(includeInactive ? {} : { active: true }) },
       orderBy: { name: 'asc' },
     })
   }

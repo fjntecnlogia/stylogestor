@@ -250,12 +250,67 @@ Base: `https://api.stylogestor.com.br/api/v1`, com `Bearer` + `x-tenant-slug`
 - `GET /tenants/mine` · `POST /tenants` *(bootstrap/onboarding — sem x-tenant-slug)*
 - `GET /tenants/me` · `GET /tenants/me/dashboard` · `PATCH /tenants/me`
 - `GET/POST /clients` · `GET/PATCH /clients/:id` · `GET /clients/:id/history`
-- `GET/POST /services` · `GET/PATCH/DELETE /services/:id`
-- `GET/POST /professionals` · `GET/PATCH /professionals/:id`
+- `GET/POST /services` · `GET/PATCH/DELETE /services/:id` ·
+  `GET /services?includeInactive=true` (gestor: lista ativos+inativos)
+- `GET/POST /professionals` · `GET/PATCH/DELETE /professionals/:id` ·
+  `GET /professionals?includeInactive=true`
 - `GET/POST /appointments` · `GET/PATCH/DELETE /appointments/:id` ·
   `PATCH /appointments/:id/status` · `GET /appointments/availability`
 - `GET /financial/cashflow` · `GET /financial/transactions` ·
   `GET /financial/reports/daily` · `POST /financial/transactions`
+
+> **Ligar/desligar serviço ou profissional:** `PATCH /services/:id` ou
+> `PATCH /professionals/:id` com `{ "active": false }` (ou `true` pra reativar).
+> O `api.ts` tem atalho: `servicesApi.setActive(id, false)` /
+> `professionalsApi.setActive(id, true)`. `DELETE` faz soft-delete (active:false).
+> Por padrão `list()` só traz ativos; `list(true)` traz inativos também.
+
+### Shape da resposta de `/appointments` (pras telas de agenda)
+
+`GET /appointments` (lista) — cada item:
+```jsonc
+{
+  "id": "uuid", "clientId": "uuid", "professionalId": "uuid",
+  "date": "2026-05-28T00:00:00.000Z",
+  "startTime": "2026-05-28T14:00:00.000Z",
+  "endTime":   "2026-05-28T14:30:00.000Z",
+  "status": "SCHEDULED",
+  "totalPrice": 35, "totalDuration": 30,
+  "notes": null, "source": "manual", "cancelReason": null,
+  "client":       { "id": "uuid", "name": "Carlos" },          // só id+name na lista
+  "professional": { "id": "uuid", "name": "João", "avatar": null },
+  "services": [
+    { "serviceId": "uuid", "price": 35, "duration": 30,
+      "service": { "id": "uuid", "name": "Corte", "price": 35, "duration": 30 } }
+  ]
+}
+```
+`GET /appointments/:id` traz o mesmo, porém `client` e `professional` **completos**
++ array `payments`.
+
+**Adaptador pro tipo local `Agendamento`:**
+```ts
+function fromApi(a: any): Agendamento {
+  const start = new Date(a.startTime)
+  return {
+    id: a.id,
+    clienteId: a.clientId,
+    clienteNome: a.client?.name ?? '',
+    profissionalId: a.professionalId,
+    profissionalNome: a.professional?.name ?? '',
+    servicoIds: (a.services ?? []).map((s: any) => s.serviceId),
+    servicoNomes: (a.services ?? []).map((s: any) => s.service?.name).join(' + '),
+    status: a.status,
+    price: Number(a.totalPrice),
+    duration: a.totalDuration,
+    date: start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+    time: start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    createdAt: a.createdAt,
+  }
+}
+```
+- Mudar status: `appointmentsApi.setStatus(id, 'COMPLETED')`.
+- Listar do dia: `appointmentsApi.list({ date: '2026-05-28' })` (YYYY-MM-DD).
 
 ---
 

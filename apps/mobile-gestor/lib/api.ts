@@ -295,21 +295,37 @@ export const clientsApi = {
 }
 
 export const professionalsApi = {
-  list: () => apiFetch<ApiObject[]>('/professionals'),
+  /** includeInactive=true traz também os desativados (tela do gestor/toggle). */
+  list: (includeInactive = false) =>
+    apiFetch<ApiObject[]>(
+      `/professionals${includeInactive ? '?includeInactive=true' : ''}`,
+    ),
   get: (id: string) => apiFetch<ApiObject>(`/professionals/${id}`),
   create: (input: ApiObject) =>
     apiFetch<ApiObject>('/professionals', { method: 'POST', body: input }),
   update: (id: string, patch: ApiObject) =>
     apiFetch<ApiObject>(`/professionals/${id}`, { method: 'PATCH', body: patch }),
+  /** Liga/desliga sem precisar montar o patch inteiro. */
+  setActive: (id: string, active: boolean) =>
+    apiFetch<ApiObject>(`/professionals/${id}`, { method: 'PATCH', body: { active } }),
+  /** Soft-delete (active:false). Pra reativar, use setActive(id, true). */
+  remove: (id: string) =>
+    apiFetch<void>(`/professionals/${id}`, { method: 'DELETE' }),
 }
 
 export const servicesApi = {
-  list: () => apiFetch<ApiObject[]>('/services'),
+  /** includeInactive=true traz também os desativados (tela do gestor/toggle). */
+  list: (includeInactive = false) =>
+    apiFetch<ApiObject[]>(`/services${includeInactive ? '?includeInactive=true' : ''}`),
   get: (id: string) => apiFetch<ApiObject>(`/services/${id}`),
   create: (input: CreateServiceInput) =>
     apiFetch<ApiObject>('/services', { method: 'POST', body: input }),
   update: (id: string, patch: Partial<CreateServiceInput>) =>
     apiFetch<ApiObject>(`/services/${id}`, { method: 'PATCH', body: patch }),
+  /** Liga/desliga o serviço (agora o DTO aceita `active`). */
+  setActive: (id: string, active: boolean) =>
+    apiFetch<ApiObject>(`/services/${id}`, { method: 'PATCH', body: { active } }),
+  /** Soft-delete (active:false). Pra reativar, use setActive(id, true). */
   remove: (id: string) => apiFetch<void>(`/services/${id}`, { method: 'DELETE' }),
 }
 

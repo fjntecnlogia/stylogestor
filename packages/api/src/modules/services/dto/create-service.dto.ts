@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsNumber, IsInt, IsOptional, Min } from 'class-validator'
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  IsInt,
+  IsOptional,
+  IsBoolean,
+  Min,
+} from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class CreateServiceDto {
@@ -9,4 +17,6 @@ export class CreateServiceDto {
   @ApiPropertyOptional() @IsOptional() @IsString() category?: string
   @ApiPropertyOptional() @IsOptional() @IsString() color?: string
   @ApiPropertyOptional() @IsOptional() @IsString() image?: string
+  // Permite ligar/desligar o serviço via PATCH (toggle ativo/inativo no app).
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() active?: boolean
 }

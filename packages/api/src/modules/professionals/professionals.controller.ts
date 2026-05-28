@@ -1,5 +1,8 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, UseInterceptors } from '@nestjs/common'
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
+import {
+  Controller, Get, Post, Patch, Delete,
+  Body, Param, Query, UseGuards, UseInterceptors, HttpCode, HttpStatus,
+} from '@nestjs/common'
+import { ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { ProfessionalsService } from './professionals.service'
 import { CreateProfessionalDto } from './dto/create-professional.dto'
 import { UpdateProfessionalDto } from './dto/update-professional.dto'
@@ -15,8 +18,12 @@ export class ProfessionalsController {
   constructor(private service: ProfessionalsService) {}
 
   @Get()
-  findAll(@CurrentTenant() t: TenantPayload) {
-    return this.service.findAll(t.id)
+  @ApiQuery({ name: 'includeInactive', required: false, type: Boolean })
+  findAll(
+    @CurrentTenant() t: TenantPayload,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    return this.service.findAll(t.id, includeInactive === 'true')
   }
 
   @Get(':id')
@@ -36,5 +43,12 @@ export class ProfessionalsController {
     @CurrentTenant() t: TenantPayload,
   ) {
     return this.service.update(id, dto, t.id)
+  }
+
+  /** Soft-delete (marca active:false). Pra reativar, PATCH com active:true. */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param('id') id: string, @CurrentTenant() t: TenantPayload) {
+    return this.service.remove(id, t.id)
   }
 }

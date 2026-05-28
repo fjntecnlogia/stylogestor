@@ -7,9 +7,13 @@ import { UpdateProfessionalDto } from './dto/update-professional.dto'
 export class ProfessionalsService {
   constructor(private prisma: PrismaService) {}
 
-  findAll(tenantId: string) {
+  /**
+   * Lista profissionais do tenant. Por padrão só os ativos; `includeInactive=true`
+   * traz todos (tela do gestor, pra ligar/desligar/reativar).
+   */
+  findAll(tenantId: string, includeInactive = false) {
     return this.prisma.professional.findMany({
-      where: { tenantId, active: true },
+      where: { tenantId, ...(includeInactive ? {} : { active: true }) },
       include: { schedules: true },
       orderBy: { name: 'asc' },
     })
@@ -39,5 +43,21 @@ export class ProfessionalsService {
       throw new NotFoundException('Profissional não encontrado')
     }
     return this.findOne(id, tenantId)
+  }
+
+  /**
+   * Soft-delete: marca `active: false` em vez de remover, porque agendamentos
+   * referenciam o profissional. Mesmo padrão do módulo Services. Pra reativar,
+   * usar PATCH com `active: true` (some da listagem padrão; aparece com
+   * `includeInactive=true`).
+   */
+  async remove(id: string, tenantId: string) {
+    const updated = await this.prisma.professional.updateMany({
+      where: { id, tenantId },
+      data: { active: false },
+    })
+    if (updated.count === 0) {
+      throw new NotFoundException('Profissional não encontrado')
+    }
   }
 }
