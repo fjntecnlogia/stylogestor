@@ -4,15 +4,15 @@ import {
   StyleSheet, SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { useSignUp } from '@clerk/clerk-expo'
-import { clerkErrorMessage } from '../../lib/clerkErrors'
+import { supabase } from '../../lib/supabase'
+import { authErrorMessage } from '../../lib/authErrors'
 
 export default function CadastroScreen() {
   const router = useRouter()
-  const { signUp, setActive, isLoaded } = useSignUp()
   const [step, setStep] = useState<'form' | 'verify'>('form')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -25,14 +25,24 @@ export default function CadastroScreen() {
       Alert.alert('Senha curta', 'Use no mínimo 8 caracteres.')
       return
     }
-    if (!isLoaded) return
     setLoading(true)
     try {
-      await signUp.create({ emailAddress: email, password })
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+      })
+      if (error) {
+        Alert.alert('Erro no cadastro', authErrorMessage(error, 'Não foi possível criar a conta.'))
+        return
+      }
+      if (data.session) {
+        // "Confirm email" desligado — vai direto pra home
+        router.replace('/')
+        return
+      }
       setStep('verify')
     } catch (err) {
-      Alert.alert('Erro no cadastro', clerkErrorMessage(err, 'Não foi possível criar a conta.'))
+      Alert.alert('Erro no cadastro', authErrorMessage(err, 'Não foi possível criar a conta.'))
     } finally {
       setLoading(false)
     }
@@ -43,18 +53,41 @@ export default function CadastroScreen() {
       Alert.alert('Atenção', 'Digite o código recebido por e-mail')
       return
     }
-    if (!isLoaded) return
     setLoading(true)
     try {
-      const attempt = await signUp.attemptEmailAddressVerification({ code })
-      if (attempt.status === 'complete') {
-        await setActive({ session: attempt.createdSessionId })
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: code,
+        type: 'signup',
+      })
+      if (error) {
+        Alert.alert('Código inválido', authErrorMessage(error, 'Verifique o código e tente novamente.'))
+        return
+      }
+      if (data.session) {
         router.replace('/')
       } else {
-        Alert.alert('Verificação incompleta', `Status: ${attempt.status}.`)
+        Alert.alert('Verificação incompleta', 'Tente novamente.')
       }
     } catch (err) {
-      Alert.alert('Código inválido', clerkErrorMessage(err, 'Verifique o código e tente novamente.'))
+      Alert.alert('Código inválido', authErrorMessage(err, 'Verifique o código e tente novamente.'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendCode = async () => {
+    if (!email) return
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email.trim().toLowerCase(),
+      })
+      if (error) throw error
+      Alert.alert('Código reenviado', `Verifique sua caixa de entrada em ${email}.`)
+    } catch (err) {
+      Alert.alert('Erro', authErrorMessage(err, 'Não foi possível reenviar o código.'))
     } finally {
       setLoading(false)
     }
@@ -93,15 +126,25 @@ export default function CadastroScreen() {
               />
 
               <Text style={s.label}>Senha (mínimo 8 caracteres)</Text>
-              <TextInput
-                style={s.input}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                placeholderTextColor="#9CA3AF"
-                secureTextEntry
-                autoComplete="password-new"
-              />
+              <View style={s.inputWrap}>
+                <TextInput
+                  style={s.inputInner}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor="#9CA3AF"
+                  secureTextEntry={!showPassword}
+                  autoComplete="password-new"
+                />
+                <TouchableOpacity
+                  style={s.eyeBtn}
+                  onPress={() => setShowPassword(!showPassword)}
+                  hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                  accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                >
+                  <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity style={[s.btn, loading && s.btnDisabled]} onPress={handleCreate} disabled={loading}>
                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Criar conta</Text>}
@@ -164,6 +207,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: '#111827',
     backgroundColor: '#F9FAFB',
   },
+  inputWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+  },
+  inputInner: {
+    flex: 1, paddingHorizontal: 16, paddingVertical: 12,
+    fontSize: 15, color: '#111827',
+  },
+  eyeBtn: { paddingHorizontal: 14, paddingVertical: 12 },
+  eyeIcon: { fontSize: 18 },
   helpText: { fontSize: 13, color: '#6B7280', lineHeight: 18, marginBottom: 8 },
   btn: {
     backgroundColor: '#1A3A6B', borderRadius: 12, paddingVertical: 14,

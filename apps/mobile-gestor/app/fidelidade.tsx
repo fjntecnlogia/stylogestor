@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react'
 import {
-  ScrollView, View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity,
+  ScrollView, View, Text, StyleSheet, TextInput, TouchableOpacity,
   Alert, Switch,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { loadObject, saveObject, loadArray, saveArray } from '../lib/storage'
 import { listClientes, type Cliente } from '../lib/clientes'
@@ -87,7 +88,7 @@ export default function FidelidadeScreen() {
     .sort((a, b) => b.stampsCount - a.stampsCount)
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={s.back}>‹ Voltar</Text>
@@ -240,7 +241,7 @@ export default function FidelidadeScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F8F6F2' },
+  safe: { flex: 1, backgroundColor: '#1A3A6B' },
   header: { backgroundColor: '#1A3A6B', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 18, flexDirection: 'row', alignItems: 'center', gap: 16 },
   back: { color: '#F5A623', fontSize: 16, fontWeight: '700' },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1 },

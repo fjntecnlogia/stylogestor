@@ -1,9 +1,10 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
+const metroResolver = require('metro-resolver');
 
 const config = getDefaultConfig(__dirname);
 
-// Adiciona polyfill que corrige console.error non-writable ANTES do @expo/metro-runtime.
+// Polyfill que corrige console.error non-writable ANTES do @expo/metro-runtime.
 config.serializer = {
   ...config.serializer,
   polyfillModuleNames: [
@@ -12,51 +13,48 @@ config.serializer = {
   ],
 };
 
-// PATCH: força UMA copia de react e react-native no bundle.
-// pnpm cria multiplas copias com peer deps diferentes que causam
-// "Cannot read property 'useMemo' of null" (multiplas instancias do React).
-const reactNativeRoot = path.join(__dirname, 'node_modules', 'react-native');
-const reactRoot = path.join(__dirname, 'node_modules', 'react');
-const reactDomRoot = path.join(__dirname, 'node_modules', 'react-dom');
+// Mesma estrategia do mobile-gestor: forca singleton de modulos nativos
+// + react. Sem isso, deps com peer ranges conflitantes geram nesteds que
+// quebram bundle (useMemo of null, RNSScreen duplicado, etc).
+const SINGLETON_MODULES = new Set([
+  'react',
+  'react/jsx-runtime',
+  'react/jsx-dev-runtime',
+  'react-native',
+  'react-native-screens',
+  'react-native-safe-area-context',
+  'react-native-svg',
+]);
 
 config.resolver = {
   ...config.resolver,
+  blockList: [
+    /[\\\/]\.next[\\\/].*/,
+    /[\\\/]\.turbo[\\\/].*/,
+    /[\\\/]apps[\\\/]web[\\\/]\.next[\\\/].*/,
+    /[\\\/]apps[\\\/]admin[\\\/]\.next[\\\/].*/,
+    /[\\\/]apps[\\\/]booking[\\\/]\.next[\\\/].*/,
+    /[\\\/]apps[\\\/]site[\\\/]\.next[\\\/].*/,
+    /[\\\/]apps[\\\/]mobile-gestor[\\\/].*/,
+  ],
   resolveRequest: (context, moduleName, platform) => {
-    if (moduleName === 'react' || moduleName.startsWith('react/')) {
-      const suffix = moduleName === 'react' ? '' : moduleName.slice('react'.length);
-      return { filePath: require.resolve(path.join(reactRoot, suffix)), type: 'sourceFile' };
-    }
-    if (moduleName === 'react-dom' || moduleName.startsWith('react-dom/')) {
-      const suffix = moduleName === 'react-dom' ? '' : moduleName.slice('react-dom'.length);
+    if (SINGLETON_MODULES.has(moduleName)) {
       try {
-        return { filePath: require.resolve(path.join(reactDomRoot, suffix)), type: 'sourceFile' };
+        const target = require.resolve(moduleName, {
+          paths: [path.join(__dirname, 'node_modules')],
+        });
+        return { filePath: target, type: 'sourceFile' };
       } catch (e) {
-        return context.resolveRequest(context, moduleName, platform);
+        // fallback
       }
     }
-    if (moduleName === 'react-native' || moduleName.startsWith('react-native/')) {
-      const suffix = moduleName === 'react-native' ? '' : moduleName.slice('react-native'.length);
-      try {
-        return { filePath: require.resolve(path.join(reactNativeRoot, suffix)), type: 'sourceFile' };
-      } catch (e) {
-        return context.resolveRequest(context, moduleName, platform);
-      }
-    }
-    return context.resolveRequest(context, moduleName, platform);
+    // Default Metro resolver sem recursao
+    return metroResolver.resolve(
+      { ...context, resolveRequest: undefined },
+      moduleName,
+      platform,
+    );
   },
 };
-
-// Excluir artefatos volateis dos outros apps Next.js do file map do Metro.
-// Sem isto, .next/static/* (gerado/destruido em hot-reload pelo Next.js)
-// causa ENOENT no FallbackWatcher do Windows.
-config.resolver.blockList = [
-  /[\\\/]\.next[\\\/].*/,
-  /[\\\/]\.turbo[\\\/].*/,
-  /[\\\/]apps[\\\/]web[\\\/]\.next[\\\/].*/,
-  /[\\\/]apps[\\\/]admin[\\\/]\.next[\\\/].*/,
-  /[\\\/]apps[\\\/]booking[\\\/]\.next[\\\/].*/,
-  /[\\\/]apps[\\\/]site[\\\/]\.next[\\\/].*/,
-  /[\\\/]apps[\\\/]mobile-gestor[\\\/].*/,
-];
 
 module.exports = config;

@@ -1,4 +1,5 @@
-import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from 'react-native'
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useCallback, useState } from 'react'
 import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -41,7 +42,7 @@ export default function AgendaScreen() {
   }
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       {/* Header */}
       <View style={s.header}>
         <Text style={s.title}>Agenda</Text>
@@ -147,7 +148,7 @@ export default function AgendaScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F8F6F2' },
+  safe: { flex: 1, backgroundColor: '#1A3A6B' },
   header: {
     backgroundColor: '#1A3A6B', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

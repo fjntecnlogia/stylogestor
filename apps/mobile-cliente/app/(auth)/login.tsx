@@ -4,14 +4,14 @@ import {
   StyleSheet, SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { useSignIn } from '@clerk/clerk-expo'
-import { clerkErrorMessage } from '../../lib/clerkErrors'
+import { supabase } from '../../lib/supabase'
+import { authErrorMessage } from '../../lib/authErrors'
 
 export default function LoginScreen() {
   const router = useRouter()
-  const { signIn, setActive, isLoaded } = useSignIn()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const handleLogin = async () => {
@@ -19,22 +19,45 @@ export default function LoginScreen() {
       Alert.alert('Atenção', 'Preencha e-mail e senha')
       return
     }
-    if (!isLoaded) return
     setLoading(true)
     try {
-      const attempt = await signIn.create({ identifier: email, password })
-      if (attempt.status === 'complete') {
-        await setActive({ session: attempt.createdSessionId })
-        // Volta pra home (que mostra dados do user logado)
-        router.replace('/')
-      } else {
-        Alert.alert('Login incompleto', `Etapa adicional necessaria (status: ${attempt.status}).`)
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      })
+      if (error) {
+        Alert.alert('Erro ao entrar', authErrorMessage(error, 'Verifique suas credenciais.'))
+        return
       }
+      // AuthProvider escuta onAuthStateChange. Volta pra home.
+      router.replace('/')
     } catch (err) {
-      Alert.alert('Erro ao entrar', clerkErrorMessage(err, 'Verifique suas credenciais.'))
+      Alert.alert('Erro ao entrar', authErrorMessage(err, 'Verifique suas credenciais.'))
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleForgotPassword = () => {
+    if (!email) {
+      Alert.alert('Informe o e-mail', 'Digite seu e-mail acima e toque novamente.')
+      return
+    }
+    Alert.alert('Recuperar senha', `Enviar link de redefinição pra ${email.trim().toLowerCase()}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Enviar',
+        onPress: async () => {
+          try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase())
+            if (error) throw error
+            Alert.alert('Verifique seu e-mail', 'Enviamos um link pra redefinir a senha.')
+          } catch (err) {
+            Alert.alert('Erro', authErrorMessage(err, 'Não foi possível enviar o e-mail.'))
+          }
+        },
+      },
+    ])
   }
 
   return (
@@ -67,29 +90,31 @@ export default function LoginScreen() {
           />
 
           <Text style={s.label}>Senha</Text>
-          <TextInput
-            style={s.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            placeholderTextColor="#9CA3AF"
-            secureTextEntry
-            autoComplete="password"
-          />
+          <View style={s.inputWrap}>
+            <TextInput
+              style={s.inputInner}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              placeholderTextColor="#9CA3AF"
+              secureTextEntry={!showPassword}
+              autoComplete="password"
+            />
+            <TouchableOpacity
+              style={s.eyeBtn}
+              onPress={() => setShowPassword(!showPassword)}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            >
+              <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity style={[s.btn, loading && s.btnDisabled]} onPress={handleLogin} disabled={loading}>
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Entrar</Text>}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={s.linkBtn}
-            onPress={() =>
-              Alert.alert(
-                'Esqueci minha senha',
-                'Por ora, redefina pelo painel web em app.stylogestor.com.br.',
-              )
-            }
-          >
+          <TouchableOpacity style={s.linkBtn} onPress={handleForgotPassword}>
             <Text style={s.linkText}>Esqueci minha senha</Text>
           </TouchableOpacity>
 
@@ -125,6 +150,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: '#111827',
     backgroundColor: '#F9FAFB',
   },
+  inputWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+  },
+  inputInner: {
+    flex: 1, paddingHorizontal: 16, paddingVertical: 12,
+    fontSize: 15, color: '#111827',
+  },
+  eyeBtn: { paddingHorizontal: 14, paddingVertical: 12 },
+  eyeIcon: { fontSize: 18 },
   btn: {
     backgroundColor: '#1A3A6B', borderRadius: 12, paddingVertical: 14,
     alignItems: 'center', marginTop: 16,

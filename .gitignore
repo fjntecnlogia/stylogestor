@@ -32,7 +32,24 @@ prisma/dev.db-journal
 # misc
 .DS_Store
 *.log
+*.logcd
 .vscode
+
+# Builds Android/iOS — binários pesados, NUNCA commitar (gerar via EAS)
+*.aab
+*.apk
+*.ipa
+build-*.aab
+build-*.apk
+
+# Backups automáticos de assets/config (gerados por Expo/Vercel)
+*.expo-default.bak
+*.vercel-default.bak
+*.bak
+
+# Arquivos temporários
+_tmp_*
+**/_tmp_*
 
 # Claude Code — config local por dev (CLAUDE.md por pasta CONTINUA versionado)
 .claude/

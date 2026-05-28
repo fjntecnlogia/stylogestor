@@ -1,6 +1,7 @@
-import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, Linking } from 'react-native'
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Image } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { useAuth } from '@clerk/clerk-expo'
+import { useAuth, useUser } from '../../lib/auth'
 import Constants from 'expo-constants'
 
 type MenuItem = {
@@ -60,14 +61,34 @@ const IMPLEMENTED_ROUTES = new Set<string>([
 export default function MaisScreen() {
   const router = useRouter()
   const { signOut } = useAuth()
+  const { user } = useUser()
+
+  // Extrai nome do user_metadata (firstName + lastName, ou name, ou email).
+  const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
+  const firstName = (meta.firstName as string | undefined) ?? ''
+  const lastName = (meta.lastName as string | undefined) ?? ''
+  const fullName = (meta.name as string | undefined) ?? ''
+  const avatarUrl = (meta.avatar_url as string | undefined) ?? ''
+
+  const displayName =
+    `${firstName} ${lastName}`.trim() ||
+    fullName ||
+    user?.email?.split('@')[0] ||
+    'Gestor'
+  const avatarLetter = displayName.charAt(0).toUpperCase()
+
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <View style={s.avatar}>
-          <Text style={s.avatarText}>J</Text>
-        </View>
-        <View>
-          <Text style={s.name}>João Silva</Text>
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={s.avatar} />
+        ) : (
+          <View style={s.avatar}>
+            <Text style={s.avatarText}>{avatarLetter}</Text>
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={s.name} numberOfLines={1}>{displayName}</Text>
           <Text style={s.plan}>✓ Plano Pro</Text>
         </View>
         <TouchableOpacity
@@ -144,7 +165,9 @@ export default function MaisScreen() {
           <Text style={s.logoutText}>Sair da conta</Text>
         </TouchableOpacity>
 
-        <Text style={s.version}>STYLOGESTOR v1.0.0</Text>
+        <Text style={s.version}>
+          STYLOGESTOR Gestor v{Constants.expoConfig?.version ?? '1.1.0'} ({Constants.expoConfig?.android?.versionCode ?? '?'})
+        </Text>
         <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
@@ -152,7 +175,7 @@ export default function MaisScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F8F6F2' },
+  safe: { flex: 1, backgroundColor: '#1A3A6B' },
   header: {
     backgroundColor: '#1A3A6B', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20,
     flexDirection: 'row', alignItems: 'center', gap: 12,

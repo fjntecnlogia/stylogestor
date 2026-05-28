@@ -1,6 +1,7 @@
 import { Tabs, Redirect } from 'expo-router'
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
-import { useAuth } from '@clerk/clerk-expo'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useAuth } from '../../lib/auth'
 
 function TabIcon({ emoji, label, focused }: { emoji: string; label: string; focused: boolean }) {
   return (
@@ -13,8 +14,9 @@ function TabIcon({ emoji, label, focused }: { emoji: string; label: string; focu
 
 export default function TabsLayout() {
   const { isLoaded, isSignedIn } = useAuth()
+  const insets = useSafeAreaInsets()
 
-  // Aguarda Clerk hidratar antes de decidir
+  // Aguarda Supabase hidratar a sessão antes de decidir
   if (!isLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1A3A6B' }}>
@@ -28,11 +30,16 @@ export default function TabsLayout() {
     return <Redirect href="/(auth)/login" />
   }
 
+  // Tab bar respeitando o safe area inferior (gestural nav bar / botoes do Android).
+  // Sem isto, em Xiaomi/MIUI a tab bar fica colada no rodape e dificulta o toque.
+  const tabBarPaddingBottom = Math.max(insets.bottom, 8)
+  const tabBarHeight = 60 + tabBarPaddingBottom
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: s.tabBar,
+        tabBarStyle: [s.tabBar, { height: tabBarHeight, paddingBottom: tabBarPaddingBottom }],
         tabBarShowLabel: false,
       }}
     >
@@ -74,8 +81,6 @@ const s = StyleSheet.create({
   tabBar: {
     backgroundColor: '#1A3A6B',
     borderTopWidth: 0,
-    height: 70,
-    paddingBottom: 8,
     paddingTop: 8,
     elevation: 20,
     shadowColor: '#000',

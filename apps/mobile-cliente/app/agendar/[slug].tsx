@@ -1,9 +1,12 @@
-import { ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, Alert } from 'react-native'
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useState, useEffect } from 'react'
 import { router, useLocalSearchParams } from 'expo-router'
 import { addDays, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { useUser } from '@clerk/clerk-expo'
+import { useUser } from '../../lib/auth'
+import { addAgendamento } from '../../lib/agendamentos'
+import { loadPerfil, savePerfil } from '../../lib/perfil'
 
 const SERVICES = [
   { id: '1', name: 'Corte masculino', duration: 30, price: 40 },
@@ -34,19 +37,26 @@ export default function AgendarScreen() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
 
-  // Pre-fill nome e telefone do perfil Clerk quando o usuario esta logado.
-  // Clerk nao captura telefone por padrao - vai ficar vazio se nao foi cadastrado.
-  // Apenas seta uma vez quando isLoaded passa a true e os campos ainda estao vazios.
+  // Pre-fill nome e telefone do perfil local (que tem endereco) e Clerk como fallback.
+  // O perfil local guarda os dados que o user editou na tela /meu-perfil.
   useEffect(() => {
-    if (!isLoaded || !user) return
-    if (!name) {
-      const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim()
-      if (fullName) setName(fullName)
-    }
-    if (!phone) {
-      const phoneFromClerk = user.primaryPhoneNumber?.phoneNumber
-      if (phoneFromClerk) setPhone(phoneFromClerk)
-    }
+    (async () => {
+      const perfil = await loadPerfil()
+      if (perfil.nome && !name) setName(perfil.nome)
+      if (perfil.telefone && !phone) setPhone(perfil.telefone)
+
+      // Fallback Supabase user_metadata se perfil local estiver vazio
+      if (!isLoaded || !user) return
+      if (!perfil.nome && !name) {
+        const meta = (user.user_metadata ?? {}) as Record<string, unknown>
+        const metaName = (meta.name as string | undefined)
+          || [meta.firstName, meta.lastName].filter(Boolean).join(' ').trim()
+        if (metaName) setName(metaName)
+      }
+      if (!perfil.telefone && !phone) {
+        if (user.phone) setPhone(user.phone)
+      }
+    })()
   }, [isLoaded, user])
 
   const total    = SERVICES.filter(s => selectedServices.includes(s.id)).reduce((a, s) => a + s.price, 0)
@@ -59,7 +69,7 @@ export default function AgendarScreen() {
 
   if (step === 'success') {
     return (
-      <SafeAreaView style={s.safe}>
+      <SafeAreaView style={s.safe} edges={['top']}>
         <View style={s.successContainer}>
           <Text style={s.successEmoji}>🎉</Text>
           <Text style={s.successTitle}>Agendado com sucesso!</Text>
@@ -69,6 +79,12 @@ export default function AgendarScreen() {
             <Text style={s.successInfo}>⏰ {selectedSlot}</Text>
             <Text style={s.successInfo}>💰 R$ {total}</Text>
           </View>
+          <TouchableOpacity
+            style={[s.successBtn, { backgroundColor: '#F5A623', marginBottom: 8 }]}
+            onPress={() => router.replace('/meus-agendamentos')}
+          >
+            <Text style={[s.successBtnText, { color: '#1A3A6B' }]}>📅 Ver meus agendamentos</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={s.successBtn} onPress={() => router.replace('/')}>
             <Text style={s.successBtnText}>Voltar ao início</Text>
           </TouchableOpacity>
@@ -78,7 +94,7 @@ export default function AgendarScreen() {
   }
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => step === 'services' ? router.back() : setStep(
@@ -232,7 +248,36 @@ export default function AgendarScreen() {
                 </View>
               ))}
             </View>
-            <TouchableOpacity style={[s.nextBtnFull, { backgroundColor: '#1B8A5A' }]} onPress={() => setStep('success')}>
+            <TouchableOpacity
+              style={[s.nextBtnFull, { backgroundColor: '#1B8A5A' }]}
+              onPress={async () => {
+                if (!selectedDay) {
+                  Alert.alert('Atenção', 'Selecione uma data antes de confirmar.')
+                  return
+                }
+                try {
+                  // Sincroniza perfil local com nome/telefone usados aqui
+                  // (caso usuario tenha digitado novos valores diferentes do perfil).
+                  await savePerfil({ nome: name, telefone: phone })
+
+                  // Salva o agendamento no storage local pra aparecer em "Meus agendamentos"
+                  await addAgendamento({
+                    barbeariaSlug: slug || 'demo',
+                    barbeariaNome: slug?.replace(/-/g, ' ') || 'Barbearia demo',
+                    servicosNomes: SERVICES.filter((sv) => selectedServices.includes(sv.id)).map((sv) => sv.name).join(' + '),
+                    profissionalNome: PROFESSIONALS.find((p) => p.id === professional)?.name || 'Sem preferência',
+                    dataISO: selectedDay.toISOString(),
+                    dataFmt: format(selectedDay, "EEEE, d 'de' MMMM", { locale: ptBR }),
+                    hora: selectedSlot,
+                    duracao: duration,
+                    preco: total,
+                  })
+                  setStep('success')
+                } catch {
+                  Alert.alert('Erro', 'Não foi possível salvar o agendamento. Tente novamente.')
+                }
+              }}
+            >
               <Text style={s.nextBtnText}>✓ Confirmar agendamento</Text>
             </TouchableOpacity>
           </View>
@@ -245,14 +290,14 @@ export default function AgendarScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F8F6F2' },
+  safe: { flex: 1, backgroundColor: '#1A3A6B' },
   header: { backgroundColor: '#1A3A6B', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 18, flexDirection: 'row', alignItems: 'center', gap: 16 },
   back: { color: '#F5A623', fontSize: 16, fontWeight: '700' },
   headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700', flex: 1, textTransform: 'capitalize' },
   progress: { backgroundColor: '#1A3A6B', flexDirection: 'row', justifyContent: 'center', gap: 6, paddingBottom: 14 },
   progressDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.3)' },
   progressDotActive: { backgroundColor: '#F5A623', width: 20 },
-  scroll: { flex: 1, padding: 16 },
+  scroll: { flex: 1, padding: 16, backgroundColor: '#F8F6F2' },
   stepTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 16 },
   serviceCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
   serviceCardActive: { borderColor: '#1A3A6B', backgroundColor: '#EFF6FF' },

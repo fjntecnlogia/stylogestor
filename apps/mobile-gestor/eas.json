@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 12.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -9,6 +9,11 @@
       "distribution": "internal",
       "node": "22.13.0",
       "pnpm": "9.15.9",
+      "env": {
+        "EXPO_NO_TELEMETRY": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ncxssdiottdvzdsdgvza.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_IvLlD8of-PXAdIk8iLSOgQ_UezZycO8"
+      },
       "android": {
         "buildType": "apk"
       }
@@ -18,7 +23,9 @@
       "node": "22.13.0",
       "pnpm": "9.15.9",
       "env": {
-        "EXPO_NO_TELEMETRY": "1"
+        "EXPO_NO_TELEMETRY": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ncxssdiottdvzdsdgvza.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_IvLlD8of-PXAdIk8iLSOgQ_UezZycO8"
       },
       "android": {
         "buildType": "apk",
@@ -26,9 +33,14 @@
       }
     },
     "production": {
-      "autoIncrement": true,
+      "autoIncrement": false,
       "node": "22.13.0",
       "pnpm": "9.15.9",
+      "env": {
+        "EXPO_NO_TELEMETRY": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ncxssdiottdvzdsdgvza.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_IvLlD8of-PXAdIk8iLSOgQ_UezZycO8"
+      },
       "android": {
         "buildType": "app-bundle"
       }

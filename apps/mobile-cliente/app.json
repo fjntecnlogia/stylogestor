@@ -18,6 +18,7 @@
       "bundleIdentifier": "br.com.stylogestor.cliente"
     },
     "android": {
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1A3A6B"

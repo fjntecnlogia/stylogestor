@@ -1,6 +1,8 @@
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, Alert } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { useAuth, useUser } from '@clerk/clerk-expo'
+import { useAuth, useUser } from '../lib/auth'
+import Constants from 'expo-constants'
 
 // Simula lista de barbearias próximas
 const BARBEARIAS = [
@@ -12,7 +14,9 @@ const BARBEARIAS = [
 export default function HomeScreen() {
   const { isSignedIn, signOut } = useAuth()
   const { user } = useUser()
-  const firstName = user?.firstName || user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'você'
+  const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
+  const fullName = (meta.name as string | undefined) || (meta.firstName as string | undefined) || ''
+  const firstName = fullName.split(' ')[0] || user?.email?.split('@')[0] || 'você'
 
   const handleSignOut = () => {
     Alert.alert('Sair da conta', 'Deseja realmente sair?', [
@@ -27,8 +31,11 @@ export default function HomeScreen() {
     ])
   }
 
+  // edges={['top']} aplica padding-top conforme insets do dispositivo (notch, status bar, etc).
+  // Sem isto, o header colorido (azul) cola na status bar e fica embaixo dos icones
+  // de bateria/rede em Xiaomi/MIUI.
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       {/* Header */}
       <View style={s.header}>
         <View style={s.headerTop}>
@@ -41,7 +48,7 @@ export default function HomeScreen() {
 
           {/* Auth corner: Entrar (anonimo) ou avatar (logado) */}
           {isSignedIn ? (
-            <TouchableOpacity style={s.userChip} onPress={handleSignOut}>
+            <TouchableOpacity style={s.userChip} onPress={() => router.push('/meu-perfil')}>
               <View style={s.userAvatar}>
                 <Text style={s.userAvatarText}>{firstName.charAt(0).toUpperCase()}</Text>
               </View>
@@ -55,6 +62,24 @@ export default function HomeScreen() {
         </View>
         <Text style={s.subtitle}>Agende na sua barbearia favorita</Text>
       </View>
+
+      {/* Atalhos rápidos pro usuario logado */}
+      {isSignedIn && (
+        <View style={s.quickRow}>
+          <TouchableOpacity style={s.quickBtn} onPress={() => router.push('/meus-agendamentos')}>
+            <Text style={s.quickEmoji}>📅</Text>
+            <Text style={s.quickText}>Meus agendamentos</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.quickBtn} onPress={() => router.push('/meu-perfil')}>
+            <Text style={s.quickEmoji}>👤</Text>
+            <Text style={s.quickText}>Meu perfil</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.quickBtn, { borderColor: '#FEE2E2' }]} onPress={handleSignOut}>
+            <Text style={s.quickEmoji}>🚪</Text>
+            <Text style={[s.quickText, { color: '#991B1B' }]}>Sair</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Demo direto */}
       <TouchableOpacity
@@ -70,6 +95,11 @@ export default function HomeScreen() {
         contentContainerStyle={s.list}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={<Text style={s.listTitle}>Barbearias disponíveis</Text>}
+        ListFooterComponent={
+          <Text style={s.version}>
+            Agendar STYLOGESTOR v{Constants.expoConfig?.version ?? '1.0.0'} ({Constants.expoConfig?.android?.versionCode ?? '?'})
+          </Text>
+        }
         renderItem={({ item: b }) => (
           <TouchableOpacity
             style={s.card}
@@ -98,7 +128,7 @@ export default function HomeScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F8F6F2' },
+  safe: { flex: 1, backgroundColor: '#1A3A6B' },
   header: { backgroundColor: '#1A3A6B', padding: 20, paddingBottom: 24 },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -116,12 +146,22 @@ const s = StyleSheet.create({
   logoText: { color: '#fff', fontWeight: '900', fontSize: 20 },
   logoAccent: { color: '#F5A623' },
   subtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
+  quickRow: {
+    flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 12,
+    backgroundColor: '#F8F6F2',
+  },
+  quickBtn: {
+    flex: 1, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 12,
+    alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  quickEmoji: { fontSize: 22 },
+  quickText: { fontSize: 11, fontWeight: '600', color: '#1A3A6B', marginTop: 4, textAlign: 'center' },
   demoBtn: {
     backgroundColor: '#F5A623', margin: 12, borderRadius: 14,
     paddingVertical: 14, alignItems: 'center',
   },
   demoBtnText: { color: '#1A3A6B', fontWeight: '800', fontSize: 15 },
-  list: { paddingHorizontal: 12, paddingBottom: 24 },
+  list: { paddingHorizontal: 12, paddingBottom: 24, backgroundColor: '#F8F6F2' },
   listTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 10 },
   card: {
     backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 8,
@@ -142,4 +182,5 @@ const s = StyleSheet.create({
   cardRight: { alignItems: 'flex-end' },
   cardSlot: { fontSize: 11, color: '#1B8A5A', fontWeight: '700', backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   cardArrow: { fontSize: 22, color: '#9CA3AF', marginTop: 4 },
+  version: { textAlign: 'center', color: '#9CA3AF', fontSize: 11, marginTop: 24, marginBottom: 8 },
 })
