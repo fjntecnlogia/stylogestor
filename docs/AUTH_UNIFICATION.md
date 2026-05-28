@@ -54,10 +54,54 @@ SUPABASE_URL=https://xxxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=...   (ou SUPABASE_ANON_KEY)
 ```
 
-### Fase 1 — Mobile consome a NestJS (PRÓXIMA)
-- `mobile-gestor/lib/api.ts`: apontar `api.stylogestor.com.br` + JWT Supabase
-- Migrar dados de `expo-secure-store` (storage local) → API/DB real
-- mobile-cliente idem
+### Fase 1 — Mobile consome a NestJS (EM ANDAMENTO)
+
+#### ✅ Backend (CONCLUÍDO 28/05/2026) — enablers de onboarding mobile-first
+Um usuário criado pelo `MultiAuthGuard` (Supabase) nasce SEM tenant. O
+`TenantGuard` exige `x-tenant-slug` + membership ativo → barrava toda rota
+scoped. Faltavam 2 rotas pra o app sair do zero:
+
+- **`GET /tenants/mine`** — lista os tenants do usuário (SEM TenantGuard).
+  Retorna `[]` se ainda não tem barbearia → app manda pro onboarding.
+  ```json
+  [{ "id": "...", "slug": "minha-barbearia", "name": "...", "logo": null,
+     "plan": "FREE", "role": "owner" }]
+  ```
+- **`POST /tenants`** — onboarding: cria barbearia + vincula como `owner` +
+  horários/profissionais/serviços iniciais + subscription trial (14 dias).
+  Body (todos os campos exceto `name` são opcionais):
+  ```json
+  { "name": "Barbearia X", "type": "barbershop", "phone": "...", "city": "...",
+    "plan": "FREE",
+    "schedules": [{ "day": 1, "start": "09:00", "end": "18:00", "active": true }],
+    "professionals": [{ "name": "João", "role": "Barbeiro", "commission": 40 }],
+    "services": [{ "name": "Corte", "price": 35, "duration": 30 }] }
+  ```
+  ⚠️ ValidationPipe usa `forbidNonWhitelisted` → NÃO enviar campos fora do
+  schema acima (vira 400).
+
+#### Contrato pra o mobile (rotas scoped — exigem header `x-tenant-slug`)
+Todas pedem `Authorization: Bearer <jwt Supabase>` **e** `x-tenant-slug: <slug>`:
+- **Appointments**: `GET /appointments?date=&professionalId=&status=`,
+  `GET /appointments/availability?date=&professionalId=&serviceIds=`,
+  `GET /appointments/:id`, `POST /appointments`, `PATCH /appointments/:id`,
+  `PATCH /appointments/:id/status`, `DELETE /appointments/:id`
+- **Clients**: `GET /clients?search=`, `GET /clients/:id`,
+  `GET /clients/:id/history`, `POST /clients`, `PATCH /clients/:id`
+- **Financial**: `GET /financial/cashflow?month=`,
+  `GET /financial/transactions?from=&to=`, `GET /financial/reports/daily?date=`,
+  `POST /financial/transactions`
+- **Tenant**: `GET /tenants/me`, `GET /tenants/me/dashboard`, `PATCH /tenants/me`
+
+#### ⏳ Mobile (PRÓXIMO — time Mobile)
+1. `mobile-gestor/lib/api.ts`: base URL `https://api.stylogestor.com.br`;
+   no `fetcher`, injetar `Authorization: Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+   + `x-tenant-slug` (do tenant resolvido no bootstrap).
+2. Bootstrap pós-login: `GET /tenants/mine` → guarda `slug`; se `[]`, fluxo de
+   onboarding (`POST /tenants`).
+3. Migrar CRUD local (`lib/agendamentos.ts`, `clientes.ts`, `lancamentos.ts`)
+   pros endpoints acima; manter storage local só como cache offline opcional.
+4. mobile-cliente idem (consome rotas `@Public` de booking `/v1/booking/:slug/*`).
 
 ### Fase 2 — Consolidar backend (Next routes → NestJS)
 - Mover lógica de `apps/web/src/app/api/*` pra NestJS
