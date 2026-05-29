@@ -140,4 +140,29 @@ export class SupabaseMetadataService {
       return { ok: false }
     }
   }
+
+  /**
+   * Cria a conta de um novo usuário via convite por e-mail (barbeiro no invite).
+   * Dispara o e-mail "você foi convidado" do Supabase (requer SMTP configurado).
+   * `userMetadata` vai pro `user_metadata` (ex.: name); o `app_metadata` é
+   * setado depois via setAppMetadata. Retorna o id criado, ou null em falha
+   * (ex.: e-mail já registrado / SMTP ausente).
+   */
+  async inviteUser(
+    email: string,
+    userMetadata?: Record<string, unknown>,
+  ): Promise<{ id: string } | null> {
+    if (!this.admin) return null
+    try {
+      const { data, error } = await this.admin.auth.admin.inviteUserByEmail(email, {
+        data: userMetadata,
+      })
+      if (error || !data.user) throw new Error(error?.message ?? 'sem user retornado')
+      return { id: data.user.id }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'erro desconhecido'
+      this.logger.error(`inviteUser falhou (${email}): ${msg}`)
+      return null
+    }
+  }
 }
