@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { UserButton, useUser } from '@clerk/nextjs'
+import { useUser } from '@/lib/use-user'
+import { UserMenu } from '@/components/auth/user-menu'
 
 const NAV = [
   { href: '/profissional/agenda',     label: 'Agenda',      icon: '📅' },
@@ -25,8 +26,8 @@ export function ProfissionalShell({ children }: Props) {
   const path = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
   const { user } = useUser()
-  const nomeProfissional = (user?.publicMetadata as { professionalName?: string } | undefined)?.professionalName
-    ?? user?.firstName
+  const nomeProfissional = (user?.app_metadata as { professionalName?: string } | undefined)?.professionalName
+    ?? (user?.user_metadata as { name?: string } | undefined)?.name
     ?? 'Profissional'
 
   return (
@@ -76,8 +77,8 @@ export function ProfissionalShell({ children }: Props) {
         {/* User info + logout (desktop) */}
         <div className={`p-4 border-t border-white/10 ${menuOpen ? 'block' : 'hidden lg:block'}`}>
           <div className="flex items-center gap-3">
-            {/* Após logout, ClerkProvider.signInUrl redireciona pra /login */}
-            <UserButton />
+            {/* Logout → /login (lib/use-user signOut) */}
+            <UserMenu size={36} />
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-semibold truncate">{nomeProfissional}</p>
               <p className="text-white/40 text-[10px]">Profissional</p>

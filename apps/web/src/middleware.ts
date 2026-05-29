@@ -1,5 +1,5 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse, type NextRequest } from 'next/server'
+import { updateSession, readClaims } from './lib/supabase/middleware'
 
 const BASE_DOMAIN = process.env.BASE_DOMAIN || 'stylogestor.com.br'
 
@@ -8,9 +8,20 @@ const RESERVED_SUBDOMAINS = new Set([
   'smtp', 'ftp', 'localhost', 'staging', 'dev',
 ])
 
-const isPublicRoute = createRouteMatcher([
+// Matcher de rota simples (substitui o createRouteMatcher do Clerk).
+// Os padrões usam `(.*)` no fim como curinga, igual aos do Clerk.
+function routeMatcher(patterns: string[]) {
+  const regexes = patterns.map(
+    (p) => new RegExp(`^${p.replace(/\(\.\*\)/g, '.*')}$`),
+  )
+  return (pathname: string) => regexes.some((r) => r.test(pathname))
+}
+
+const isPublicRoute = routeMatcher([
   '/login(.*)',
   '/cadastro(.*)',
+  '/recuperar-senha(.*)',         // pedir reset de senha (página nova)
+  '/redefinir-senha(.*)',         // definir nova senha após o link do e-mail
   '/onboarding(.*)',
   '/sucesso(.*)',
   '/bloqueado(.*)',
@@ -20,17 +31,17 @@ const isPublicRoute = createRouteMatcher([
   '/api/tenants(.*)',            // Onboarding create tenant
   '/api/notifications(.*)',      // Email notifications
   '/api/automations(.*)',        // Automações — chamadas internamente
-  '/api/cron(.*)',               // Cron jobs — autenticados via CRON_SECRET, não Clerk
+  '/api/cron(.*)',               // Cron jobs — autenticados via CRON_SECRET
   '/api/v1/tenants/by-slug(.*)',
   '/api/v1/booking(.*)',         // Booking público — cliente final agenda sem login
   '/b/(.*)',                     // Landing pública de agendamento
   '/api/health',                 // Health check pro painel admin pingar
-  '/api/debug/(.*)',             // Endpoints de debug temporários (instance, etc)
+  '/api/debug/(.*)',             // Endpoints de debug temporários
   '/reset-conta(.*)',            // Página de recuperação (tenant fantasma)
 ])
 
 // Rotas permitidas mesmo sem assinatura ativa
-const isPaymentRoute = createRouteMatcher([
+const isPaymentRoute = routeMatcher([
   '/planos(.*)',
   '/sucesso(.*)',
   '/bloqueado(.*)',
@@ -39,12 +50,12 @@ const isPaymentRoute = createRouteMatcher([
 ])
 
 // Rotas exclusivas do painel do profissional (barbeiro)
-const isProfessionalRoute = createRouteMatcher([
+const isProfessionalRoute = routeMatcher([
   '/profissional(.*)',
 ])
 
 // Rotas exclusivas do gestor (dashboard, clientes, financeiro etc)
-const isGestorRoute = createRouteMatcher([
+const isGestorRoute = routeMatcher([
   '/dashboard(.*)',
   '/agenda(.*)',
   '/clientes(.*)',
@@ -58,12 +69,19 @@ const isGestorRoute = createRouteMatcher([
   '/afiliados(.*)',
 ])
 
-export default clerkMiddleware(async (auth, request: NextRequest) => {
+// Copia os cookies (sessão renovada pelo updateSession) pra uma nova resposta
+// (redirect/rewrite), pra não perder o refresh do token.
+function withSessionCookies(target: NextResponse, from: NextResponse): NextResponse {
+  from.cookies.getAll().forEach((c) => target.cookies.set(c))
+  return target
+}
+
+export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone()
   const hostname = request.headers.get('host') || ''
   const subdomain = extractSubdomain(hostname, BASE_DOMAIN)
 
-  // Subdomínio de tenant (booking público)
+  // ── Subdomínio de tenant (booking público) — não precisa de sessão ──
   if (subdomain && !RESERVED_SUBDOMAINS.has(subdomain)) {
     const tenantResponse = await fetchTenantBySlug(subdomain)
     if (!tenantResponse) {
@@ -78,14 +96,19 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
     return response
   }
 
-  // Rotas públicas — sem auth
-  if (isPublicRoute(request)) return NextResponse.next()
+  // ── Renova a sessão Supabase (mantém cookies frescos) e pega o user ──
+  const { user, response } = await updateSession(request)
+
+  // Rotas públicas — sem auth (mas já com cookies renovados)
+  if (isPublicRoute(url.pathname)) return response
 
   // Exige autenticação
-  const { userId, sessionClaims } = await auth.protect()
+  if (!user) {
+    url.pathname = '/login'
+    return withSessionCookies(NextResponse.redirect(url), response)
+  }
 
-  const metadata = (sessionClaims?.metadata as Record<string, string> | undefined) ?? {}
-  const role = metadata.role // 'gestor' | 'barbeiro' | undefined (assume gestor por retrocompat)
+  const { role, subscriptionStatus } = readClaims(user)
 
   // ───────────────────────────────────────────────────────────────
   // Role-based routing: barbeiro só acessa /profissional/*
@@ -93,35 +116,34 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   // em /profissional/*.
   // ───────────────────────────────────────────────────────────────
   if (role === 'barbeiro') {
-    // Bloqueia barbeiro em rotas do gestor → redireciona pro painel dele
-    if (isGestorRoute(request)) {
+    if (isGestorRoute(url.pathname)) {
       url.pathname = '/profissional/agenda'
-      return NextResponse.redirect(url)
+      return withSessionCookies(NextResponse.redirect(url), response)
     }
-    // Se acessa raiz `/`, manda direto pro painel dele
     if (url.pathname === '/') {
       url.pathname = '/profissional/agenda'
-      return NextResponse.redirect(url)
+      return withSessionCookies(NextResponse.redirect(url), response)
     }
   } else {
-    // Gestor (ou role indefinida) não deve entrar em /profissional/*
-    if (isProfessionalRoute(request)) {
+    if (isProfessionalRoute(url.pathname)) {
       url.pathname = '/dashboard'
-      return NextResponse.redirect(url)
+      return withSessionCookies(NextResponse.redirect(url), response)
     }
   }
 
-  // Verificar status da assinatura (salvo no publicMetadata do Clerk)
-  const subStatus = metadata.subscriptionStatus
+  // Verificar status da assinatura (vem do app_metadata do Supabase)
   const blockedStatuses = ['past_due', 'canceled', 'unpaid']
-
-  if (subStatus && blockedStatuses.includes(subStatus) && !isPaymentRoute(request)) {
+  if (
+    subscriptionStatus &&
+    blockedStatuses.includes(subscriptionStatus) &&
+    !isPaymentRoute(url.pathname)
+  ) {
     url.pathname = '/bloqueado'
-    return NextResponse.redirect(url)
+    return withSessionCookies(NextResponse.redirect(url), response)
   }
 
-  return NextResponse.next()
-})
+  return response
+}
 
 function extractSubdomain(hostname: string, baseDomain: string): string | null {
   if (hostname.includes('localhost')) return null

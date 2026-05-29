@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useUser } from '@/lib/use-user'
 import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/components/ui/toast'
@@ -24,7 +24,7 @@ interface Bloqueio {
 
 export function HorariosProfissionalView() {
   const { user } = useUser()
-  const professionalId = (user?.publicMetadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
+  const professionalId = (user?.app_metadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
 
   // Encontra o profissional logado na lista compartilhada com /profissionais
   const [allProfessionals] = useTenantPersistedState<ProfessionalFixture[]>(

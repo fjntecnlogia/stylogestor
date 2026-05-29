@@ -1,6 +1,39 @@
-import { SignIn } from '@clerk/nextjs'
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+import { authErrorMessage } from '@/lib/auth-errors'
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email || !password) {
+      setError('Preencha e-mail e senha.')
+      return
+    }
+    setError('')
+    setLoading(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    })
+    if (error) {
+      setError(authErrorMessage(error.message, 'Não foi possível entrar.'))
+      setLoading(false)
+      return
+    }
+    // Full reload pra o middleware ler o cookie e rotear por role (gestor/barbeiro).
+    window.location.assign('/dashboard')
+  }
+
   return (
     <div className="min-h-screen bg-[#1A3A6B] flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
@@ -16,17 +49,65 @@ export default function LoginPage() {
           <p className="text-white/60 text-sm">Acesse sua conta para gerenciar seu negócio</p>
         </div>
 
-        <SignIn
-          routing="hash"
-          signUpUrl="/cadastro"
-          fallbackRedirectUrl="/dashboard"
-        />
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-2xl p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">E-mail</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu@email.com"
+              autoComplete="email"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none focus:border-[#1A3A6B]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Senha</label>
+            <div className="flex items-center rounded-xl border border-gray-200 bg-gray-50">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                className="flex-1 bg-transparent px-4 py-3 text-sm text-gray-900 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="px-4 text-sm text-gray-500"
+              >
+                {showPassword ? 'ocultar' : 'mostrar'}
+              </button>
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl bg-[#1A3A6B] py-3 font-semibold text-white hover:bg-[#142d55] disabled:opacity-60"
+          >
+            {loading ? 'Entrando...' : 'Entrar'}
+          </button>
+
+          <div className="flex items-center justify-between text-sm">
+            <Link href="/recuperar-senha" className="text-[#1A3A6B] font-medium hover:underline">
+              Esqueci minha senha
+            </Link>
+            <Link href="/cadastro" className="text-[#1A3A6B] font-medium hover:underline">
+              Criar conta
+            </Link>
+          </div>
+        </form>
 
         <p className="text-center text-white/40 text-xs">
           Não tem conta?{' '}
-          <a href="/cadastro" className="text-[#F5A623] hover:underline font-medium">
+          <Link href="/cadastro" className="text-[#F5A623] hover:underline font-medium">
             Teste grátis por 14 dias
-          </a>
+          </Link>
         </p>
       </div>
     </div>

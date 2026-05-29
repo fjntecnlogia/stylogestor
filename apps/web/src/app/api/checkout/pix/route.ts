@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 import { getStripe, PLANS } from '@/lib/stripe'
 
 /**
@@ -22,19 +22,15 @@ import { getStripe, PLANS } from '@/lib/stripe'
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth()
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    const user = await getServerUser()
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
     const { planId } = await req.json()
     const plan = PLANS.find((p) => p.id === planId)
     if (!plan) return NextResponse.json({ error: 'Plano não encontrado' }, { status: 404 })
 
-    // Pega email + nome do usuário no Clerk pra pré-preencher o checkout
-    const user = await currentUser()
-    const email =
-      user?.primaryEmailAddress?.emailAddress ??
-      user?.emailAddresses?.[0]?.emailAddress ??
-      undefined
+    // Email do usuário Supabase logado pra pré-preencher o checkout
+    const email = user.email ?? undefined
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
     const stripe = getStripe()
@@ -62,9 +58,9 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      metadata: { userId, planId: plan.id, paymentType: 'pix_first_month' },
+      metadata: { userId: user.id, planId: plan.id, paymentType: 'pix_first_month' },
       payment_intent_data: {
-        metadata: { userId, planId: plan.id, paymentType: 'pix_first_month' },
+        metadata: { userId: user.id, planId: plan.id, paymentType: 'pix_first_month' },
       },
       // Pré-preenche email do usuário logado — uma fricção a menos
       ...(email ? { customer_email: email } : {}),

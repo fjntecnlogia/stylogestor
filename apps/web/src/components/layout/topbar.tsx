@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserButton, Show } from '@clerk/nextjs'
 import { AppointmentModal, type NewAppointmentPayload } from '../agenda/appointment-modal'
 import { TrialBadge } from './trial-badge'
+import { UserMenu } from '@/components/auth/user-menu'
 
 interface Props {
   onMenuToggle?: () => void
@@ -75,11 +75,7 @@ export function Topbar({ onMenuToggle }: Props) {
           >
             + <span className="hidden sm:inline">Novo </span>agendamento
           </button>
-          <Show when="signed-in">
-            <UserButton
-              appearance={{ elements: { avatarBox: 'w-8 h-8' } }}
-            />
-          </Show>
+          <UserMenu size={32} />
         </div>
       </header>
 

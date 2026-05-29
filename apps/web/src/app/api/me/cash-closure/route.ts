@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
-import { auth } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/auth-tenant'
 
 /**
@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
  * Idempotente: se já existe pra data, retorna o existente (sem erro).
  */
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
+  const user = await getServerUser()
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
 
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
         byMethod: totals.byMethod,
         byProfessional: totals.byProfessional,
         totalCommissions: totals.totalCommissions,
-        closedByClerkId: userId ?? null,
+        closedByClerkId: user?.id ?? null,
         notes: notes?.trim() || null,
       },
     })

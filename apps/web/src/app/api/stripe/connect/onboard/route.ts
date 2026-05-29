@@ -1,30 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 import { getStripe } from '@/lib/stripe'
 
 // Cria conta Express no Stripe Connect para a barbearia receber pagamentos
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth()
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    const user = await getServerUser()
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
     const body = await req.json().catch(() => ({}))
     const { tenantName, email: bodyEmail } = body as { tenantName?: string; email?: string }
 
-    // Email: 1º tenta o que veio no body, 2º busca do Clerk se vazio/inválido.
+    // Email: 1º tenta o que veio no body, 2º o do usuário Supabase logado.
     // Stripe Connect EXIGE email válido — antes mandávamos string vazia e
     // dava "Invalid email address".
     let email = bodyEmail
     if (!email || !email.includes('@') || email.endsWith('@clerk.temp')) {
-      const user = await currentUser()
-      email =
-        user?.primaryEmailAddress?.emailAddress ??
-        user?.emailAddresses?.[0]?.emailAddress ??
-        undefined
+      email = user.email ?? undefined
     }
     if (!email) {
       return NextResponse.json(
-        { error: 'Email não configurado. Adicione um email no seu perfil Clerk antes de conectar com Stripe.' },
+        { error: 'Email não configurado. Adicione um email no seu perfil antes de conectar com Stripe.' },
         { status: 400 },
       )
     }
@@ -42,7 +38,7 @@ export async function POST(req: NextRequest) {
         transfers: { requested: true },
       },
       business_type: 'individual',
-      metadata: { userId, tenantName: tenantName ?? '' },
+      metadata: { userId: user.id, tenantName: tenantName ?? '' },
     })
 
     // Link de onboarding

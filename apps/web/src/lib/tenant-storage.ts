@@ -7,7 +7,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useUser } from './use-user'
 
 /**
  * Storage scoped por tenant pra persistir state simples no browser.
@@ -92,7 +92,7 @@ export function useTenantPersistedState<T>(
   initial: T,
 ): [T, Dispatch<SetStateAction<T>>] {
   const { user, isLoaded } = useUser()
-  const tenantSlug = (user?.publicMetadata as { tenantSlug?: string } | undefined)?.tenantSlug
+  const tenantSlug = (user?.app_metadata as { tenantSlug?: string } | undefined)?.tenantSlug
 
   const [value, setValue] = useState<T>(initial)
   const hydratedRef = useRef(false)

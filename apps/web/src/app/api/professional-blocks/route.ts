@@ -1,25 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
 import { getCurrentTenantId } from '@/lib/auth-tenant'
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 
 /**
  * Helpers pra descobrir qual profissional o user logado é
  * (caso barbeiro queira ver/criar SÓ os seus bloqueios).
+ * professionalId vem do app_metadata do JWT Supabase.
  */
 async function currentProfessionalId(tenantId: string): Promise<string | null> {
-  const { userId } = await auth()
-  if (!userId) return null
-  try {
-    const client = await clerkClient()
-    const user = await client.users.getUser(userId)
-    const profId = (user.publicMetadata as { professionalId?: string } | undefined)?.professionalId
-    if (!profId) return null
-    const owned = await prisma.professional.findFirst({ where: { id: profId, tenantId } })
-    return owned?.id ?? null
-  } catch {
-    return null
-  }
+  const user = await getServerUser()
+  const profId = (user?.app_metadata as { professionalId?: string } | undefined)?.professionalId
+  if (!profId) return null
+  const owned = await prisma.professional.findFirst({ where: { id: profId, tenantId } })
+  return owned?.id ?? null
 }
 
 function shape(b: {

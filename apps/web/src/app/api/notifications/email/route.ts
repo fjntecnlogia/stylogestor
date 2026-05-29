@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 import {
   sendWelcomeEmail,
   sendTrialExpiringEmail,
@@ -7,8 +7,8 @@ import {
 } from '@/lib/resend'
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  const user = await getServerUser()
+  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const body = await req.json()
   const { type, to, data } = body

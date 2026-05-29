@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useUser } from '@/lib/use-user'
 import { useToast } from '@/components/ui/toast'
 import { useTenantPersistedState } from '@/lib/tenant-storage'
 import { getInitialProfessionals, type ProfessionalFixture } from '../../components/profissionais/__fixtures__/professionals'
@@ -22,7 +22,7 @@ const ESPECIALIDADES_SUGESTOES = [
 
 export function PerfilProfissionalView() {
   const { user } = useUser()
-  const professionalId = (user?.publicMetadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
+  const professionalId = (user?.app_metadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
 
   // Dados base do profissional (vêm do gestor — só leitura aqui)
   // Lê do storage compartilhado com /profissionais (preenchido no onboarding).

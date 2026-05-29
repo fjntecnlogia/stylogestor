@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useUser } from '@/lib/use-user'
 import { format, addDays, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/components/ui/toast'
@@ -21,9 +21,9 @@ type StatusKey = keyof typeof STATUS_CONFIG
 
 export function AgendaProfissionalView() {
   const { user } = useUser()
-  // ID do profissional logado vem do Clerk metadata (setado no convite).
+  // ID do profissional logado vem do app_metadata (setado no convite).
   // Fallback '1' pra testar enquanto não tem auth real configurada.
-  const professionalId = (user?.publicMetadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
+  const professionalId = (user?.app_metadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
 
   const [selectedDate, setSelectedDate] = useState(new Date())
   const { success, info } = useToast()

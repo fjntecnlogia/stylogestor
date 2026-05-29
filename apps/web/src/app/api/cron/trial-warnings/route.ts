@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@stylogestor/database'
-import { clerkClient } from '@clerk/nextjs/server'
 import { sendTrialExpiringEmail } from '@/lib/resend'
 import { log } from '@/lib/logger'
 
@@ -53,7 +52,7 @@ export async function GET(req: NextRequest) {
         name: true,
         users: {
           where: { role: 'owner' },
-          select: { user: { select: { clerkId: true } } },
+          select: { user: { select: { email: true } } },
           take: 1,
         },
       },
@@ -63,17 +62,10 @@ export async function GET(req: NextRequest) {
     let failed = 0
 
     for (const tenant of tenants) {
-      const clerkId = tenant.users[0]?.user?.clerkId
-      if (!clerkId) { failed++; continue }
+      const email = tenant.users[0]?.user?.email
+      if (!email) { failed++; continue }
 
       try {
-        const client = await clerkClient()
-        const user = await client.users.getUser(clerkId)
-        const email =
-          user.primaryEmailAddress?.emailAddress ??
-          user.emailAddresses?.[0]?.emailAddress
-        if (!email) { failed++; continue }
-
         const ok = await sendTrialExpiringEmail(email, tenant.name, window.daysLeft)
         if (ok) sent++
         else failed++

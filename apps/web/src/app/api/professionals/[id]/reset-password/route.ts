@@ -1,35 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 import { prisma } from '@stylogestor/database'
 import { getCurrentTenantId } from '@/lib/auth-tenant'
-import { log } from '@/lib/logger'
 
 /**
  * POST /api/professionals/[id]/reset-password
  *
- * Permite ao gestor redefinir a senha de um profissional (barbeiro)
- * que tem conta Clerk. Útil quando o profissional esquece a senha e
- * o gestor precisa destravar na hora — sem ter que pedir pro Clerk
- * mandar email de reset.
+ * Gestor redefine a senha de um profissional (barbeiro).
  *
- * Fluxo:
- *   1. Confirma que quem chama é o gestor logado com tenantId
- *   2. Busca o Professional no DB e valida que pertence AO MESMO tenant
- *      (segurança: gestor de uma barbearia NÃO pode resetar senha de
- *      barbeiro de outra)
- *   3. Procura o user Clerk pelo email do Professional (Clerk Backend
- *      API: getUserList com filtro emailAddress)
- *   4. Sanity check: confirma que o user tem role='barbeiro' E
- *      professionalId casando — evita resetar conta errada se 2 users
- *      tiverem o mesmo email por algum motivo
- *   5. Chama updateUser({ password }) — Clerk aplica validação de
- *     força mínima da própria org
- *
- * Loga em system_logs (level=warn) com tenantId pra audit trail —
- * importante porque é ação destrutiva (gestor toma controle da conta
- * do funcionário).
- *
- * Body: { password: string }
+ * ⚠️ Fase 3 (Clerk→Supabase): trocar a senha de OUTRO usuário exige a SERVICE
+ * ROLE do Supabase (só no backend, por decisão). Então o reset real vira um
+ * endpoint NestJS (TODO: POST /professionals/:id/reset-password →
+ * `auth.admin.updateUserById(barbeiroId, { password })`). Aqui validamos tudo
+ * que o web consegue (caller é gestor, profissional é do tenant, senha válida)
+ * e retornamos 501 enquanto o endpoint não existe.
  */
 export async function POST(
   req: NextRequest,
@@ -37,10 +21,11 @@ export async function POST(
 ) {
   try {
     // 1) Auth do gestor
-    const { userId, sessionClaims } = await auth()
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
-    const callerRole = (sessionClaims?.metadata as Record<string, string> | undefined)?.role
-    if (callerRole && callerRole !== 'gestor') {
+    const user = await getServerUser()
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    // Backend grava role='owner' pro gestor; só 'barbeiro' é restrito.
+    const callerRole = (user.app_metadata as { role?: string } | undefined)?.role
+    if (callerRole === 'barbeiro') {
       return NextResponse.json({ error: 'Apenas gestores podem trocar senhas' }, { status: 403 })
     }
 
@@ -73,48 +58,20 @@ export async function POST(
       )
     }
 
-    // 4) Encontra o user Clerk
-    const client = await clerkClient()
-    const userList = await client.users.getUserList({ emailAddress: [prof.email] })
-    const candidates = userList.data ?? []
-    if (candidates.length === 0) {
-      return NextResponse.json(
-        { error: 'Nenhuma conta encontrada com esse email. O profissional já aceitou o convite?' },
-        { status: 404 },
-      )
-    }
-
-    // 5) Sanity check: escolhe o user cujo publicMetadata.professionalId casa
-    // (proteção pra casos raros onde múltiplos users compartilham email)
-    const matched =
-      candidates.find((u) => {
-        const meta = u.publicMetadata as { professionalId?: string } | undefined
-        return meta?.professionalId === prof.id
-      }) ?? candidates[0]
-
-    // 6) Aplica a nova senha
-    await client.users.updateUser(matched.id, { password })
-
-    void log.warn(
-      'api/professionals/reset-password',
-      `Gestor redefiniu senha do profissional ${prof.name}`,
+    // 4) Reset real da senha → backend (service role).
+    return NextResponse.json(
       {
-        professionalId: prof.id,
-        professionalEmail: prof.email,
-        clerkUserId: matched.id,
-        callerClerkId: userId,
+        error:
+          'Redefinição de senha de profissional está sendo migrada para o novo ' +
+          'sistema de login. Em breve. Por enquanto, o profissional pode usar ' +
+          '"Esqueci minha senha" na tela de login.',
+        pending: 'backend-endpoint',
       },
-      tenantId,
+      { status: 501 },
     )
-
-    return NextResponse.json({ ok: true, professionalId: prof.id })
   } catch (err) {
     console.error('[PROFESSIONAL_RESET_PASSWORD_ERROR]', err)
-    // Clerk costuma retornar erro 422 com mensagem útil quando a senha
-    // é fraca, repete a anterior, ou viola política da org. Repassa.
     const message = err instanceof Error ? err.message : 'Erro ao trocar senha'
-    const clerkErrors = (err as { errors?: Array<{ longMessage?: string; message?: string }> })?.errors
-    const friendly = clerkErrors?.[0]?.longMessage || clerkErrors?.[0]?.message || message
-    return NextResponse.json({ error: friendly }, { status: 400 })
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 }

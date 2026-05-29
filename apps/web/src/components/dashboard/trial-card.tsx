@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/components/ui/toast'
-import { useUser } from '@clerk/nextjs'
+import { useUser, refreshUser } from '@/lib/use-user'
 
 interface TrialStatus {
   status: 'trial' | 'active' | 'expired' | 'canceled' | 'unknown'
@@ -61,7 +61,7 @@ export function TrialCard() {
       setCode('')
       setShowCodeInput(false)
       fetchStatus() // re-busca status atualizado
-      try { await user?.reload() } catch { /* não-bloqueante */ }
+      try { await refreshUser() } catch { /* não-bloqueante */ }
     } catch (err) {
       error('Erro de conexão')
       console.error(err)

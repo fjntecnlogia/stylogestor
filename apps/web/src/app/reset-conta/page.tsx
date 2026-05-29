@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useUser, useClerk } from '@clerk/nextjs'
+import { useUser, signOut } from '@/lib/use-user'
 import { useRouter } from 'next/navigation'
 
 /**
@@ -25,7 +25,6 @@ import { useRouter } from 'next/navigation'
  */
 export default function ResetContaPage() {
   const { user } = useUser()
-  const { signOut } = useClerk()
   const router = useRouter()
   const [step, setStep] = useState<'idle' | 'resetting' | 'cleaning' | 'signing-out' | 'done' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState<string>('')
@@ -81,7 +80,7 @@ export default function ResetContaPage() {
           <div className="bg-[#F8F6F2] rounded-xl p-3 text-xs text-[#4A4A5A] space-y-0.5">
             <p>Conta logada:</p>
             <p className="font-mono text-[#1C1C2E] break-all">
-              {user.primaryEmailAddress?.emailAddress || user.id}
+              {user.email || user.id}
             </p>
           </div>
         )}

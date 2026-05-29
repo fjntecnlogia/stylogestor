@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useState } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useUser, refreshUser } from '@/lib/use-user'
 
 interface Step {
   /** seletor CSS do elemento a destacar — usa data-tour="<key>" */
@@ -70,7 +70,7 @@ export function DashboardTour() {
   // Decide se deve abrir o tour
   useEffect(() => {
     if (!isLoaded || !user) return
-    const completed = (user.publicMetadata as { tourCompleted?: boolean })?.tourCompleted
+    const completed = (user.app_metadata as { tourCompleted?: boolean })?.tourCompleted
     if (!completed) {
       // Pequeno delay pra dashboard renderizar antes
       const t = setTimeout(() => setActive(true), 600)
@@ -125,8 +125,8 @@ export function DashboardTour() {
     setActive(false)
     try {
       await fetch('/api/me/tour-completed', { method: 'POST' })
-      // Refresca o user pra ter publicMetadata atualizado em memória
-      await user?.reload?.()
+      // Refresca a sessão pra ter o app_metadata atualizado no JWT
+      await refreshUser()
     } catch (err) {
       // Não bloqueia: usuário vai ver o tour de novo no próximo F5, paciência.
       console.error('[tour] falha ao salvar tourCompleted', err)

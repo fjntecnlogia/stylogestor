@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 import { prisma, getSetting, SETTING_KEYS } from '@stylogestor/database'
 import { sendWelcomeEmail } from '@/lib/resend'
 import { sendWhatsApp, msgWelcomeGestor } from '@/lib/whatsapp'
@@ -7,8 +7,8 @@ import { sendWhatsApp, msgWelcomeGestor } from '@/lib/whatsapp'
 // POST /api/tenants — criar tenant no onboarding
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth()
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    const authUser = await getServerUser()
+    if (!authUser) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
     const body = await req.json()
     const { name, type, phone, city, plan, schedules, professionals, services } = body
@@ -50,21 +50,21 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Vincular usuário ao tenant
-    await prisma.user.upsert({
-      where: { clerkId: userId },
-      create: { clerkId: userId, email: `${userId}@clerk.temp`, name: name },
+    // Vincular usuário (Supabase) ao tenant
+    const dbUser = await prisma.user.upsert({
+      where: { supabaseId: authUser.id },
+      create: {
+        supabaseId: authUser.id,
+        email: authUser.email ?? `${authUser.id}@user.temp`,
+        name,
+      },
       update: {},
     })
-
-    const user = await prisma.user.findUnique({ where: { clerkId: userId } })
-    if (user) {
-      await prisma.tenantUser.upsert({
-        where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } },
-        create: { tenantId: tenant.id, userId: user.id, role: 'owner' },
-        update: {},
-      })
-    }
+    await prisma.tenantUser.upsert({
+      where: { tenantId_userId: { tenantId: tenant.id, userId: dbUser.id } },
+      create: { tenantId: tenant.id, userId: dbUser.id, role: 'owner' },
+      update: {},
+    })
 
     // Criar horários padrão
     if (schedules?.length) {
@@ -121,32 +121,16 @@ export async function POST(req: NextRequest) {
       update: {},
     })
 
-    // Persiste no publicMetadata do Clerk user:
-    //   - tenantSlug + tenantName: usados pelo frontend pra mostrar nome da
-    //     barbearia no header e pra scoped localStorage
-    //   - role 'gestor': lido pelo middleware (barbeiros recebem via invite)
-    let userEmail: string | null = null
-    try {
-      const client = await clerkClient()
-      const existing = await client.users.getUser(userId)
-      const existingMetadata = (existing.publicMetadata as Record<string, unknown>) ?? {}
-      userEmail =
-        existing.primaryEmailAddress?.emailAddress ??
-        existing.emailAddresses?.[0]?.emailAddress ??
-        null
-      await client.users.updateUserMetadata(userId, {
-        publicMetadata: {
-          ...existingMetadata,
-          tenantSlug: slug,
-          tenantName: name,
-          role: existingMetadata.role ?? 'gestor',
-        },
-      })
-    } catch (metaErr) {
-      console.error('[TENANT_SET_METADATA_ERROR]', metaErr)
-      // Não bloqueia: tenant foi criado, só o metadata falhou.
-      // Usuário pode setar manualmente no Clerk depois se necessário.
-    }
+    // app_metadata (tenantSlug/tenantName/role/subscriptionStatus) é setado
+    // pelo BACKEND (service role) — ver docs/BACKEND_FASE3_APP_METADATA.md.
+    // O web não tem service role (decisão Fase 3). Enquanto o backend não
+    // popular: o middleware trata role indefinido como 'gestor' e sem
+    // subscriptionStatus como não-bloqueado, e o auth-tenant resolve o tenant
+    // por supabaseId/email — então o onboarding funciona. O client chama
+    // refreshUser() após o POST; quando o backend setar o metadata, o slug
+    // aparece no JWT (necessário só pro localStorage scoped por tenant).
+    // TODO(backend): POST /tenants do NestJS deve setar app_metadata do criador.
+    const userEmail: string | null = authUser.email ?? null
 
     // Email de boas-vindas — disparo non-blocking (não falha o POST
     // se o Resend tiver fora do ar / API key não setada).
@@ -189,10 +173,10 @@ export async function POST(req: NextRequest) {
 }
 
 // GET /api/tenants — listar tenants (para admin)
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const { userId } = await auth()
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    const authUser = await getServerUser()
+    if (!authUser) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
     const tenants = await prisma.tenant.findMany({
       include: {

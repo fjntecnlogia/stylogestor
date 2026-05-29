@@ -1,6 +1,6 @@
 'use client'
 
-import { useUser } from '@clerk/nextjs'
+import { useUser } from '@/lib/use-user'
 import { useState } from 'react'
 
 export default function AfiliadosPage() {

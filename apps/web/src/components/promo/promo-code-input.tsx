@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useUser, refreshUser } from '@/lib/use-user'
 import { useToast } from '@/components/ui/toast'
 
 interface Props {
@@ -51,8 +51,8 @@ export function PromoCodeInput({
       }
       success(`Código ${data.code} aplicado! +${data.trialDaysAdded} dias de trial 🎉`)
       setCode('')
-      // Recarrega user pra atualizar publicMetadata.subscriptionStatus (se mudou)
-      try { await user?.reload() } catch { /* não-bloqueante */ }
+      // Renova sessão pra atualizar app_metadata.subscriptionStatus (se mudou)
+      try { await refreshUser() } catch { /* não-bloqueante */ }
       onRedeem?.(data)
     } catch (err) {
       error('Erro de conexão. Tente novamente.')

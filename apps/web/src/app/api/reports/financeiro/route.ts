@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/auth-tenant'
 import { prisma } from '@stylogestor/database'
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId } = await auth()
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    const user = await getServerUser()
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-    // Buscar tenant do usuário
-    const tenantUser = await prisma.tenantUser.findFirst({
-      where: { user: { clerkId: userId }, active: true },
-      include: { tenant: true },
-    })
-    if (!tenantUser) return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
-
-    const tenantId = tenantUser.tenantId
+    const tenantId = await getCurrentTenantId()
+    if (!tenantId) return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
     const { searchParams } = new URL(req.url)
     const periodo = searchParams.get('periodo') || 'mes' // hoje | semana | mes | ano
 

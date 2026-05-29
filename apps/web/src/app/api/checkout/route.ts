@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 import { getStripe, PLANS } from '@/lib/stripe'
 
 /**
@@ -22,8 +22,8 @@ import { getStripe, PLANS } from '@/lib/stripe'
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth()
-    if (!userId) {
+    const user = await getServerUser()
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
@@ -34,11 +34,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Plano não encontrado' }, { status: 404 })
     }
 
-    const user = await currentUser()
-    const email =
-      user?.primaryEmailAddress?.emailAddress ??
-      user?.emailAddresses?.[0]?.emailAddress ??
-      undefined
+    const email = user.email ?? undefined
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.stylogestor.com.br'
     const isAnual = ciclo === 'anual'
@@ -69,10 +65,10 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      metadata: { userId, planId: plan.id, ciclo },
+      metadata: { userId: user.id, planId: plan.id, ciclo },
       subscription_data: {
         trial_period_days: 14,
-        metadata: { userId, planId: plan.id },
+        metadata: { userId: user.id, planId: plan.id },
       },
       // Pré-preenche email do usuário logado
       ...(email ? { customer_email: email } : {}),

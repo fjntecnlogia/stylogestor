@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useUser } from '@clerk/nextjs'
+import { useUser, refreshUser } from '@/lib/use-user'
 import { saveToTenantStorage } from '@/lib/tenant-storage'
 
 type Step = 1 | 2 | 3 | 4
@@ -108,11 +108,11 @@ export function OnboardingFlow() {
         saveToTenantStorage('services', slug, servicesToStore)
       }
 
-      // Força refresh do JWT pra incluir o novo publicMetadata.tenantSlug
+      // Força refresh do JWT pra incluir o novo app_metadata.tenantSlug
       // (setado pela API). Sem isso, a próxima request ainda usa JWT antigo
       // sem o slug — e useTenantPersistedState retorna fallback.
       try {
-        await user?.reload()
+        await refreshUser()
       } catch {
         // Reload não-bloqueante: se falhar, o JWT atualiza no próximo refresh natural
       }

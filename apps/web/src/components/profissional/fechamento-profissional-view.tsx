@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useUser } from '@/lib/use-user'
 import { format, subDays, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/components/ui/toast'
@@ -19,7 +19,7 @@ const METHOD_COLORS: Record<string, string> = {
 
 export function FechamentoProfissionalView() {
   const { user } = useUser()
-  const professionalId = (user?.publicMetadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
+  const professionalId = (user?.app_metadata as { professionalId?: string } | undefined)?.professionalId ?? '1'
   const { success } = useToast()
 
   // Lista de profissionais compartilhada com /profissionais (gestor)

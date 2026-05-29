@@ -1,27 +1,19 @@
 import { NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 
 /**
  * POST /api/me/tour-completed
- * Marca `tourCompleted=true` no publicMetadata do usuário Clerk —
- * usado pelo <DashboardTour /> pra não rodar o passeio de novo.
+ * Marca `tourCompleted` no app_metadata (lido pelo <DashboardTour />).
+ *
+ * Fase 3: app_metadata exige service role → a escrita real é responsabilidade
+ * do BACKEND (TODO: PATCH /me/tour-completed no NestJS). Interim: retorna ok
+ * (não-bloqueante; o tour pode reaparecer numa nova sessão até o backend
+ * persistir a flag).
  */
 export async function POST() {
-  try {
-    const { userId } = await auth()
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  const user = await getServerUser()
+  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-    const client = await clerkClient()
-    const existing = await client.users.getUser(userId)
-    const existingMetadata = (existing.publicMetadata as Record<string, unknown>) ?? {}
-
-    await client.users.updateUserMetadata(userId, {
-      publicMetadata: { ...existingMetadata, tourCompleted: true },
-    })
-
-    return NextResponse.json({ ok: true })
-  } catch (error) {
-    console.error('[TOUR_COMPLETED_ERROR]', error)
-    return NextResponse.json({ error: 'Erro ao salvar status do tour' }, { status: 500 })
-  }
+  // TODO(backend): persistir app_metadata.tourCompleted=true via endpoint NestJS.
+  return NextResponse.json({ ok: true })
 }

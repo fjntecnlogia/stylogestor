@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 import { sendWhatsApp } from '@/lib/whatsapp'
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth()
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    const user = await getServerUser()
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
     const { phone, message } = await req.json()
     if (!phone || !message) return NextResponse.json({ error: 'phone e message são obrigatórios' }, { status: 400 })

@@ -1,43 +1,23 @@
 import { NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
 import { prisma } from '@stylogestor/database'
 
 /**
  * GET /api/me/debug
  *
- * Endpoint TEMPORÁRIO de diagnóstico — mostra exatamente o que
- * `getCurrentTenantId()` está vendo do user logado. Útil quando
- * aparece "Tenant não encontrado" sem motivo aparente.
- *
- * Retorna:
- *   - userId Clerk
- *   - email
- *   - sessionClaims.metadata (role + tenantSlug atuais no token)
- *   - publicMetadata fresh (vindo da API do Clerk)
- *   - tenant achado por slug (se houver)
- *   - tenantUsers no DB (TODOS — pra ver se a conta tá linkada
- *     a algum tenant via fallback)
- *
- * Acessível por qualquer gestor logado. Pode ser removido depois
- * que o problema tiver sido diagnosticado.
+ * Endpoint TEMPORÁRIO de diagnóstico — mostra o que `getCurrentTenantId()`
+ * está vendo do user Supabase logado. Útil quando aparece "Tenant não
+ * encontrado" sem motivo aparente.
  */
 export async function GET() {
-  const { userId, sessionClaims } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const user = await getServerUser()
+  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const metadata = (sessionClaims?.metadata as Record<string, string> | undefined) ?? {}
-  const tenantSlugFromToken = metadata.tenantSlug
-  const roleFromToken = metadata.role
+  const meta = (user.app_metadata ?? {}) as Record<string, unknown>
+  const tenantSlugFromToken = meta.tenantSlug as string | undefined
+  const roleFromToken = meta.role as string | undefined
 
-  // Email + publicMetadata fresh (não do token cacheado)
-  const user = await currentUser()
-  const email =
-    user?.primaryEmailAddress?.emailAddress ??
-    user?.emailAddresses?.[0]?.emailAddress ??
-    null
-  const freshMetadata = (user?.publicMetadata as Record<string, unknown> | undefined) ?? {}
-
-  // Tenant por slug do token
+  // Tenant por slug do app_metadata
   let tenantBySlug = null
   if (tenantSlugFromToken) {
     tenantBySlug = await prisma.tenant.findUnique({
@@ -46,9 +26,11 @@ export async function GET() {
     })
   }
 
-  // Fallback: TenantUsers linkados a esse clerkId
+  // Fallback: TenantUsers linkados por supabaseId OU email
   const tenantUsers = await prisma.tenantUser.findMany({
-    where: { user: { clerkId: userId } },
+    where: {
+      user: { OR: [{ supabaseId: user.id }, ...(user.email ? [{ email: user.email }] : [])] },
+    },
     select: {
       tenantId: true,
       role: true,
@@ -59,20 +41,19 @@ export async function GET() {
   })
 
   return NextResponse.json({
-    clerkUserId: userId,
-    email,
+    supabaseUserId: user.id,
+    email: user.email ?? null,
+    appMetadata: meta,
     session: {
       tenantSlug: tenantSlugFromToken ?? null,
       role: roleFromToken ?? null,
     },
-    publicMetadataFresh: freshMetadata,
     tenantBySlug,
     tenantUsersInDB: tenantUsers,
-    diagnosis:
-      tenantBySlug
-        ? '✅ Resolve via session.metadata.tenantSlug — tudo OK'
-        : tenantUsers.length > 0
-        ? '⚠️ Session sem tenantSlug, mas TenantUser existe — getCurrentTenantId vai resolver pelo fallback. Se ainda assim quebrar, problema diferente.'
-        : '❌ Nenhum tenant linkado. Conta precisa de onboarding OU TenantUser ficou órfão.',
+    diagnosis: tenantBySlug
+      ? '✅ Resolve via app_metadata.tenantSlug — tudo OK'
+      : tenantUsers.length > 0
+        ? '⚠️ app_metadata sem tenantSlug, mas TenantUser existe — getCurrentTenantId resolve pelo fallback.'
+        : '❌ Nenhum tenant linkado. Conta precisa de onboarding OU TenantUser órfão.',
   })
 }

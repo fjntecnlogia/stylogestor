@@ -1,19 +1,16 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/auth-tenant'
 import { prisma } from '@stylogestor/database'
 import { startOfTodayBR, endOfTodayBR, startOfMonthBR } from '@/lib/datetime-br'
 
 export async function GET() {
   try {
-    const { userId } = await auth()
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    const user = await getServerUser()
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-    const tenantUser = await prisma.tenantUser.findFirst({
-      where: { user: { clerkId: userId }, active: true },
-    })
-    if (!tenantUser) return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
-
-    const tenantId = tenantUser.tenantId
+    const tenantId = await getCurrentTenantId()
+    if (!tenantId) return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
     // Datas no fuso BR — sem isso o server (UTC) pegava janela errada
     // do dia. Ex: agendamento das 23h BRT (= 02h UTC do dia seguinte)
     // não aparecia no "hoje" UTC.

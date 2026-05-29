@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useUser } from '@/lib/use-user'
 import { useToast } from '@/components/ui/toast'
 import { PortalButton } from '@/components/ui/portal-button'
 import { PromoCodeInput } from '@/components/promo/promo-code-input'
@@ -269,7 +269,7 @@ export function ConfiguracoesView() {
 
   // Slug do tenant vem do Clerk publicMetadata (setado pelo webhook do Stripe no signup).
   // Se ainda não estiver disponível, mostra placeholder bem-comunicado.
-  const tenantSlug = (user?.publicMetadata as { tenantSlug?: string } | undefined)?.tenantSlug
+  const tenantSlug = (user?.app_metadata as { tenantSlug?: string } | undefined)?.tenantSlug
   const slug = tenantSlug || (isLoaded ? 'sua-barbearia' : '...')
   // Link público de agendamento. Até subdomain estar configurado por DNS,
   // usa o path /b/[slug] no domínio principal — funciona desde já.

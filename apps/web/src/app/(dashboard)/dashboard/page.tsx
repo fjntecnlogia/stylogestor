@@ -1,6 +1,7 @@
 'use client'
 
-import { useUser } from '@clerk/nextjs'
+import { useEffect, useState } from 'react'
+import { useUser } from '@/lib/use-user'
 import { StatsGrid } from '@/components/dashboard/stats-grid'
 import { AppointmentsToday } from '@/components/dashboard/appointments-today'
 import { CashflowCard } from '@/components/dashboard/cashflow-card'
@@ -11,8 +12,19 @@ import { TrialCard } from '@/components/dashboard/trial-card'
 
 export default function DashboardPage() {
   const { user } = useUser()
-  const tenantName = (user?.publicMetadata as { tenantName?: string } | undefined)?.tenantName
-  const displayName = tenantName || user?.firstName || 'Gestor'
+  const [tenantName, setTenantName] = useState('')
+
+  // Nome da barbearia vem da API (não do app_metadata) — a saudação funciona
+  // mesmo que o backend ainda não tenha populado o metadata.
+  useEffect(() => {
+    fetch('/api/me/tenant')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.name) setTenantName(d.name) })
+      .catch(() => {})
+  }, [])
+
+  const userName = (user?.user_metadata as { name?: string } | undefined)?.name
+  const displayName = tenantName || userName || 'Gestor'
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
