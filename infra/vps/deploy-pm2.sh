@@ -116,6 +116,33 @@ for app in apps/web apps/admin; do
   echo "   ✓ $ENV_FILE — NEXT_PUBLIC_USE_MOCKS=false"
 done
 
+# ─── [4.5b] Supabase no web (Fase 3 — login único Clerk→Supabase) ───
+# O web migrou pra Supabase Auth. Os clients (@supabase/ssr) leem
+# NEXT_PUBLIC_SUPABASE_URL/ANON_KEY em BUILD-time. A API já tem
+# SUPABASE_URL + SUPABASE_ANON_KEY no .env — copiamos pro web como
+# NEXT_PUBLIC_* (mesma instância = unifica identidade com o mobile).
+# Sem isso, o middleware (createServerClient com env undefined) quebra
+# TODA request. Idempotente: só adiciona se faltar.
+WEB_ENV="$APP_DIR/apps/web/.env.production.local"
+API_ENV="$APP_DIR/packages/api/.env"
+touch "$WEB_ENV"
+copy_supabase_to_web() {
+  local pub_var=$1   # nome NEXT_PUBLIC_* no web
+  local src_var=$2   # nome no .env da API
+  if ! grep -q "^${pub_var}=" "$WEB_ENV"; then
+    local value
+    value=$(grep "^${src_var}=" "$API_ENV" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    if [ -n "$value" ]; then
+      echo "${pub_var}=${value}" >> "$WEB_ENV"
+      echo "   ✓ Web recebeu ${pub_var} (de ${src_var} da API)"
+    else
+      echo "   ⚠️  ${src_var} ausente na API — web precisa setar ${pub_var} manualmente (cutover Supabase quebra sem isso)"
+    fi
+  fi
+}
+copy_supabase_to_web "NEXT_PUBLIC_SUPABASE_URL" "SUPABASE_URL"
+copy_supabase_to_web "NEXT_PUBLIC_SUPABASE_ANON_KEY" "SUPABASE_ANON_KEY"
+
 # ─── Bootstrap Clerk no admin ──────────────────────────────────────
 # O admin agora exige login Clerk + role super_admin (ou email no
 # allowlist ADMIN_EMAILS). Se as keys do Clerk ainda não estão no
