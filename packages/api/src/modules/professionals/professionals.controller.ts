@@ -6,6 +6,7 @@ import { ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { ProfessionalsService } from './professionals.service'
 import { CreateProfessionalDto } from './dto/create-professional.dto'
 import { UpdateProfessionalDto } from './dto/update-professional.dto'
+import { ResetPasswordDto } from './dto/reset-password.dto'
 import { TenantGuard } from '../../common/guards/tenant.guard'
 import { TenantThrottleGuard } from '../../common/guards/tenant-throttle.guard'
 import { TenantContextInterceptor } from '../../common/interceptors/tenant-context.interceptor'
@@ -50,5 +51,16 @@ export class ProfessionalsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string, @CurrentTenant() t: TenantPayload) {
     return this.service.remove(id, t.id)
+  }
+
+  /** Gestor redefine a senha do login (Supabase) do profissional. */
+  @Post(':id/reset-password')
+  @HttpCode(HttpStatus.OK)
+  resetPassword(
+    @Param('id') id: string,
+    @Body() dto: ResetPasswordDto,
+    @CurrentTenant() t: TenantPayload,
+  ) {
+    return this.service.resetPassword(id, t.id, dto.password)
   }
 }

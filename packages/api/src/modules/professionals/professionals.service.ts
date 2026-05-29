@@ -1,11 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { PrismaService } from '../../common/prisma/prisma.service'
+import { SupabaseMetadataService } from '../../common/auth/supabase-metadata.service'
 import { CreateProfessionalDto } from './dto/create-professional.dto'
 import { UpdateProfessionalDto } from './dto/update-professional.dto'
 
 @Injectable()
 export class ProfessionalsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private supabaseMetadata: SupabaseMetadataService,
+  ) {}
 
   /**
    * Lista profissionais do tenant. Por padrão só os ativos; `includeInactive=true`
@@ -59,5 +68,37 @@ export class ProfessionalsService {
     if (updated.count === 0) {
       throw new NotFoundException('Profissional não encontrado')
     }
+  }
+
+  /**
+   * Gestor redefine a senha do login (Supabase) de um profissional do seu tenant.
+   * Resolve o login do barbeiro pelo email do Professional (gravado no invite)
+   * → User.supabaseId → admin.setPassword. Requer service_role no runtime.
+   */
+  async resetPassword(id: string, tenantId: string, password: string) {
+    const prof = await this.prisma.professional.findFirst({
+      where: { id, tenantId },
+      select: { id: true, email: true },
+    })
+    if (!prof) throw new NotFoundException('Profissional não encontrado')
+    if (!prof.email) {
+      throw new BadRequestException(
+        'Profissional sem email — não dá pra localizar o login dele',
+      )
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { email: prof.email },
+      select: { supabaseId: true },
+    })
+    if (!user?.supabaseId) {
+      throw new NotFoundException(
+        'Login do profissional não encontrado (ainda não foi convidado?)',
+      )
+    }
+    const res = await this.supabaseMetadata.setPassword(user.supabaseId, password)
+    if (!res.ok) {
+      throw new ServiceUnavailableException('Não foi possível redefinir a senha agora')
+    }
+    return { ok: true }
   }
 }
