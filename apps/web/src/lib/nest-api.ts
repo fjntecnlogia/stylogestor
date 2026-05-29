@@ -22,8 +22,14 @@
 
 import { createClient } from './supabase/client'
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'https://api.stylogestor.com.br/api/v1'
+// NEXT_PUBLIC_API_URL é a BASE da API (sem path) — mesma convenção do
+// middleware.ts, que monta `${base}/api/v1/...`. Na VPS a env está como
+// https://api.stylogestor.com.br (SEM /api/v1), então adicionamos o prefixo
+// aqui. Sem isso as chamadas iam pra https://api.stylogestor.com.br/me/...
+// → 404 (o NestJS tem globalPrefix 'api/v1'). O endsWith torna resiliente
+// caso a env venha com o prefixo (ex.: dev local).
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://api.stylogestor.com.br').replace(/\/+$/, '')
+const API_URL = API_BASE.endsWith('/api/v1') ? API_BASE : `${API_BASE}/api/v1`
 
 export class NestApiError extends Error {
   status: number
