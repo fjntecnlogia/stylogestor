@@ -85,6 +85,7 @@ LEGACY_APPLIED_MIGRATIONS="
 20260519_add_cash_closures
 20260519_add_professional_blocks
 20260520_add_system_logs
+20260528_user_supabase_id
 "
 for mig in $LEGACY_APPLIED_MIGRATIONS; do
   if [ -n "$mig" ]; then
