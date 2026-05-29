@@ -1,4 +1,4 @@
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useCallback, useState } from 'react'
 import { format, addDays } from 'date-fns'
@@ -19,20 +19,36 @@ export default function AgendaScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedApt, setSelectedApt] = useState<string | null>(null)
   const [appointments, setAppointments] = useState<Agendamento[]>([])
+  const [refreshing, setRefreshing] = useState(false)
 
-  // Recarrega da storage toda vez que a tab ganha foco (apos novo agendamento, etc.)
-  const reload = useCallback(() => {
-    listAgendamentos().then(setAppointments)
+  // Recarrega do banco (API) toda vez que a tab ganha foco (apos novo agendamento, etc.)
+  const reload = useCallback(async () => {
+    try {
+      const data = await listAgendamentos()
+      setAppointments(data)
+    } catch {
+      // Offline ou erro de rede — mantém o que já tinha em tela.
+    }
   }, [])
   useFocusEffect(useCallback(() => { reload() }, [reload]))
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await reload()
+    setRefreshing(false)
+  }, [reload])
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i))
   const selectedDateStr = format(selectedDate, 'dd/MM')
   const dayAppointments = appointments.filter(a => a.date === selectedDateStr)
 
   const updateStatus = async (id: string, status: Agendamento['status']) => {
-    await updateAgendamentoStatus(id, status)
-    reload()
+    try {
+      await updateAgendamentoStatus(id, status)
+      await reload()
+    } catch (err) {
+      Alert.alert('Erro', err instanceof Error ? err.message : 'Não foi possível atualizar o agendamento.')
+    }
   }
   const confirmCancel = (id: string, client: string) => {
     Alert.alert(`Cancelar agendamento de ${client}?`, 'Esta ação não pode ser desfeita.', [
@@ -86,7 +102,11 @@ export default function AgendaScreen() {
       </View>
 
       {/* Lista */}
-      <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={s.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1A3A6B" />}
+      >
         {dayAppointments.length === 0 ? (
           <View style={s.empty}>
             <Text style={s.emptyEmoji}>📭</Text>

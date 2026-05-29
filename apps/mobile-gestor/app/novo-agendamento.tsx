@@ -78,27 +78,37 @@ export default function NovoAgendamentoScreen() {
     setStep('servicos')
   }
 
+  const [saving, setSaving] = useState(false)
+
   const handleConfirmar = async () => {
     if (!clientePicked || !profissionalPicked || !selectedDay || !selectedSlot || servicosPicked.length === 0) {
       Alert.alert('Atenção', 'Algum dado está faltando.')
       return
     }
-    await addAgendamento({
-      date: format(selectedDay, 'dd/MM'),
-      time: selectedSlot,
-      clienteId: clientePicked.id,
-      clienteNome: clientePicked.name,
-      servicoIds: servicosPicked.map((s) => s.id),
-      servicoNomes: servicosPicked.map((s) => s.nome).join(' + '),
-      profissionalId: profissionalPicked.id,
-      profissionalNome: profissionalPicked.nome,
-      price: total,
-      duration: duracao,
-      observacao: observacao.trim() || undefined,
-    })
-    Alert.alert('Agendado com sucesso!', `${clientePicked.name} · ${format(selectedDay, "EEEE, d 'de' MMMM", { locale: ptBR })} às ${selectedSlot}`, [
-      { text: 'OK', onPress: () => router.replace('/(tabs)/agenda') },
-    ])
+    if (saving) return
+    setSaving(true)
+    try {
+      // Grava no banco via API (aparece no web e em outros aparelhos).
+      await addAgendamento({
+        dateObj: selectedDay,
+        time: selectedSlot,
+        clienteId: clientePicked.id,
+        servicoIds: servicosPicked.map((s) => s.id),
+        profissionalId: profissionalPicked.id,
+        price: total,
+        duration: duracao,
+        observacao: observacao.trim() || undefined,
+      })
+      Alert.alert('Agendado com sucesso!', `${clientePicked.name} · ${format(selectedDay, "EEEE, d 'de' MMMM", { locale: ptBR })} às ${selectedSlot}`, [
+        { text: 'OK', onPress: () => router.replace('/(tabs)/agenda') },
+      ])
+    } catch (err) {
+      // A API valida conflito de horário, serviços do tenant, etc — repassa a msg.
+      const msg = err instanceof Error ? err.message : 'Não foi possível agendar. Tente de novo.'
+      Alert.alert('Não foi possível agendar', msg)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const clientesFiltered = busca
@@ -357,8 +367,12 @@ export default function NovoAgendamentoScreen() {
                 multiline
               />
 
-              <TouchableOpacity style={[s.nextBtnFull, { backgroundColor: '#1B8A5A' }]} onPress={handleConfirmar}>
-                <Text style={s.nextBtnText}>✓ Confirmar agendamento</Text>
+              <TouchableOpacity
+                style={[s.nextBtnFull, { backgroundColor: '#1B8A5A' }, saving && { opacity: 0.6 }]}
+                onPress={handleConfirmar}
+                disabled={saving}
+              >
+                <Text style={s.nextBtnText}>{saving ? 'Agendando...' : '✓ Confirmar agendamento'}</Text>
               </TouchableOpacity>
             </View>
           )}
