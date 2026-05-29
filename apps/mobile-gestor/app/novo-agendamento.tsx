@@ -7,12 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { addDays, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { loadArray } from '../lib/storage'
 import { listClientes, addCliente, type Cliente } from '../lib/clientes'
+import { listServicos, type Servico } from '../lib/servicos'
+import { listProfissionais, type Profissional } from '../lib/profissionais'
 import { addAgendamento } from '../lib/agendamentos'
-
-type Servico = { id: string; nome: string; duracao: number; preco: number; categoria: string; ativo: boolean }
-type Profissional = { id: string; nome: string; role: string; telefone: string; comissaoPct: number; ativo: boolean }
 
 type Step = 'cliente' | 'servicos' | 'profissional' | 'datetime' | 'confirm'
 
@@ -53,9 +51,9 @@ export default function NovoAgendamentoScreen() {
   const [observacao, setObservacao] = useState('')
 
   useFocusEffect(useCallback(() => {
-    listClientes().then(setClientes)
-    loadArray<Servico>('servicos_v1').then((list) => setServicos(list.filter((sv) => sv.ativo)))
-    loadArray<Profissional>('profissionais_v1').then((list) => setProfissionais(list.filter((p) => p.ativo)))
+    listClientes().then(setClientes).catch(() => {})
+    listServicos().then(setServicos).catch(() => {})
+    listProfissionais().then(setProfissionais).catch(() => {})
   }, []))
 
   // Derived totals

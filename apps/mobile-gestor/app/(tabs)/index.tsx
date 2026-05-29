@@ -105,7 +105,7 @@ export default function DashboardScreen() {
 
         {/* Agendamentos de hoje */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Agendamentos de hoje</Text>
+          <Text style={s.sectionTitleLight}>Agendamentos de hoje</Text>
           {agsHoje.length === 0 ? (
             <View style={s.empty}>
               <Text style={s.emptyEmoji}>📭</Text>
@@ -197,6 +197,8 @@ const s = StyleSheet.create({
   ctaText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   section: { marginTop: 20 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 10 },
+  // Título sobre o fundo azul do dashboard (precisa ser claro pra ter contraste).
+  sectionTitleLight: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 10 },
   aptCard: {
     backgroundColor: '#fff', borderRadius: 14, padding: 12, marginBottom: 8,
     flexDirection: 'row', alignItems: 'center', gap: 12,

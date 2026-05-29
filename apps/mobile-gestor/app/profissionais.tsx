@@ -1,29 +1,16 @@
 import { useCallback, useState } from 'react'
 import {
   ScrollView, View, Text, StyleSheet, TextInput, TouchableOpacity,
-  Alert, Modal, KeyboardAvoidingView, Platform, Switch,
+  Alert, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router'
-import { loadArray, saveArray, newId } from '../lib/storage'
-
-type Profissional = {
-  id: string
-  nome: string
-  role: string
-  telefone: string
-  comissaoPct: number
-  ativo: boolean
-}
-
-const KEY = 'profissionais_v1'
+import {
+  listProfissionais, addProfissional, updateProfissional, removeProfissional,
+  type Profissional,
+} from '../lib/profissionais'
 
 const ROLES = ['Barbeiro', 'Cabeleireiro', 'Manicure', 'Esteticista', 'Outro']
-
-const SEED: Profissional[] = [
-  { id: 'pr_1', nome: 'João Silva',  role: 'Barbeiro',     telefone: '(11) 98765-4321', comissaoPct: 50, ativo: true },
-  { id: 'pr_2', nome: 'Pedro Costa', role: 'Cabeleireiro', telefone: '(11) 98765-4322', comissaoPct: 45, ativo: true },
-]
 
 function maskPhone(value: string): string {
   let digits = value.replace(/\D/g, '')
@@ -50,12 +37,11 @@ export default function ProfissionaisScreen() {
   })
 
   const load = useCallback(async () => {
-    let list = await loadArray<Profissional>(KEY)
-    if (list.length === 0) {
-      list = SEED
-      await saveArray(KEY, list)
+    try {
+      setProfs(await listProfissionais())
+    } catch (e) {
+      Alert.alert('Erro', e instanceof Error ? e.message : 'Falha ao carregar profissionais.')
     }
-    setProfs(list)
   }, [])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
@@ -77,21 +63,17 @@ export default function ProfissionaisScreen() {
       Alert.alert('Atenção', 'Nome é obrigatório.')
       return
     }
-    let updated: Profissional[]
-    if (editing) {
-      updated = profs.map((p) => (p.id === editing.id ? { ...p, ...form } : p))
-    } else {
-      updated = [{ id: newId('pr'), ...form, ativo: true }, ...profs]
+    try {
+      if (editing) {
+        await updateProfissional(editing.id, form)
+      } else {
+        await addProfissional(form)
+      }
+      setModalOpen(false)
+      await load()
+    } catch (e) {
+      Alert.alert('Erro', e instanceof Error ? e.message : 'Não foi possível salvar o profissional.')
     }
-    await saveArray(KEY, updated)
-    setProfs(updated)
-    setModalOpen(false)
-  }
-
-  const handleToggleAtivo = async (p: Profissional) => {
-    const updated = profs.map((x) => (x.id === p.id ? { ...x, ativo: !x.ativo } : x))
-    await saveArray(KEY, updated)
-    setProfs(updated)
   }
 
   const handleDelete = (p: Profissional) => {
@@ -101,9 +83,12 @@ export default function ProfissionaisScreen() {
         text: 'Remover',
         style: 'destructive',
         onPress: async () => {
-          const updated = profs.filter((x) => x.id !== p.id)
-          await saveArray(KEY, updated)
-          setProfs(updated)
+          try {
+            await removeProfissional(p.id)
+            await load()
+          } catch (e) {
+            Alert.alert('Erro', e instanceof Error ? e.message : 'Não foi possível remover.')
+          }
         },
       },
     ])
@@ -149,15 +134,9 @@ export default function ProfissionaisScreen() {
                 <Text style={s.commissionValue}>{p.comissaoPct}%</Text>
               </View>
             </TouchableOpacity>
-            <View style={s.cardActions}>
-              <Switch
-                value={p.ativo}
-                onValueChange={() => handleToggleAtivo(p)}
-                trackColor={{ false: '#E5E7EB', true: '#1A3A6B' }}
-                thumbColor={p.ativo ? '#F5A623' : '#fff'}
-              />
+            <View style={[s.cardActions, { justifyContent: 'flex-end' }]}>
               <TouchableOpacity onPress={() => handleDelete(p)}>
-                <Text style={s.deleteText}>🗑️</Text>
+                <Text style={s.deleteText}>🗑️ Remover</Text>
               </TouchableOpacity>
             </View>
           </View>

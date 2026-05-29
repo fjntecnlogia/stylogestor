@@ -72,8 +72,15 @@ export default function FinanceiroScreen() {
         text: 'Excluir',
         style: 'destructive',
         onPress: async () => {
-          await deleteLancamento(l.id)
-          reload()
+          try {
+            await deleteLancamento(l.id)
+            reload()
+          } catch (err) {
+            Alert.alert(
+              'Não foi possível excluir',
+              err instanceof Error ? err.message : 'Tente novamente mais tarde.',
+            )
+          }
         },
       },
     ])

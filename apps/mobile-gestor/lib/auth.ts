@@ -9,6 +9,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { createElement } from 'react'
 import type { Session, User, AuthError } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { clearActiveTenant } from './tenant'
 
 type AuthState = {
   session: Session | null
@@ -53,6 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoaded,
     isSignedIn: !!session,
     signOut: async () => {
+      // Limpa a barbearia ativa (slug em memória + SecureStore) ANTES de
+      // deslogar, pra não vazar tenant pro próximo usuário que logar no device.
+      try {
+        await clearActiveTenant()
+      } catch (err) {
+        console.warn('[auth] falha ao limpar tenant no logout:', err)
+      }
       const { error } = await supabase.auth.signOut()
       return { error }
     },

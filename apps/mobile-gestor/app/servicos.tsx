@@ -1,31 +1,16 @@
 import { useCallback, useState } from 'react'
 import {
   ScrollView, View, Text, StyleSheet, TextInput, TouchableOpacity,
-  Alert, Modal, KeyboardAvoidingView, Platform, Switch,
+  Alert, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router'
-import { loadArray, saveArray, newId } from '../lib/storage'
-
-type Servico = {
-  id: string
-  nome: string
-  duracao: number
-  preco: number
-  categoria: string
-  ativo: boolean
-}
-
-const KEY = 'servicos_v1'
+import {
+  listServicos, addServico, updateServico, removeServico,
+  type Servico,
+} from '../lib/servicos'
 
 const CATEGORIAS = ['Corte', 'Barba', 'Combo', 'Pigmentação', 'Sobrancelha', 'Outros']
-
-const SEED: Servico[] = [
-  { id: 'sv_1', nome: 'Corte masculino',  duracao: 30, preco: 40, categoria: 'Corte', ativo: true },
-  { id: 'sv_2', nome: 'Barba',            duracao: 30, preco: 30, categoria: 'Barba', ativo: true },
-  { id: 'sv_3', nome: 'Corte + Barba',    duracao: 45, preco: 60, categoria: 'Combo', ativo: true },
-  { id: 'sv_4', nome: 'Pigmentação',      duracao: 60, preco: 80, categoria: 'Pigmentação', ativo: true },
-]
 
 export default function ServicosScreen() {
   const router = useRouter()
@@ -39,13 +24,11 @@ export default function ServicosScreen() {
   })
 
   const load = useCallback(async () => {
-    let list = await loadArray<Servico>(KEY)
-    if (list.length === 0) {
-      // Primeira execucao: popula com seed pra usuario nao ver tela vazia
-      list = SEED
-      await saveArray(KEY, list)
+    try {
+      setServicos(await listServicos())
+    } catch (e) {
+      Alert.alert('Erro', e instanceof Error ? e.message : 'Falha ao carregar serviços.')
     }
-    setServicos(list)
   }, [])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
@@ -76,21 +59,18 @@ export default function ServicosScreen() {
       return
     }
 
-    let updated: Servico[]
-    if (editing) {
-      updated = servicos.map((s) => (s.id === editing.id ? { ...s, ...form } : s))
-    } else {
-      updated = [{ id: newId('sv'), ...form, ativo: true }, ...servicos]
+    try {
+      const { nome, duracao, preco, categoria } = form
+      if (editing) {
+        await updateServico(editing.id, { nome, duracao, preco, categoria })
+      } else {
+        await addServico({ nome, duracao, preco, categoria })
+      }
+      setModalOpen(false)
+      await load()
+    } catch (e) {
+      Alert.alert('Erro', e instanceof Error ? e.message : 'Não foi possível salvar o serviço.')
     }
-    await saveArray(KEY, updated)
-    setServicos(updated)
-    setModalOpen(false)
-  }
-
-  const handleToggleAtivo = async (sv: Servico) => {
-    const updated = servicos.map((s) => (s.id === sv.id ? { ...s, ativo: !s.ativo } : s))
-    await saveArray(KEY, updated)
-    setServicos(updated)
   }
 
   const handleDelete = (sv: Servico) => {
@@ -100,9 +80,12 @@ export default function ServicosScreen() {
         text: 'Remover',
         style: 'destructive',
         onPress: async () => {
-          const updated = servicos.filter((s) => s.id !== sv.id)
-          await saveArray(KEY, updated)
-          setServicos(updated)
+          try {
+            await removeServico(sv.id)
+            await load()
+          } catch (e) {
+            Alert.alert('Erro', e instanceof Error ? e.message : 'Não foi possível remover.')
+          }
         },
       },
     ])
@@ -143,15 +126,9 @@ export default function ServicosScreen() {
               </View>
               <Text style={s.cardPrice}>R$ {sv.preco}</Text>
             </TouchableOpacity>
-            <View style={s.cardActions}>
-              <Switch
-                value={sv.ativo}
-                onValueChange={() => handleToggleAtivo(sv)}
-                trackColor={{ false: '#E5E7EB', true: '#1A3A6B' }}
-                thumbColor={sv.ativo ? '#F5A623' : '#fff'}
-              />
+            <View style={[s.cardActions, { justifyContent: 'flex-end' }]}>
               <TouchableOpacity onPress={() => handleDelete(sv)}>
-                <Text style={s.deleteText}>🗑️</Text>
+                <Text style={s.deleteText}>🗑️ Remover</Text>
               </TouchableOpacity>
             </View>
           </View>

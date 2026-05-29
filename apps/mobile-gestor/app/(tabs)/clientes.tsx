@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity,
-  Alert, Linking, Modal, KeyboardAvoidingView, Platform,
+  Alert, Linking, Modal, KeyboardAvoidingView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useCallback, useState } from 'react'
@@ -175,7 +175,7 @@ export default function ClientesScreen() {
       <Modal visible={showNew} animationType="slide" transparent onRequestClose={() => setShowNew(false)}>
         <KeyboardAvoidingView
           style={s.modalBackdrop}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
         >
           <View style={s.modalSheet}>
             <View style={s.modalHandle} />

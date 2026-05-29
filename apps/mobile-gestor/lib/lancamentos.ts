@@ -1,11 +1,14 @@
-// CRUD local de lançamentos financeiros (entradas/saídas).
-// Usado em (tabs)/financeiro.tsx e novo-lancamento.tsx.
+// Lançamentos financeiros (entradas/saídas) — agora servidos pela API NestJS.
 //
-// Lançamentos "auto" (vindo de agendamento concluído) podem ser inseridos via
-// addLancamentoFromAgendamento — útil pra futuro quando concluir agendamento
-// gerar entrada automatica.
+// Fase 1 da unificação (docs/MOBILE_FASE1_HANDOFF.md): o miolo migrou de
+// SecureStore para `financialApi`. Assinaturas mantidas pra não mexer nas telas
+// (financeiro.tsx, novo-lancamento.tsx, (tabs)/index.tsx).
+//
+// Adaptadores de formato local <-> API:
+//   tipo:   'IN'/'OUT'  <->  'INCOME'/'EXPENSE'
+//   método: 'PIX'/'Dinheiro'/'Cartão'/'Outro'  <->  'PIX'/'CASH'/'CREDIT_CARD'/...
 
-import { loadArray, saveArray, newId } from './storage'
+import { financialApi, ApiError, type CreateTransactionInput, type PaymentMethod } from './api'
 
 export type MetodoPagamento = 'PIX' | 'Dinheiro' | 'Cartão' | 'Outro'
 
@@ -21,28 +24,65 @@ export type Lancamento = {
   createdAt: string           // ISO
 }
 
-const KEY = 'lancamentos_v1'
+const metodoParaApi: Record<MetodoPagamento, PaymentMethod> = {
+  PIX: 'PIX',
+  Dinheiro: 'CASH',
+  Cartão: 'CREDIT_CARD',
+  Outro: 'OTHER',
+}
+
+const metodoDaApi: Record<string, MetodoPagamento> = {
+  PIX: 'PIX',
+  CASH: 'Dinheiro',
+  CREDIT_CARD: 'Cartão',
+  DEBIT_CARD: 'Cartão',
+  TRANSFER: 'Outro',
+  OTHER: 'Outro',
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fromApi(t: any): Lancamento {
+  const d = new Date(t.date ?? t.createdAt ?? Date.now())
+  return {
+    id: String(t.id),
+    type: t.type === 'INCOME' ? 'IN' : 'OUT',
+    desc: t.description ?? '',
+    method: metodoDaApi[t.paymentMethod] ?? 'Outro',
+    amount: Number(t.amount ?? 0),
+    date: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+    time: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    createdAt: t.createdAt ?? d.toISOString(),
+  }
+}
 
 export async function listLancamentos(): Promise<Lancamento[]> {
-  return loadArray<Lancamento>(KEY)
+  // Janela do mês corrente (a tela já filtra "hoje" por cima disso).
+  const hoje = new Date()
+  const ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString()
+  const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59).toISOString()
+  const txs = await financialApi.transactions(ini, fim)
+  return txs.map(fromApi)
 }
 
 export async function addLancamento(
   l: Omit<Lancamento, 'id' | 'createdAt'>,
 ): Promise<Lancamento> {
-  const list = await listLancamentos()
-  const novo: Lancamento = {
-    ...l,
-    id: newId('lc'),
-    createdAt: new Date().toISOString(),
+  const input: CreateTransactionInput = {
+    type: l.type === 'IN' ? 'INCOME' : 'EXPENSE',
+    category: 'geral',
+    description: l.desc,
+    amount: l.amount,
+    date: new Date().toISOString(),
+    paymentMethod: metodoParaApi[l.method],
   }
-  await saveArray(KEY, [novo, ...list])
-  return novo
+  return fromApi(await financialApi.createTransaction(input))
 }
 
-export async function deleteLancamento(id: string): Promise<void> {
-  const list = await listLancamentos()
-  await saveArray(KEY, list.filter((l) => l.id !== id))
+export async function deleteLancamento(_id: string): Promise<void> {
+  // A API ainda não expõe DELETE /financial/transactions/:id (ver handoff §6).
+  // Lançamos um ApiError tratado na tela (financeiro.tsx) pra dar feedback
+  // honesto em vez de fingir que excluiu.
+  throw new ApiError(501, 'Exclusão de lançamentos ainda não está disponível no app.')
 }
 
 // Soma entradas/saídas filtrando por data (dd/MM). Se data omitida, soma tudo.
