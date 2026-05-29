@@ -47,6 +47,19 @@ export class TenantsController {
     return this.tenantsService.createForUser(user.id, dto)
   }
 
+  /**
+   * (Re)sincroniza os claims do usuário no app_metadata do Supabase
+   * (role/subscriptionStatus/tenantSlug/tenantName). SEM TenantGuard — resolve
+   * o tenant ativo sozinho. O web chama no pós-onboarding e no login (e depois
+   * dá refresh na sessão pro JWT carregar os claims novos).
+   */
+  @ApiBearerAuth()
+  @Post('me/sync-claims')
+  async syncClaims(@CurrentUser() user: AuthUser) {
+    const claims = await this.tenantsService.syncClaimsForUser(user.id)
+    return { synced: claims !== null, claims }
+  }
+
   @ApiBearerAuth()
   @UseGuards(TenantGuard, TenantThrottleGuard)
   @UseInterceptors(TenantContextInterceptor)

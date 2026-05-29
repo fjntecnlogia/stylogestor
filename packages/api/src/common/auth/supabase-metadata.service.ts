@@ -5,8 +5,12 @@ export interface SupabaseAppMetadata {
   role?: string
   subscriptionStatus?: string
   tenantSlug?: string
+  tenantName?: string
   plan?: string
   stripeSubId?: string
+  // Painéis do barbeiro (setados pelo futuro endpoint de invite, com role:'barbeiro').
+  professionalId?: string
+  professionalName?: string
 }
 
 /**

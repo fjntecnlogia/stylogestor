@@ -2,7 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { PlanType } from '@prisma/client'
 import { CacheService } from '../../common/cache/cache.service'
 import { PrismaService } from '../../common/prisma/prisma.service'
-import { SupabaseMetadataService } from '../../common/auth/supabase-metadata.service'
+import {
+  SupabaseAppMetadata,
+  SupabaseMetadataService,
+} from '../../common/auth/supabase-metadata.service'
 import { UpdateTenantDto } from './dto/update-tenant.dto'
 import { CreateTenantDto } from './dto/create-tenant.dto'
 
@@ -226,19 +229,69 @@ export class TenantsService {
     })
 
     // Sync app_metadata no Supabase pro middleware do web ler role/tenant/assinatura
-    // direto do JWT. Best-effort, fora da transação: usuário só-Clerk não tem
-    // supabaseId → no-op; service_role ausente → no-op. Não derruba o onboarding.
-    const u = await this.prisma.user.findUnique({
+    // direto do JWT. Best-effort, fora da transação. Passa o tenant recém-criado
+    // como ativo. No-op se usuário só-Clerk (sem supabaseId) ou sem service_role.
+    await this.syncClaimsForUser(userId, tenant.id)
+
+    return { ok: true, tenant }
+  }
+
+  /**
+   * (Re)sincroniza os claims do usuário no `app_metadata` do Supabase — o que o
+   * middleware do web lê do JWT: `role`, `subscriptionStatus`, `tenantSlug`,
+   * `tenantName`. Idempotente e self-healing: o web chama no pós-onboarding e no
+   * login; cobre qualquer caminho (inclusive o onboarding web que escreve direto
+   * no banco sem passar pelo NestJS).
+   *
+   * Resolve o tenant ATIVO do usuário: usa `preferredTenantId` se informado
+   * (ex.: o recém-criado no onboarding), senão a primeira membership (MVP single
+   * tenant). Retorna os claims gravados, ou `null` se nada a sincronizar
+   * (usuário só-Clerk, sem supabaseId, ou ainda sem tenant).
+   *
+   * ⚠️ O token só reflete os claims novos após refresh da sessão — o web deve
+   * dar refresh após chamar isto.
+   */
+  async syncClaimsForUser(
+    userId: string,
+    preferredTenantId?: string,
+  ): Promise<SupabaseAppMetadata | null> {
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { supabaseId: true },
     })
-    await this.supabaseMetadata.setAppMetadata(u?.supabaseId, {
-      role: 'owner',
-      tenantSlug: tenant.slug,
-      subscriptionStatus: 'trial',
-    })
+    if (!user?.supabaseId) return null
 
-    return { ok: true, tenant }
+    const memberships = await this.prisma.tenantUser.findMany({
+      where: { userId, active: true },
+      orderBy: { joinedAt: 'asc' },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            active: true,
+            subscription: { select: { status: true } },
+          },
+        },
+      },
+    })
+    const activeMemberships = memberships.filter((m) => m.tenant.active)
+    if (activeMemberships.length === 0) return null
+
+    const chosen =
+      (preferredTenantId &&
+        activeMemberships.find((m) => m.tenant.id === preferredTenantId)) ||
+      activeMemberships[0]
+
+    const claims: SupabaseAppMetadata = {
+      role: chosen.role,
+      tenantSlug: chosen.tenant.slug,
+      tenantName: chosen.tenant.name,
+      subscriptionStatus: chosen.tenant.subscription?.status ?? 'trial',
+    }
+    await this.supabaseMetadata.setAppMetadata(user.supabaseId, claims)
+    return claims
   }
 
   async getDashboardStats(tenantId: string) {
