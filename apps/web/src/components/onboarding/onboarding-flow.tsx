@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser, refreshUser } from '@/lib/use-user'
+import { nestFetchWithRefresh } from '@/lib/nest-api'
 import { saveToTenantStorage } from '@/lib/tenant-storage'
 
 type Step = 1 | 2 | 3 | 4
@@ -108,13 +109,17 @@ export function OnboardingFlow() {
         saveToTenantStorage('services', slug, servicesToStore)
       }
 
-      // Força refresh do JWT pra incluir o novo app_metadata.tenantSlug
-      // (setado pela API). Sem isso, a próxima request ainda usa JWT antigo
-      // sem o slug — e useTenantPersistedState retorna fallback.
+      // O POST /api/tenants (Next) cria o tenant+membership no banco, mas
+      // NÃO escreve o app_metadata (exige service role, que só o backend
+      // tem). sync-claims resolve esse gap: popula role/subscriptionStatus/
+      // tenantSlug/tenantName no app_metadata via NestJS. nestFetchWithRefresh
+      // já faz o refreshSession() depois pra o JWT carregar os claims novos.
       try {
-        await refreshUser()
+        await nestFetchWithRefresh('/tenants/me/sync-claims', { method: 'POST' })
       } catch {
-        // Reload não-bloqueante: se falhar, o JWT atualiza no próximo refresh natural
+        // Fallback: ao menos tenta refrescar a sessão. Se o sync falhar, o
+        // middleware ainda resolve o tenant pelo membership (self-healing).
+        try { await refreshUser() } catch { /* atualiza no próximo refresh natural */ }
       }
 
       router.push('/dashboard')

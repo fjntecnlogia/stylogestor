@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { authErrorMessage } from '@/lib/auth-errors'
+import { nestFetchWithRefresh } from '@/lib/nest-api'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -29,6 +30,16 @@ export default function LoginPage() {
       setError(authErrorMessage(error.message, 'Não foi possível entrar.'))
       setLoading(false)
       return
+    }
+    // Pós-login: sincroniza claims (role/subscriptionStatus/tenantSlug/
+    // tenantName) no app_metadata — self-healing caso tenham mudado no
+    // backend. nestFetchWithRefresh faz refreshSession depois, então o
+    // cookie já vai atualizado pro full reload abaixo. Não bloqueia:
+    // conta nova sem tenant cai no onboarding pelo middleware.
+    try {
+      await nestFetchWithRefresh('/tenants/me/sync-claims', { method: 'POST' })
+    } catch {
+      // segue mesmo assim — middleware tem fallback
     }
     // Full reload pra o middleware ler o cookie e rotear por role (gestor/barbeiro).
     window.location.assign('/dashboard')

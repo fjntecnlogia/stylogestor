@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { useTenantPersistedState } from '@/lib/tenant-storage'
+import { useUser, appMeta } from '@/lib/use-user'
+import { nestFetch } from '@/lib/nest-api'
 import { getInitialProfessionals, type ProfessionalFixture } from './__fixtures__/professionals'
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
@@ -438,6 +440,8 @@ function ResetPasswordModal({
   onSuccess: () => void
   onError: (msg: string) => void
 }) {
+  const { user } = useUser()
+  const tenantSlug = appMeta(user).tenantSlug as string | undefined
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -462,21 +466,24 @@ function ResetPasswordModal({
       onError('A senha precisa ter pelo menos 8 caracteres')
       return
     }
+    if (!tenantSlug) {
+      onError('Não foi possível identificar sua barbearia. Recarregue a página.')
+      return
+    }
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/professionals/${professional.id}/reset-password`, {
+      // POST /api/v1/professionals/:id/reset-password (NestJS) — exige
+      // x-tenant-slug. Não altera app_metadata do gestor, então usa
+      // nestFetch (sem refreshSession). 404 = barbeiro ainda sem login.
+      await nestFetch(`/professionals/${professional.id}/reset-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: { password },
+        tenantSlug,
       })
-      const data = await res.json()
-      if (!res.ok) {
-        onError(data.error || 'Erro ao trocar senha')
-        return
-      }
       onSuccess()
-    } catch {
-      onError('Erro de conexão. Tente de novo.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro de conexão. Tente de novo.'
+      onError(msg)
     } finally {
       setSubmitting(false)
     }

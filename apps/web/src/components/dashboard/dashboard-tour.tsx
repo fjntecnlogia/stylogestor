@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useState } from 'react'
-import { useUser, refreshUser } from '@/lib/use-user'
+import { useUser } from '@/lib/use-user'
+import { nestFetchWithRefresh } from '@/lib/nest-api'
 
 interface Step {
   /** seletor CSS do elemento a destacar — usa data-tour="<key>" */
@@ -124,9 +125,10 @@ export function DashboardTour() {
   const finish = async (skipped = false) => {
     setActive(false)
     try {
-      await fetch('/api/me/tour-completed', { method: 'POST' })
-      // Refresca a sessão pra ter o app_metadata atualizado no JWT
-      await refreshUser()
+      // PATCH /api/v1/me/tour-completed (NestJS) persiste tourCompleted no
+      // app_metadata via service role. nestFetchWithRefresh já faz o
+      // refreshSession() depois pra o JWT pegar a flag nova.
+      await nestFetchWithRefresh('/me/tour-completed', { method: 'PATCH' })
     } catch (err) {
       // Não bloqueia: usuário vai ver o tour de novo no próximo F5, paciência.
       console.error('[tour] falha ao salvar tourCompleted', err)

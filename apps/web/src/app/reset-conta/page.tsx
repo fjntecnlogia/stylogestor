@@ -2,23 +2,26 @@
 
 import { useState } from 'react'
 import { useUser, signOut } from '@/lib/use-user'
+import { nestFetch } from '@/lib/nest-api'
 import { useRouter } from 'next/navigation'
 
 /**
  * Página /reset-conta — TEMPORÁRIA de recuperação.
  *
- * UI mínima pra disparar POST /api/me/reset-onboarding sem precisar
- * abrir DevTools. Usada quando a conta Clerk fica num estado
- * fantasma (publicMetadata aponta pra tenant deletado).
+ * UI mínima pra disparar o reset de onboarding sem abrir DevTools.
+ * Usada quando a conta fica num estado fantasma (app_metadata aponta
+ * pra tenant deletado).
  *
  * Fluxo:
- *   1. Click "Resetar conta" → POST /api/me/reset-onboarding
+ *   1. Click "Resetar conta" → POST /api/v1/me/reset-onboarding (NestJS):
+ *      desativa memberships + limpa claims fantasma do app_metadata
  *   2. Limpa o localStorage do app (pra remover dados-fantasma)
- *   3. Faz signOut() no Clerk (necessário pra renovar o JWT)
+ *   3. Faz signOut() no Supabase (renova a sessão do zero)
  *   4. Redireciona pra /login
  *
  * Após logar de novo, o user cai no estado limpo e pode acessar
- * /onboarding pra criar a barbearia.
+ * /onboarding pra criar a barbearia. (Não precisa de refreshSession
+ * aqui porque o signOut já descarta o JWT antigo.)
  *
  * Remover esta página quando não houver mais contas em estado
  * fantasma (ou mover pro admin SaaS).
@@ -33,13 +36,9 @@ export default function ResetContaPage() {
     setStep('resetting')
     setErrorMsg('')
     try {
-      const res = await fetch('/api/me/reset-onboarding', { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) {
-        setErrorMsg(data.error || 'Falha ao resetar')
-        setStep('error')
-        return
-      }
+      // POST /api/v1/me/reset-onboarding (NestJS): desativa memberships +
+      // limpa claims fantasma do app_metadata. nestFetch lança em !ok.
+      await nestFetch('/me/reset-onboarding', { method: 'POST' })
 
       // 2) Limpa localStorage do app — remove os dados-fantasma
       // (clientes, agendamentos antigos do tenant que não existe mais)
@@ -88,7 +87,7 @@ export default function ResetContaPage() {
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 space-y-1.5">
           <p className="font-bold">⚠️ O que vai acontecer:</p>
           <ol className="list-decimal list-inside space-y-0.5">
-            <li>Limpa o vínculo com a barbearia atual no Clerk</li>
+            <li>Limpa o vínculo com a barbearia atual (memberships + claims)</li>
             <li>Apaga o cache local do navegador (dados-fantasma)</li>
             <li>Faz logout</li>
             <li>Te leva pra tela de login</li>
