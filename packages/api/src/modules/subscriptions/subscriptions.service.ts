@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import Stripe from 'stripe'
 import { ClerkMetadataService } from '../../common/clerk/clerk-metadata.service'
+import { SupabaseMetadataService } from '../../common/auth/supabase-metadata.service'
 import { PrismaService } from '../../common/prisma/prisma.service'
 import { EmailService } from '../notifications/email.service'
 import {
@@ -64,8 +65,27 @@ export class SubscriptionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly clerkMetadata: ClerkMetadataService,
+    private readonly supabaseMetadata: SupabaseMetadataService,
     private readonly email: EmailService,
   ) {}
+
+  /**
+   * Dual-write da assinatura no `app_metadata` do Supabase (além do Clerk), pro
+   * middleware do web ler o status do JWT durante e depois do cutover da Fase 3.
+   * Resolve o owner do tenant → supabaseId. No-op se service_role ausente ou se
+   * o owner não tiver conta Supabase (ainda só-Clerk). Best-effort.
+   */
+  private async syncSupabaseSubscription(
+    tenantId: string,
+    payload: { subscriptionStatus: string; plan?: string; stripeSubId?: string },
+  ) {
+    if (!this.supabaseMetadata.enabled) return
+    const owner = await this.prisma.tenantUser.findFirst({
+      where: { tenantId, active: true, role: 'owner' },
+      include: { user: { select: { supabaseId: true } } },
+    })
+    await this.supabaseMetadata.updateSubscription(owner?.user?.supabaseId, payload)
+  }
 
   getPlans() {
     return PLANOS
@@ -206,6 +226,12 @@ export class SubscriptionsService {
         stripeSubId,
       })
     }
+    // 2b. Dual-write Supabase app_metadata (middleware do web pós-Fase 3)
+    await this.syncSupabaseSubscription(md.tenantId, {
+      subscriptionStatus: 'active',
+      plan: md.plan,
+      stripeSubId,
+    })
 
     // 3. Email de boas-vindas (best-effort)
     const customerEmail = session.customer_details?.email
@@ -262,6 +288,12 @@ export class SubscriptionsService {
         stripeSubId: sub.id,
       })
     }
+    // Dual-write Supabase app_metadata
+    await this.syncSupabaseSubscription(md.tenantId, {
+      subscriptionStatus: status,
+      plan: md.plan,
+      stripeSubId: sub.id,
+    })
   }
 
   // ── Assinatura cancelada ─────────────────────────────────────
@@ -288,6 +320,8 @@ export class SubscriptionsService {
         subscriptionStatus: 'canceled',
       })
     }
+    // Dual-write Supabase app_metadata
+    await this.syncSupabaseSubscription(md.tenantId, { subscriptionStatus: 'canceled' })
   }
 
   // ── Pagamento confirmado ─────────────────────────────────────
@@ -311,6 +345,8 @@ export class SubscriptionsService {
         subscriptionStatus: 'active',
       })
     }
+    // Dual-write Supabase app_metadata
+    await this.syncSupabaseSubscription(tenantId, { subscriptionStatus: 'active' })
   }
 
   // ── Pagamento falhou ─────────────────────────────────────────
@@ -336,6 +372,8 @@ export class SubscriptionsService {
         subscriptionStatus: 'past_due',
       })
     }
+    // Dual-write Supabase app_metadata
+    await this.syncSupabaseSubscription(tenantId, { subscriptionStatus: 'past_due' })
 
     if (owner?.user?.email && owner.user.name) {
       const amount = new Intl.NumberFormat('pt-BR', {

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { PlanType } from '@prisma/client'
 import { CacheService } from '../../common/cache/cache.service'
 import { PrismaService } from '../../common/prisma/prisma.service'
+import { SupabaseMetadataService } from '../../common/auth/supabase-metadata.service'
 import { UpdateTenantDto } from './dto/update-tenant.dto'
 import { CreateTenantDto } from './dto/create-tenant.dto'
 
@@ -29,6 +30,7 @@ export class TenantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly supabaseMetadata: SupabaseMetadataService,
   ) {}
 
   private slugCacheKey(slug: string) {
@@ -221,6 +223,19 @@ export class TenantsService {
       })
 
       return t
+    })
+
+    // Sync app_metadata no Supabase pro middleware do web ler role/tenant/assinatura
+    // direto do JWT. Best-effort, fora da transação: usuário só-Clerk não tem
+    // supabaseId → no-op; service_role ausente → no-op. Não derruba o onboarding.
+    const u = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { supabaseId: true },
+    })
+    await this.supabaseMetadata.setAppMetadata(u?.supabaseId, {
+      role: 'owner',
+      tenantSlug: tenant.slug,
+      subscriptionStatus: 'trial',
     })
 
     return { ok: true, tenant }
