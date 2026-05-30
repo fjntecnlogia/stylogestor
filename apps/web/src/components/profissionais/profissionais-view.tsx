@@ -31,6 +31,9 @@ export function ProfissionaisView() {
   // Modal de troca de senha do profissional (gestor reseta direto pelo painel)
   const [resetPwdFor, setResetPwdFor] = useState<ProfessionalFixture | null>(null)
   const { success, error } = useToast()
+  // tenantSlug do JWT (app_metadata) — exigido em rotas scoped do NestJS
+  const { user } = useUser()
+  const tenantSlug = appMeta(user).tenantSlug as string | undefined
 
   // Hidrata do banco no mount (fonte de verdade)
   useEffect(() => {
@@ -56,23 +59,39 @@ export function ProfissionaisView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só roda no mount
   }, [])
 
-  // Chama /api/professionals/invite pra criar usuário Clerk + enviar email convite
-  const sendInvite = async (profId: string, profName: string, email: string, phone: string) => {
+  // Convite ao profissional via NestJS direto (mesmo padrão dos outros endpoints
+  // admin da Fase 3 — client→API, sem hop pelo route handler Next).
+  // O backend cuida de TUDO: cria conta Supabase do barbeiro, dispara e-mail
+  // (Resend), vincula Professional.userId e popula app_metadata (role,
+  // tenantSlug, professionalId, professionalName). O web só repassa o body.
+  // Argumento `phone` é mantido na assinatura por retrocompat com os callers,
+  // mas o backend ignora (não está no contrato {email, name, professionalId}).
+  const sendInvite = async (profId: string, profName: string, email: string, _phone?: string) => {
+    if (!tenantSlug) {
+      error('Não foi possível identificar sua barbearia. Recarregue a página.')
+      return
+    }
     setInvitingId(profId)
     try {
-      const res = await fetch('/api/professionals/invite', {
+      await nestFetch('/professionals/invite', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: profName, email, phone, professionalId: profId }),
+        body: { email, name: profName, professionalId: profId },
+        tenantSlug,
       })
-      const data = await res.json()
-      if (!res.ok) {
-        error(data.error || 'Erro ao enviar convite')
-        return
-      }
       success(`Convite enviado para ${email} 📧`)
-    } catch {
-      error('Erro de conexão. Tente novamente.')
+    } catch (err) {
+      // nestFetch lança com status + mensagem do backend. Mapeia os casos
+      // específicos (409/404/503) pra mensagens claras pro gestor.
+      const e = err as { status?: number; message?: string }
+      if (e.status === 409) {
+        error('Esse profissional já tem login vinculado.')
+      } else if (e.status === 404) {
+        error('Profissional não encontrado nessa barbearia.')
+      } else if (e.status === 503) {
+        error('Serviço de convite temporariamente indisponível. Tente em alguns minutos.')
+      } else {
+        error(e.message || 'Erro ao enviar convite. Tente novamente.')
+      }
     } finally {
       setInvitingId(null)
     }
