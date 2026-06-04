@@ -236,6 +236,26 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
             {/* STEP 2 — Serviços */}
             {step === 'services' && (
               <div className="space-y-2">
+                {/* Empty state: tenant sem serviços ativos cadastrados.
+                    Sem isso, a area ficava em branco e parecia bug. */}
+                {allServices.length === 0 ? (
+                  <div className="text-center py-8 px-4 bg-[#F8F6F2] rounded-xl border border-dashed border-[#E8E6E2]">
+                    <p className="text-3xl mb-2">✂️</p>
+                    <p className="text-sm font-semibold text-[#1C1C2E] mb-1">
+                      Nenhum serviço cadastrado
+                    </p>
+                    <p className="text-xs text-[#4A4A5A] mb-4">
+                      Você precisa de pelo menos 1 serviço pra criar um agendamento.
+                    </p>
+                    <a
+                      href="/servicos"
+                      className="inline-block bg-[#1A3A6B] text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-[#142d55] transition-colors"
+                    >
+                      Cadastrar serviço →
+                    </a>
+                  </div>
+                ) : (
+                  <>
                 {allServices.map((s) => {
                   const selected = selectedServices.includes(s.id)
                   return (
@@ -266,6 +286,8 @@ export function AppointmentModal({ open, onClose, defaultDate, defaultTime, defa
                     <span className="text-[#4A4A5A]">Total: {totalDuration} min</span>
                     <span className="font-bold text-[#1A3A6B]">R$ {totalPrice}</span>
                   </div>
+                )}
+                  </>
                 )}
               </div>
             )}
