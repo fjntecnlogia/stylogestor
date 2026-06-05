@@ -18,7 +18,7 @@
       "bundleIdentifier": "br.com.stylogestor.gestor"
     },
     "android": {
-      "versionCode": 48,
+      "versionCode": 49,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1A3A6B"
