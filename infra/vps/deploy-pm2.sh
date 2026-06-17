@@ -286,6 +286,8 @@ cat >> "$CRON_TMP" <<EOF
 0 9 * * * curl -fsS -H "X-Cron-Secret: ${CRON_SECRET_VALUE}" https://app.stylogestor.com.br/api/cron/trial-warnings >> /var/log/stylogestor-cron.log 2>&1
 # Lembrete WhatsApp 24h antes do agendamento — roda de hora em hora
 0 * * * * curl -fsS -H "X-Cron-Secret: ${CRON_SECRET_VALUE}" https://app.stylogestor.com.br/api/cron/appointment-reminders >> /var/log/stylogestor-cron.log 2>&1
+# Expira trials cujo trialEndsAt já passou — roda 00:30 BRT (= 03:30 UTC) diariamente
+30 3 * * * curl -fsS -H "X-Cron-Secret: ${CRON_SECRET_VALUE}" https://app.stylogestor.com.br/api/cron/expire-trials >> /var/log/stylogestor-cron.log 2>&1
 # STYLOGESTOR_CRON_END
 EOF
 crontab "$CRON_TMP"
@@ -293,7 +295,7 @@ rm -f "$CRON_TMP"
 
 # Garante que o log file existe e o cron consegue escrever
 touch /var/log/stylogestor-cron.log 2>/dev/null || true
-echo "   ✓ Crontab atualizado (2 jobs: trial-warnings 09h diário · appointment-reminders por hora)"
+echo "   ✓ Crontab atualizado (3 jobs: trial-warnings 09h · appointment-reminders horário · expire-trials 00:30 BRT)"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

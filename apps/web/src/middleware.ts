@@ -131,8 +131,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Verificar status da assinatura (vem do app_metadata do Supabase)
-  const blockedStatuses = ['past_due', 'canceled', 'unpaid']
+  // Verificar status da assinatura (vem do app_metadata do Supabase).
+  // 'expired' = trial cujo trialEndsAt já passou — populado pelo cron diário
+  // /api/cron/expire-trials. Sem isso, trial vencido continua usando o sistema.
+  const blockedStatuses = ['expired', 'past_due', 'canceled', 'unpaid']
   if (
     subscriptionStatus &&
     blockedStatuses.includes(subscriptionStatus) &&
