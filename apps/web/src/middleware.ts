@@ -47,6 +47,11 @@ const isPaymentRoute = routeMatcher([
   '/bloqueado(.*)',
   '/ajuda(.*)',
   '/suporte(.*)',
+  // Endpoints de pagamento — sem isso o middleware redireciona pra /bloqueado
+  // antes do fetch chegar no route handler, e o Stripe Checkout nunca abre.
+  '/api/checkout(.*)',
+  '/api/stripe(.*)',
+  '/api/me/redeem-code(.*)',
 ])
 
 // Rotas exclusivas do painel do profissional (barbeiro)

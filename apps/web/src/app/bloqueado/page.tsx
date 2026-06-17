@@ -1,7 +1,27 @@
 import Link from 'next/link'
+import { prisma } from '@stylogestor/database'
+import { getCurrentTenantId } from '@/lib/auth-tenant'
+import { PortalButton } from '@/components/ui/portal-button'
 import { PromoCodeInput } from '@/components/promo/promo-code-input'
 
-export default function BloqueadoPage() {
+/**
+ * Página de bloqueio quando subscriptionStatus ∈ {expired, past_due, canceled, unpaid}.
+ *
+ * Server Component: checamos o stripeCustomerId do tenant pra decidir se mostra
+ * o botão "Atualizar forma de pagamento" — só faz sentido pra quem JÁ passou por
+ * algum checkout (tem customer no Stripe). Trial expirado sem nunca ter pago
+ * cai direto em /planos via "Renovar assinatura".
+ */
+export default async function BloqueadoPage() {
+  const tenantId = await getCurrentTenantId()
+  const sub = tenantId
+    ? await prisma.subscription.findUnique({
+        where: { tenantId },
+        select: { stripeCustomerId: true },
+      })
+    : null
+  const hasStripeCustomer = Boolean(sub?.stripeCustomerId)
+
   return (
     <div className="min-h-screen bg-[#F8F6F2] flex items-center justify-center px-4">
       <div className="bg-white rounded-3xl shadow-xl max-w-md w-full p-8 text-center">
@@ -36,13 +56,19 @@ export default function BloqueadoPage() {
           >
             🔓 Renovar assinatura agora
           </Link>
-          <a
-            href="https://billing.stripe.com/p/login/live_eVaaEO0dL3x6grS288"
-            target="_blank"
-            className="border-2 border-[#1A3A6B] text-[#1A3A6B] font-bold py-3 rounded-2xl hover:bg-[#F0F4FF] transition-colors text-sm"
-          >
-            Atualizar forma de pagamento
-          </a>
+
+          {/* Portal Stripe — só faz sentido pra quem tem stripeCustomerId.
+              Trial expirado sem nunca ter feito checkout (caso comum) não
+              tem cartão pra "atualizar" → esconde a opção pra não confundir.
+              Antes: link hardcoded `billing.stripe.com/p/login/live_...` que
+              estava 404. Agora chama POST /api/stripe/portal que gera session
+              específica do customer do tenant. */}
+          {hasStripeCustomer && (
+            <PortalButton className="border-2 border-[#1A3A6B] text-[#1A3A6B] font-bold py-3 rounded-2xl hover:bg-[#F0F4FF] transition-colors text-sm">
+              Atualizar forma de pagamento
+            </PortalButton>
+          )}
+
           <a
             href="https://wa.me/5565996952828"
             target="_blank"
