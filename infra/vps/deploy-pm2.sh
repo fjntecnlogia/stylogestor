@@ -297,12 +297,24 @@ rm -f "$CRON_TMP"
 touch /var/log/stylogestor-cron.log 2>/dev/null || true
 echo "   ✓ Crontab atualizado (3 jobs: trial-warnings 09h · appointment-reminders horário · expire-trials 00:30 BRT)"
 
+# ─── [7.5/7] Reload nginx Docker (pega nova config sem downtime) ──────────
+# O nginx roda num container Docker (stylogestor_nginx) e monta
+# infra/vps/nginx/conf.d/ como volume read-only. Após um deploy que altere
+# o conf (ex: troca de proxy_pass), é preciso fazer reload pra recarregar.
+# Idempotente — ignora se nginx não estiver rodando em Docker.
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q 'stylogestor_nginx'; then
+  echo ""
+  echo "🔄 Recarregando nginx (Docker)..."
+  docker exec stylogestor_nginx nginx -s reload 2>/dev/null && echo "   ✓ nginx recarregado" || echo "   ⚠️  nginx reload falhou (tente: docker restart stylogestor_nginx)"
+fi
+
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ Deploy concluído: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "   Dashboard:  https://app.stylogestor.com.br"
 echo "   API:        https://api.stylogestor.com.br"
 echo "   Site:       https://stylogestor.com.br"
+echo "   Admin:      https://admin.stylogestor.com.br"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "Status final dos processos:"

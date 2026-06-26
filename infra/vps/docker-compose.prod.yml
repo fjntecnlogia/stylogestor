@@ -141,6 +141,10 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    # Permite que o nginx acesse serviços PM2 no host via host.docker.internal.
+    # Necessário para o admin (roda via PM2 no host, não como container Docker).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - web
       - site
