@@ -15,11 +15,28 @@ import { NextResponse } from 'next/server'
  * com a URL pega lista completa de barbearias e MRR do sistema.
  */
 export async function requireAdmin() {
-  const { userId } = await auth()
+  const { userId, sessionClaims } = await auth()
   if (!userId) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   }
 
+  // Se role já está no session token, evita chamar currentUser() (1 menos req Clerk)
+  const metadata = (sessionClaims?.metadata as Record<string, string> | undefined) ?? {}
+  if (metadata.role === 'super_admin') return null
+
+  const emailFromToken =
+    (sessionClaims?.email as string | undefined) ??
+    (sessionClaims?.primary_email_address as string | undefined) ??
+    null
+
+  const allowlist = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+
+  if (emailFromToken && allowlist.includes(emailFromToken.toLowerCase())) return null
+
+  // Fallback: busca via currentUser() se email não está no token
   const user = await currentUser()
   const email =
     user?.primaryEmailAddress?.emailAddress ??
@@ -28,10 +45,6 @@ export async function requireAdmin() {
   const role = (user?.publicMetadata as { role?: string } | undefined)?.role
 
   if (role === 'super_admin') return null
-  const allowlist = (process.env.ADMIN_EMAILS || '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
   if (email && allowlist.includes(email.toLowerCase())) return null
 
   return NextResponse.json(

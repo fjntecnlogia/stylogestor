@@ -2,8 +2,13 @@ import { currentUser } from '@clerk/nextjs/server'
 import { SignOutButton } from '@clerk/nextjs'
 
 export default async function AcessoNegadoPage() {
-  const user = await currentUser()
-  const email = user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses?.[0]?.emailAddress
+  let email: string | undefined
+  try {
+    const user = await currentUser()
+    email = user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses?.[0]?.emailAddress
+  } catch {
+    // não bloqueia a página se Clerk falhar
+  }
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4 bg-[#0F172A]">
