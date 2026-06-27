@@ -76,6 +76,16 @@ const TIPO_TICKET = {
   sugestao:   { icon: '💡', label: 'Sugestão',   color: '#F59E0B' },
 }
 
+function getStatusTenant(s: string) {
+  return STATUS_TENANT[s as keyof typeof STATUS_TENANT] ?? { label: s ?? '', cls: 'bg-white/10 text-white/60' }
+}
+function getStatusTicket(s: string) {
+  return STATUS_TICKET[s as keyof typeof STATUS_TICKET] ?? { label: s ?? '', cls: 'bg-white/10 text-white/60' }
+}
+function getTipoTicket(tipo: string) {
+  return TIPO_TICKET[tipo as keyof typeof TIPO_TICKET] ?? { icon: '❓', label: tipo ?? '', color: '#6B7280' }
+}
+
 const PLAN_COLORS: Record<string, string> = { STARTER: '#6B7280', PRO: '#1A3A6B', PREMIUM: '#7C3AED' }
 
 const NAV = [
@@ -1236,8 +1246,8 @@ export function AdminDashboard() {
                   ) : (
                   <div className="space-y-3">
                     {tickets.filter(t => t.status !== 'resolvido').slice(0,4).map((t) => {
-                      const tipo = TIPO_TICKET[t.tipo as keyof typeof TIPO_TICKET]
-                      const st = STATUS_TICKET[t.status as keyof typeof STATUS_TICKET]
+                      const tipo = getTipoTicket(t.tipo)
+                      const st = getStatusTicket(t.status)
                       return (
                         <div key={t.id} className="flex items-center gap-3 cursor-pointer hover:bg-white/5 rounded-xl p-2 -mx-2 transition-colors" onClick={() => { setPage('tickets'); setSelectedTicket(t) }}>
                           <span className="text-xl">{tipo.icon}</span>
@@ -1268,7 +1278,7 @@ export function AdminDashboard() {
                   ) : (
                   <div className="space-y-3">
                     {tenants.slice(0,5).map((t) => {
-                      const st = STATUS_TENANT[t.status as keyof typeof STATUS_TENANT]
+                      const st = getStatusTenant(t.status)
                       return (
                         <div key={t.id} className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -1434,7 +1444,7 @@ export function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {filteredTenants.map((t) => {
-                      const st = STATUS_TENANT[t.status as keyof typeof STATUS_TENANT]
+                      const st = getStatusTenant(t.status)
                       return (
                         <tr key={t.id} className="hover:bg-white/5 transition-colors">
                           <td className="px-4 py-3.5">
@@ -1480,7 +1490,7 @@ export function AdminDashboard() {
           {/* ── DETALHE DO TENANT ── */}
           {page === 'tenant-detail' && selectedTenant && (() => {
             const t = selectedTenant
-            const st = STATUS_TENANT[t.status as keyof typeof STATUS_TENANT]
+            const st = getStatusTenant(t.status)
             const tenantTickets = tickets.filter((tk) => tk.tenant === t.name)
             const isSuspended = tenantsSuspended.includes(t.id)
             // Dados financeiros simulados por tenant
@@ -1960,8 +1970,8 @@ export function AdminDashboard() {
                       ) : (
                         <div className="divide-y divide-white/5">
                           {tenantTickets.map((tk) => {
-                            const stk = STATUS_TICKET[tk.status as keyof typeof STATUS_TICKET]
-                            const tipo = TIPO_TICKET[tk.tipo as keyof typeof TIPO_TICKET]
+                            const stk = getStatusTicket(tk.status)
+                            const tipo = getTipoTicket(tk.tipo)
                             return (
                               <div key={tk.id} className="px-5 py-4 flex items-center gap-3">
                                 <span className="text-2xl">{tipo.icon}</span>
@@ -2039,8 +2049,8 @@ export function AdminDashboard() {
                 {/* Lista de tickets */}
                 <div className="lg:col-span-2 space-y-3">
                   {filteredTickets.map((t) => {
-                    const tipo = TIPO_TICKET[t.tipo as keyof typeof TIPO_TICKET]
-                    const st = STATUS_TICKET[t.status as keyof typeof STATUS_TICKET]
+                    const tipo = getTipoTicket(t.tipo)
+                    const st = getStatusTicket(t.status)
                     const prioColor = t.prioridade === 'alta' ? '#F87171' : t.prioridade === 'media' ? '#FCD34D' : '#6EE7B7'
                     return (
                       <div key={t.id} onClick={() => setSelectedTicket(selectedTicket?.id === t.id ? null : t)}
@@ -2074,7 +2084,7 @@ export function AdminDashboard() {
                   {selectedTicket ? (
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4 sticky top-6">
                       <div className="flex items-start gap-3">
-                        <span className="text-3xl">{TIPO_TICKET[selectedTicket.tipo as keyof typeof TIPO_TICKET].icon}</span>
+                        <span className="text-3xl">{getTipoTicket(selectedTicket.tipo).icon}</span>
                         <div>
                           <p className="font-sora font-bold text-white">{selectedTicket.titulo}</p>
                           <p className="text-xs text-white/40 mt-0.5">{selectedTicket.tenant}</p>
@@ -2083,8 +2093,8 @@ export function AdminDashboard() {
 
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {[
-                          { label: 'Tipo', value: TIPO_TICKET[selectedTicket.tipo as keyof typeof TIPO_TICKET].label },
-                          { label: 'Status', value: STATUS_TICKET[selectedTicket.status as keyof typeof STATUS_TICKET].label },
+                          { label: 'Tipo', value: getTipoTicket(selectedTicket.tipo).label },
+                          { label: 'Status', value: getStatusTicket(selectedTicket.status).label },
                           { label: 'Prioridade', value: selectedTicket.prioridade },
                           { label: 'Data', value: selectedTicket.data },
                         ].map((i) => (
