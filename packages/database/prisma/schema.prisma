@@ -602,3 +602,28 @@ model PromoCodeRedemption {
   @@index([promoCodeId])
   @@map("promo_code_redemptions")
 }
+
+// ============================================================
+// SITE VISIT — Analytics do site público stylogestor.com.br
+// ============================================================
+// Cada page view no apps/site é registrado (fire-and-forget via
+// middleware). Usado pela aba Analytics do admin SaaS pra:
+//   - KPI "Visitas hoje"
+//   - Gráfico "Visitas ao site (últimos 13 dias)"
+//   - "Páginas mais acessadas"
+//
+// Anonimizado: ipHash/uaHash são hashes SHA-256 truncados (nada de PII).
+// Retention manual — pra evitar crescer sem controle: cron mensal ou
+// job admin apagando registros com > 90 dias (implementar depois).
+
+model SiteVisit {
+  id     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  path   String
+  ipHash String?
+  uaHash String?
+  ts     DateTime @default(now())
+
+  @@index([ts])
+  @@index([path, ts])
+  @@map("site_visits")
+}

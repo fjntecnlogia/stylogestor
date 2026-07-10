@@ -217,6 +217,37 @@ export function AdminDashboard() {
   const [dbStats, setDbStats] = useState({ totalMRR: 0, active: 0, trials: 0, totalClients: 0, totalAppts: 0 })
   const [loadingDB, setLoadingDB] = useState(true)
 
+  // ── Analytics do SaaS (aba "Analytics") — dados reais do banco ───
+  interface AnalyticsData {
+    kpis: {
+      visitsToday: number
+      visitsYesterday: number
+      visitsChangePct: number | null
+      newTenantsThisWeek: number
+      newTenantsPrevWeek: number
+      tenantsChangePct: number | null
+      conversionRate: number
+      churnRate: number
+    }
+    siteVisitsLast13Days: Array<{ date: string; count: number }>
+    newTenantsLast30Days: Array<{ date: string; count: number }>
+    planDistribution: Array<{ plan: string; count: number; pct: number }>
+    topPages: Array<{ path: string; views: number; pct: number }>
+  }
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+
+  useEffect(() => {
+    if (page !== 'analytics') return
+    setAnalyticsLoading(true)
+    fetch('/api/analytics')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data: AnalyticsData) => setAnalytics(data))
+      .catch((err) => console.error('[analytics] falha ao buscar', err))
+      .finally(() => setAnalyticsLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
+
   useEffect(() => {
     // Buscar tenants reais
     fetch('/api/tenants')
@@ -649,7 +680,10 @@ export function AdminDashboard() {
 
   const ticketsAbertos = tickets.filter((t) => t.status === 'aberto').length
 
-  const maxPageView = Math.max(...ANALYTICS.pageViews)
+  // maxPageView legacy — mocks removidos, Analytics agora usa `analytics.siteVisitsLast13Days`
+  // com max calculado inline. Mantido só pra retrocompat caso outra vista consuma.
+  const _maxPageView = Math.max(0, ...ANALYTICS.pageViews)
+  void _maxPageView
 
   // Adicionar novo tenant
   const handleAdicionarTenant = useCallback(() => {
@@ -1297,14 +1331,24 @@ export function AdminDashboard() {
                 <p className="text-white/40 text-sm mt-0.5">Métricas de acesso, cadastros e engajamento</p>
               </div>
 
-              {/* KPIs analytics */}
+              {/* KPIs analytics — dados reais via /api/analytics */}
+              {analyticsLoading && !analytics && (
+                <p className="text-sm text-white/40">Carregando analytics...</p>
+              )}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { label: 'Visitas hoje',          value: '1.020',  sub: '▲ 5% vs ontem',     icon: '👁️',  color: '#60A5FA' },
-                  { label: 'Cadastros esta semana',  value: '7',      sub: '▲ 40% vs semana ant',icon: '🆕',  color: '#1B8A5A' },
-                  { label: 'Taxa de conversão',      value: '3,2%',   sub: 'trial → pago',       icon: '🎯',  color: '#F5A623' },
-                  { label: 'Churn rate',             value: '4,8%',   sub: '▼ 0,5% vs mês ant',  icon: '📉',  color: '#F87171' },
-                ].map((k) => (
+                {(() => {
+                  const k = analytics?.kpis
+                  const fmtChange = (v: number | null | undefined, invertGood?: boolean) =>
+                    v === null || v === undefined ? '—'
+                      : v === 0 ? 'sem mudança'
+                        : `${v > 0 ? '▲' : '▼'} ${Math.abs(v)}%${invertGood ? (v > 0 ? ' 😟' : ' 👌') : ''}`
+                  return [
+                    { label: 'Visitas hoje',           value: k ? k.visitsToday.toLocaleString('pt-BR') : '—',      sub: `${fmtChange(k?.visitsChangePct)} vs ontem`,      icon: '👁️',  color: '#60A5FA' },
+                    { label: 'Cadastros esta semana',  value: k ? String(k.newTenantsThisWeek) : '—',                sub: `${fmtChange(k?.tenantsChangePct)} vs semana ant`, icon: '🆕',  color: '#1B8A5A' },
+                    { label: 'Taxa de conversão',      value: k ? `${k.conversionRate}%` : '—',                     sub: 'active / (active+trial+expired)',                 icon: '🎯',  color: '#F5A623' },
+                    { label: 'Churn rate',             value: k ? `${k.churnRate}%` : '—',                          sub: 'cancelados 30d / ativos início do mês',           icon: '📉',  color: '#F87171' },
+                  ]
+                })().map((k) => (
                   <div key={k.label} className="bg-white/5 border border-white/10 rounded-2xl p-5">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-2xl">{k.icon}</span>
@@ -1322,76 +1366,98 @@ export function AdminDashboard() {
                   <h3 className="font-sora font-bold text-white">Visitas ao site (últimos 13 dias)</h3>
                   <span className="text-xs text-white/40 bg-white/5 px-3 py-1 rounded-full">stylogestor.com.br</span>
                 </div>
-                <div className="flex items-end gap-2 h-40">
-                  {ANALYTICS.pageViews.map((v, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                      <span className="text-[9px] text-white/30">{v}</span>
-                      <div
-                        className="w-full rounded-t-lg bg-gradient-to-t from-[#1A3A6B] to-[#3B82F6] transition-all hover:opacity-80"
-                        style={{ height: `${(v / maxPageView) * 100}%`, minHeight: '4px' }}
-                        title={`${ANALYTICS.days[i]}: ${v} visitas`}
-                      />
-                      <span className="text-[8px] text-white/30 rotate-45 origin-left mt-1 hidden md:block">
-                        {ANALYTICS.days[i]}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                {(() => {
+                  const series = analytics?.siteVisitsLast13Days ?? []
+                  const max = series.length > 0 ? Math.max(1, ...series.map((s) => s.count)) : 1
+                  const totalWindow = series.reduce((s, r) => s + r.count, 0)
+                  return (
+                    <>
+                      <div className="flex items-end gap-2 h-40">
+                        {series.map((r, i) => {
+                          const day = r.date.slice(5) // 'MM-DD'
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                              <span className="text-[9px] text-white/30">{r.count}</span>
+                              <div
+                                className="w-full rounded-t-lg bg-gradient-to-t from-[#1A3A6B] to-[#3B82F6] transition-all hover:opacity-80"
+                                style={{ height: `${(r.count / max) * 100}%`, minHeight: '4px' }}
+                                title={`${r.date}: ${r.count} visitas`}
+                              />
+                              <span className="text-[8px] text-white/30 rotate-45 origin-left mt-1 hidden md:block">{day}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {series.length === 0 && !analyticsLoading && (
+                        <p className="text-xs text-white/40 mt-3">Sem visitas registradas ainda. O tracking começa a coletar assim que este build sobe em produção.</p>
+                      )}
+                      {series.length > 0 && (
+                        <p className="text-xs text-white/30 mt-3">Total no período: {totalWindow.toLocaleString('pt-BR')} visitas</p>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
 
               {/* Gráfico de cadastros */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                  <h3 className="font-sora font-bold text-white mb-4">Novos cadastros por dia</h3>
-                  <div className="flex items-end gap-2 h-24">
-                    {ANALYTICS.signups.map((v, i) => (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                        <span className="text-[9px] text-white/40">{v}</span>
-                        <div
-                          className="w-full rounded-t-lg bg-gradient-to-t from-[#1B8A5A] to-[#34D399]"
-                          style={{ height: `${(v / Math.max(...ANALYTICS.signups)) * 100}%`, minHeight: '4px' }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-white/30 mt-3">Total no período: {ANALYTICS.signups.reduce((s, v) => s + v, 0)} cadastros</p>
+                  <h3 className="font-sora font-bold text-white mb-4">Novos cadastros por dia (30d)</h3>
+                  {(() => {
+                    const signups = analytics?.newTenantsLast30Days ?? []
+                    const max = signups.length > 0 ? Math.max(1, ...signups.map((s) => s.count)) : 1
+                    const total = signups.reduce((s, r) => s + r.count, 0)
+                    return (
+                      <>
+                        <div className="flex items-end gap-1 h-24">
+                          {signups.map((r, i) => (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                              <div
+                                className="w-full rounded-t bg-gradient-to-t from-[#1B8A5A] to-[#34D399]"
+                                style={{ height: `${(r.count / max) * 100}%`, minHeight: '4px' }}
+                                title={`${r.date}: ${r.count} cadastros`}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-white/30 mt-3">Total no período: {total} cadastros</p>
+                      </>
+                    )
+                  })()}
                 </div>
 
-                {/* Distribuição por plano */}
+                {/* Distribuição por plano — dados reais */}
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
                   <h3 className="font-sora font-bold text-white mb-4">Distribuição por plano</h3>
                   <div className="space-y-3">
-                    {[
-                      { plan: 'PREMIUM', count: 1, pct: 17 },
-                      { plan: 'PRO',     count: 3, pct: 50 },
-                      { plan: 'STARTER', count: 2, pct: 33 },
-                    ].map((p) => (
+                    {(analytics?.planDistribution ?? []).length === 0 && !analyticsLoading && (
+                      <p className="text-xs text-white/40">Nenhum tenant ativo/trial ainda.</p>
+                    )}
+                    {(analytics?.planDistribution ?? []).map((p) => (
                       <div key={p.plan}>
                         <div className="flex justify-between text-xs mb-1">
                           <span className="font-semibold text-white">{p.plan}</span>
                           <span className="text-white/40">{p.count} tenants · {p.pct}%</span>
                         </div>
                         <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${p.pct}%`, background: PLAN_COLORS[p.plan] }} />
+                          <div className="h-full rounded-full transition-all" style={{ width: `${p.pct}%`, background: PLAN_COLORS[p.plan] || '#6B7280' }} />
                         </div>
                       </div>
                     ))}
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-white/10">
-                    <p className="text-xs text-white/40 mb-2">Páginas mais acessadas</p>
-                    {[
-                      { page: '/login',     views: 324, pct: 85 },
-                      { page: '/agenda',    views: 289, pct: 76 },
-                      { page: '/clientes',  views: 201, pct: 53 },
-                      { page: '/financeiro',views: 156, pct: 41 },
-                    ].map((p) => (
-                      <div key={p.page} className="flex items-center gap-2 mb-1.5">
-                        <span className="text-xs text-white/60 w-28 font-mono">{p.page}</span>
+                    <p className="text-xs text-white/40 mb-2">Páginas mais acessadas (30d)</p>
+                    {(analytics?.topPages ?? []).length === 0 && !analyticsLoading && (
+                      <p className="text-[10px] text-white/40">Sem visitas registradas ainda.</p>
+                    )}
+                    {(analytics?.topPages ?? []).map((p) => (
+                      <div key={p.path} className="flex items-center gap-2 mb-1.5">
+                        <span className="text-xs text-white/60 w-28 font-mono truncate" title={p.path}>{p.path}</span>
                         <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
                           <div className="h-full bg-[#F5A623] rounded-full" style={{ width: `${p.pct}%` }} />
                         </div>
-                        <span className="text-[10px] text-white/40 w-8 text-right">{p.views}</span>
+                        <span className="text-[10px] text-white/40 w-10 text-right">{p.views}</span>
                       </div>
                     ))}
                   </div>

@@ -36,6 +36,7 @@ const isPublicRoute = routeMatcher([
   '/api/v1/booking(.*)',         // Booking público — cliente final agenda sem login
   '/b/(.*)',                     // Landing pública de agendamento
   '/api/health',                 // Health check pro painel admin pingar
+  '/api/track',                  // Site público (analytics) posta pageviews aqui
   '/api/debug/(.*)',             // Endpoints de debug temporários
   '/reset-conta(.*)',            // Página de recuperação (tenant fantasma)
 ])
