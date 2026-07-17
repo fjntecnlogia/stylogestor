@@ -292,6 +292,109 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── APP MOBILE ── */}
+      <section className="bg-[#F8F6F2] py-20 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <p className="text-xs font-bold text-[#F5A623] uppercase tracking-widest mb-2">Leve no bolso</p>
+            <h2 className="font-sora font-bold text-3xl md:text-4xl text-[#1C1C2E]">
+              App gratuito para gestor e cliente
+            </h2>
+            <p className="text-[#4A4A5A] mt-3 max-w-xl mx-auto">
+              Gerencie sua barbearia de onde estiver. Seus clientes agendam pelo app — sem ligação, sem mensagem.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* App Gestor */}
+            <div className="bg-white rounded-2xl border border-[#E8E6E2] p-8 flex flex-col">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-14 h-14 bg-[#1A3A6B] rounded-2xl flex items-center justify-center text-2xl shrink-0">✂️</div>
+                <div>
+                  <p className="text-[10px] font-bold text-[#F5A623] uppercase tracking-widest">Para donos e gestores</p>
+                  <h3 className="font-sora font-bold text-xl text-[#1C1C2E] leading-tight">Stylogestor Gestor</h3>
+                </div>
+              </div>
+              <ul className="space-y-2 text-sm text-[#4A4A5A] mb-8 flex-1">
+                {['Agenda e agendamentos em tempo real', 'Financeiro, caixa e relatórios', 'Gestão da equipe e comissões', 'Notificações e lembretes automáticos'].map(f => (
+                  <li key={f} className="flex items-center gap-2"><span className="text-[#1B8A5A] font-bold">✓</span>{f}</li>
+                ))}
+              </ul>
+              <div className="flex flex-col gap-3">
+                <a
+                  href="https://play.google.com/store/apps/details?id=br.com.stylogestor.gestor"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-fit"
+                  aria-label="Baixar Stylogestor Gestor no Google Play"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="https://play.google.com/intl/pt-BR/badges/static/images/badges/pt-br_badge_web_generic.png"
+                    alt="Disponível no Google Play"
+                    className="h-14 w-auto"
+                    loading="lazy"
+                  />
+                </a>
+                <div className="flex items-center gap-3 w-fit opacity-40 select-none cursor-default" title="Em breve na App Store">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg"
+                    alt="Em breve na App Store"
+                    className="h-10 w-auto"
+                    loading="lazy"
+                  />
+                  <span className="text-xs font-bold text-[#1C1C2E] bg-[#1C1C2E]/10 px-2 py-1 rounded-lg whitespace-nowrap">Em breve</span>
+                </div>
+              </div>
+            </div>
+
+            {/* App Cliente */}
+            <div className="bg-white rounded-2xl border border-[#E8E6E2] p-8 flex flex-col">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-14 h-14 bg-[#1B8A5A] rounded-2xl flex items-center justify-center text-2xl shrink-0">📅</div>
+                <div>
+                  <p className="text-[10px] font-bold text-[#F5A623] uppercase tracking-widest">Para clientes da barbearia</p>
+                  <h3 className="font-sora font-bold text-xl text-[#1C1C2E] leading-tight">Stylogestor Cliente</h3>
+                </div>
+              </div>
+              <ul className="space-y-2 text-sm text-[#4A4A5A] mb-8 flex-1">
+                {['Agendamento online 24h por dia', 'Escolha o profissional e serviço', 'Confirmação e lembrete automático', 'Histórico de atendimentos'].map(f => (
+                  <li key={f} className="flex items-center gap-2"><span className="text-[#1B8A5A] font-bold">✓</span>{f}</li>
+                ))}
+              </ul>
+              <div className="flex flex-col gap-3">
+                <a
+                  href="https://play.google.com/store/apps/details?id=br.com.stylogestor.cliente"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-fit"
+                  aria-label="Baixar Stylogestor Cliente no Google Play"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="https://play.google.com/intl/pt-BR/badges/static/images/badges/pt-br_badge_web_generic.png"
+                    alt="Disponível no Google Play"
+                    className="h-14 w-auto"
+                    loading="lazy"
+                  />
+                </a>
+                <div className="flex items-center gap-3 w-fit opacity-40 select-none cursor-default" title="Em breve na App Store">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg"
+                    alt="Em breve na App Store"
+                    className="h-10 w-auto"
+                    loading="lazy"
+                  />
+                  <span className="text-xs font-bold text-[#1C1C2E] bg-[#1C1C2E]/10 px-2 py-1 rounded-lg whitespace-nowrap">Em breve</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── CAPTURA DE LEADS ── */}
       <section className="bg-[#1A3A6B] py-20 px-4">
         <div className="max-w-2xl mx-auto text-center">
