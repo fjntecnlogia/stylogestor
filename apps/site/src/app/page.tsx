@@ -294,8 +294,8 @@ export default function Home() {
 
       {/* ── APP MOBILE ── */}
       <section className="bg-[#F8F6F2] py-20 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
             <p className="text-xs font-bold text-[#F5A623] uppercase tracking-widest mb-2">Leve no bolso</p>
             <h2 className="font-sora font-bold text-3xl md:text-4xl text-[#1C1C2E]">
               App gratuito para gestor e cliente
@@ -305,92 +305,115 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* App Gestor */}
-            <div className="bg-white rounded-2xl border border-[#E8E6E2] p-8 flex flex-col">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-14 h-14 bg-[#1A3A6B] rounded-2xl flex items-center justify-center text-2xl shrink-0">✂️</div>
-                <div>
-                  <p className="text-[10px] font-bold text-[#F5A623] uppercase tracking-widest">Para donos e gestores</p>
-                  <h3 className="font-sora font-bold text-xl text-[#1C1C2E] leading-tight">Stylogestor Gestor</h3>
-                </div>
+          {/* 3-col: gestor | phone | cliente */}
+          <div className="flex flex-col md:flex-row items-center gap-8 md:gap-6">
+
+            {/* ── Card Gestor ── */}
+            <div className="bg-white rounded-2xl border border-[#E8E6E2] p-7 flex flex-col flex-1 w-full">
+              {/* Icon SVG */}
+              <div className="mb-4">
+                <svg width="64" height="64" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="100" height="100" rx="22" fill="#1A3A6B"/>
+                  <rect x="17" y="17" width="66" height="66" rx="15" fill="#F5A623"/>
+                  <text x="50" y="74" textAnchor="middle" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="55" fill="#1A3A6B">S</text>
+                </svg>
               </div>
-              <ul className="space-y-2 text-sm text-[#4A4A5A] mb-8 flex-1">
-                {['Agenda e agendamentos em tempo real', 'Financeiro, caixa e relatórios', 'Gestão da equipe e comissões', 'Notificações e lembretes automáticos'].map(f => (
-                  <li key={f} className="flex items-center gap-2"><span className="text-[#1B8A5A] font-bold">✓</span>{f}</li>
+              <p className="text-[10px] font-bold text-[#F5A623] uppercase tracking-widest mb-0.5">Para donos e gestores</p>
+              <h3 className="font-sora font-bold text-lg text-[#1C1C2E] mb-4 leading-tight">Stylogestor Gestor</h3>
+              <ul className="space-y-2 text-sm text-[#4A4A5A] mb-7 flex-1">
+                {['Agenda em tempo real', 'Financeiro e relatórios', 'Gestão da equipe', 'Lembretes automáticos'].map(f => (
+                  <li key={f} className="flex items-center gap-2"><span className="text-[#1B8A5A] font-bold text-xs">✓</span>{f}</li>
                 ))}
               </ul>
-              <div className="flex flex-col gap-3">
-                <a
-                  href="https://play.google.com/store/apps/details?id=br.com.stylogestor.gestor"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-fit"
-                  aria-label="Baixar Stylogestor Gestor no Google Play"
-                >
+              <div className="flex flex-col gap-2">
+                <a href="https://play.google.com/store/apps/details?id=br.com.stylogestor.gestor" target="_blank" rel="noopener noreferrer" className="block w-fit" aria-label="Baixar no Google Play">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="https://play.google.com/intl/pt-BR/badges/static/images/badges/pt-br_badge_web_generic.png"
-                    alt="Disponível no Google Play"
-                    className="h-14 w-auto"
-                    loading="lazy"
-                  />
+                  <img src="https://play.google.com/intl/pt-BR/badges/static/images/badges/pt-br_badge_web_generic.png" alt="Disponível no Google Play" className="h-12 w-auto" loading="lazy"/>
                 </a>
-                <div className="flex items-center gap-3 w-fit opacity-40 select-none cursor-default" title="Em breve na App Store">
+                <div className="flex items-center gap-2 opacity-35 select-none cursor-default">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg"
-                    alt="Em breve na App Store"
-                    className="h-10 w-auto"
-                    loading="lazy"
-                  />
-                  <span className="text-xs font-bold text-[#1C1C2E] bg-[#1C1C2E]/10 px-2 py-1 rounded-lg whitespace-nowrap">Em breve</span>
+                  <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Em breve na App Store" className="h-9 w-auto" loading="lazy"/>
+                  <span className="text-[10px] font-bold text-[#1C1C2E] bg-[#1C1C2E]/10 px-1.5 py-0.5 rounded whitespace-nowrap">Em breve</span>
                 </div>
               </div>
             </div>
 
-            {/* App Cliente */}
-            <div className="bg-white rounded-2xl border border-[#E8E6E2] p-8 flex flex-col">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-14 h-14 bg-[#1B8A5A] rounded-2xl flex items-center justify-center text-2xl shrink-0">📅</div>
-                <div>
-                  <p className="text-[10px] font-bold text-[#F5A623] uppercase tracking-widest">Para clientes da barbearia</p>
-                  <h3 className="font-sora font-bold text-xl text-[#1C1C2E] leading-tight">Stylogestor Cliente</h3>
+            {/* ── Phone Mockup ── */}
+            <div className="shrink-0 flex flex-col items-center gap-3">
+              <div className="relative w-[195px] rounded-[32px] border-[7px] border-[#1C1C2E] shadow-2xl overflow-hidden bg-[#1A3A6B]" style={{boxShadow:'0 25px 50px rgba(26,58,107,0.35)'}}>
+                {/* Status bar */}
+                <div className="flex justify-between items-center px-4 py-1.5 text-white/50 text-[8px]">
+                  <span>10:17</span>
+                  <div className="flex gap-1">
+                    <span>4G</span><span>▲</span><span>🔋</span>
+                  </div>
+                </div>
+                {/* Screen content */}
+                <div className="px-4 pb-5 flex flex-col items-center">
+                  <p className="text-[#F5A623] text-[8px] mb-4 self-start">← Voltar e continuar sem conta</p>
+                  {/* App icon */}
+                  <div className="w-11 h-11 bg-[#F5A623] rounded-xl flex items-center justify-center mb-2 shadow-lg">
+                    <svg width="28" height="28" viewBox="0 0 100 100"><text x="50" y="76" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="72" fill="#1A3A6B">S</text></svg>
+                  </div>
+                  <p className="text-white font-bold text-[11px] mb-0.5 tracking-wide">
+                    <span className="text-white">STYLO</span><span className="text-[#F5A623]">GESTOR</span>
+                  </p>
+                  <p className="text-white/50 text-[8px] mb-4">Criar conta</p>
+                  {/* Form card */}
+                  <div className="bg-white rounded-2xl p-3 w-full shadow-sm">
+                    <p className="text-[#1C1C2E] text-[8px] mb-1">E-mail</p>
+                    <div className="border border-[#E8E6E2] rounded-lg h-6 mb-2.5 px-2 flex items-center">
+                      <p className="text-[#C0C0C0] text-[7px]">seu@email.com</p>
+                    </div>
+                    <p className="text-[#1C1C2E] text-[8px] mb-1">Senha (mínimo 8 caracteres)</p>
+                    <div className="border border-[#E8E6E2] rounded-lg h-6 mb-3 px-2 flex items-center">
+                      <p className="text-[#C0C0C0] text-[9px] tracking-widest">••••••••</p>
+                    </div>
+                    <div className="bg-[#1A3A6B] rounded-xl h-7 flex items-center justify-center mb-2">
+                      <p className="text-white text-[9px] font-bold">Criar conta</p>
+                    </div>
+                    <p className="text-center text-[#1A3A6B] text-[8px]">Já tem conta? Entrar</p>
+                  </div>
+                </div>
+                {/* Bottom nav bar */}
+                <div className="flex justify-center gap-5 py-2 bg-white/5">
+                  <div className="w-3.5 h-3.5 border border-white/30 rounded-sm"></div>
+                  <div className="w-3.5 h-3.5 border border-white/30 rounded-full"></div>
+                  <div className="w-3.5 h-3.5 border-b-2 border-x-2 border-white/30" style={{borderRadius:'0 0 3px 3px'}}></div>
                 </div>
               </div>
-              <ul className="space-y-2 text-sm text-[#4A4A5A] mb-8 flex-1">
-                {['Agendamento online 24h por dia', 'Escolha o profissional e serviço', 'Confirmação e lembrete automático', 'Histórico de atendimentos'].map(f => (
-                  <li key={f} className="flex items-center gap-2"><span className="text-[#1B8A5A] font-bold">✓</span>{f}</li>
+              <p className="text-xs text-[#4A4A5A] text-center mt-1 max-w-[160px]">Interface real do app</p>
+            </div>
+
+            {/* ── Card Cliente ── */}
+            <div className="bg-white rounded-2xl border border-[#E8E6E2] p-7 flex flex-col flex-1 w-full">
+              {/* Icon SVG */}
+              <div className="mb-4">
+                <svg width="64" height="64" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="100" height="100" rx="22" fill="#F5A623"/>
+                  <text x="50" y="76" textAnchor="middle" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="65" fill="#1A3A6B">S</text>
+                </svg>
+              </div>
+              <p className="text-[10px] font-bold text-[#F5A623] uppercase tracking-widest mb-0.5">Para clientes da barbearia</p>
+              <h3 className="font-sora font-bold text-lg text-[#1C1C2E] mb-4 leading-tight">Stylogestor Cliente</h3>
+              <ul className="space-y-2 text-sm text-[#4A4A5A] mb-7 flex-1">
+                {['Agendamento online 24h', 'Escolha profissional e serviço', 'Confirmação automática', 'Histórico de atendimentos'].map(f => (
+                  <li key={f} className="flex items-center gap-2"><span className="text-[#1B8A5A] font-bold text-xs">✓</span>{f}</li>
                 ))}
               </ul>
-              <div className="flex flex-col gap-3">
-                <a
-                  href="https://play.google.com/store/apps/details?id=br.com.stylogestor.cliente"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-fit"
-                  aria-label="Baixar Stylogestor Cliente no Google Play"
-                >
+              <div className="flex flex-col gap-2">
+                <a href="https://play.google.com/store/apps/details?id=br.com.stylogestor.cliente" target="_blank" rel="noopener noreferrer" className="block w-fit" aria-label="Baixar no Google Play">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="https://play.google.com/intl/pt-BR/badges/static/images/badges/pt-br_badge_web_generic.png"
-                    alt="Disponível no Google Play"
-                    className="h-14 w-auto"
-                    loading="lazy"
-                  />
+                  <img src="https://play.google.com/intl/pt-BR/badges/static/images/badges/pt-br_badge_web_generic.png" alt="Disponível no Google Play" className="h-12 w-auto" loading="lazy"/>
                 </a>
-                <div className="flex items-center gap-3 w-fit opacity-40 select-none cursor-default" title="Em breve na App Store">
+                <div className="flex items-center gap-2 opacity-35 select-none cursor-default">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg"
-                    alt="Em breve na App Store"
-                    className="h-10 w-auto"
-                    loading="lazy"
-                  />
-                  <span className="text-xs font-bold text-[#1C1C2E] bg-[#1C1C2E]/10 px-2 py-1 rounded-lg whitespace-nowrap">Em breve</span>
+                  <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Em breve na App Store" className="h-9 w-auto" loading="lazy"/>
+                  <span className="text-[10px] font-bold text-[#1C1C2E] bg-[#1C1C2E]/10 px-1.5 py-0.5 rounded whitespace-nowrap">Em breve</span>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       </section>
